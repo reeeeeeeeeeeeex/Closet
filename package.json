@@ -11,8 +11,9 @@
     "start": "node scripts/local-server.mjs start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node tests/portability.mjs && node tests/runtime.mjs",
-    "db:generate": "drizzle-kit generate"
+    "test": "node tests/portability.mjs && node tests/item-details.mjs && node tests/runtime.mjs",
+    "db:generate": "drizzle-kit generate",
+    "i18n:extract": "node scripts/i18n-catalog.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

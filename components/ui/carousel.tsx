@@ -1,5 +1,9 @@
 "use client"
 
+import { useI18n } from "@/lib/i18n/provider"
+
+
+import { tr } from "@/lib/i18n/core"
 import * as React from "react"
 import useEmblaCarousel, {
   type UseEmblaCarouselType,
@@ -36,7 +40,7 @@ function useCarousel() {
   const context = React.useContext(CarouselContext)
 
   if (!context) {
-    throw new Error("useCarousel must be used within a <Carousel />")
+    throw new Error(tr("useCarousel must be used within a <Carousel />"))
   }
 
   return context
@@ -177,6 +181,7 @@ function CarouselPrevious({
   size = "icon",
   ...props
 }: React.ComponentProps<typeof Button>) {
+  const { t } = useI18n()
   const { orientation, scrollPrev, canScrollPrev } = useCarousel()
 
   return (
@@ -196,7 +201,7 @@ function CarouselPrevious({
       {...props}
     >
       <ArrowLeft />
-      <span className="sr-only">Previous slide</span>
+      <span className="sr-only">{t("Previous slide")}</span>
     </Button>
   )
 }
@@ -207,6 +212,7 @@ function CarouselNext({
   size = "icon",
   ...props
 }: React.ComponentProps<typeof Button>) {
+  const { t } = useI18n()
   const { orientation, scrollNext, canScrollNext } = useCarousel()
 
   return (
@@ -226,7 +232,7 @@ function CarouselNext({
       {...props}
     >
       <ArrowRight />
-      <span className="sr-only">Next slide</span>
+      <span className="sr-only">{t("Next slide")}</span>
     </Button>
   )
 }

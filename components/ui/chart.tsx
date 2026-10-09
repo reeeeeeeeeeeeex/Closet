@@ -1,5 +1,6 @@
 "use client"
 
+import { tr } from "@/lib/i18n/core"
 import * as React from "react"
 import * as RechartsPrimitive from "recharts"
 import type { TooltipValueType } from "recharts"
@@ -35,7 +36,7 @@ function useChart() {
   const context = React.useContext(ChartContext)
 
   if (!context) {
-    throw new Error("useChart must be used within a <ChartContainer />")
+    throw new Error(tr("useChart must be used within a <ChartContainer />"))
   }
 
   return context
