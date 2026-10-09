@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CATEGORY_MEASUREMENTS, garmentCategory, type Measurement } from "./item-details";
 export const CATEGORIES = { top: "上装", bottom: "下装", dress: "连体 / 裙装", outerwear: "外套", shoes: "鞋履", bag: "包袋", accessory: "配饰" } as const;
 export const OCCASIONS = { work: "通勤", casual: "日常", party: "聚会", formal: "正式", vacation: "旅行", sport: "运动" } as const;
 export const SEASONS = { spring: "春", summer: "夏", autumn: "秋", winter: "冬" } as const;
@@ -7,11 +8,22 @@ const id = z.string().uuid();
 const title = z.string().trim().min(1, "请填写名称").max(100);
 const note = z.string().max(3000);
 const occasions = z.array(z.enum(["work", "casual", "party", "formal", "vacation", "sport"])).max(6);
+const centimeters = z.number().finite().positive("尺寸必须大于 0").max(500, "尺寸不能超过 500 cm").optional();
+const measurementsSchema = z.object({ shoulderWidth: centimeters, chest: centimeters, waist: centimeters, hips: centimeters, thigh: centimeters, legOpening: centimeters, length: centimeters, sleeveLength: centimeters, rise: centimeters, hem: centimeters }).strict();
 export const itemSchema = z.object({
   name: title, category: z.enum(["top", "bottom", "dress", "outerwear", "shoes", "bag", "accessory"]),
   color: z.string().max(50), seasons: z.array(z.enum(["spring", "summer", "autumn", "winter"])).max(4),
   occasions, notes: note, asset: hashSchema.nullable(), archived: z.boolean(),
-}).strict();
+  fit: z.enum(["tight", "fitted", "regular", "loose"]).nullable().default(null),
+  shoeFit: z.enum(["trueToSize", "large", "small"]).nullable().default(null),
+  shoeSize: z.object({ eu: z.number().finite().min(10, "欧码需在 10 到 60 之间").max(60, "欧码需在 10 到 60 之间").nullable().default(null), cn: z.number().int().min(100, "中国码需在 100 到 350 mm 之间").max(350, "中国码需在 100 到 350 mm 之间").multipleOf(5, "中国码以 5 mm 为间隔").nullable().default(null) }).strict().default({ eu: null, cn: null }),
+  measurements: measurementsSchema.default({}),
+}).strict().superRefine((item, ctx) => {
+  if (!garmentCategory(item.category) && item.fit) ctx.addIssue({ code: "custom", message: "此分类不适用服装版型", path: ["fit"] });
+  if (item.category !== "shoes" && (item.shoeFit || item.shoeSize.eu !== null || item.shoeSize.cn !== null)) ctx.addIssue({ code: "custom", message: "鞋码和合脚程度仅适用于鞋履", path: ["shoeSize"] });
+  const allowed = CATEGORY_MEASUREMENTS[item.category] || [];
+  for (const key of Object.keys(item.measurements) as Measurement[]) if (!allowed.includes(key)) ctx.addIssue({ code: "custom", message: "此分类不适用这项尺寸", path: ["measurements", key] });
+});
 export const outfitSchema = z.object({ name: title, itemIds: z.array(id).max(30), asset: hashSchema.nullable().default(null), occasions, notes: note, archived: z.boolean() }).strict()
   .refine(o => !!o.asset || o.itemIds.length > 0, "请添加搭配照片或选择至少一件单品")
   .refine(o => new Set(o.itemIds).size === o.itemIds.length, "搭配不能重复添加同一单品");
@@ -36,7 +48,7 @@ export type ClosetRecord = z.infer<typeof recordSchema>;
 export const assetSchema = z.object({ hash: hashSchema, name: z.string().max(255), mime: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]), size: z.number().int().positive().max(20 * 1024 * 1024) }).strict();
 export type Asset = z.infer<typeof assetSchema>;
 export const archiveSchema = z.object({
-  format: z.literal("new-closet"), schemaVersion: z.union([z.literal(1), z.literal(2)]), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
+  format: z.literal("new-closet"), schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
   records: z.array(recordSchema).max(2000), assets: z.array(assetSchema).max(2000),
 }).strict();
 export type ClosetArchive = z.infer<typeof archiveSchema>;
@@ -67,7 +79,7 @@ export function validateArchive(input: unknown): ClosetArchive {
     }
   }
   for (const hash of referencedAssets(a.records)) if (!media.has(hash)) throw new Error("备份缺少原图");
-  return { ...a, schemaVersion: 2 };
+  return { ...a, schemaVersion: 3 };
 }
 export function makeSnapshot(outfit: Outfit, items: ItemRecord[]): CalendarEntry["snapshot"] {
   const map = new Map(items.map(i => [i.id, i]));
