@@ -373,6 +373,16 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 @media (max-width: 420px) { .measurement-grid { gap: 10px; }.item-attribute-tags > span { font-size: 13px; } }
 
 .subset-browser { margin: 0 0 22px; }
+.subset-section { margin: 18px 0 28px; min-width: 0; }
+.subset-section-heading { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; }
+.subset-toggle { padding: 5px; color: #738096; }
+.subset-title { font-size: 18px; font-weight: 600; text-align: left; overflow-wrap: anywhere; }
+.subset-count { font-size: 13px; color: #77869a; }
+.subset-section-heading > .subset-actions { margin-left: auto; flex-wrap: wrap; }
+.subset-section-content > .subset-section { border-left: 2px solid var(--border); padding-left: 16px; }
+.subset-ungrouped { margin-top: 28px; }
+.subset-ungrouped > h2 { font-size: 17px; font-weight: 600; margin-bottom: 16px; }
+@media (max-width: 767px) { .subset-section-heading > .subset-actions { width: 100%; margin-left: 0; gap: 4px; }.subset-section-heading .subset-actions button { padding: 0 8px; font-size: 12px; }.subset-section-content > .subset-section { padding-left: 8px; }.subset-title { font-size: 16px; } }
 .subset-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
 .subset-path { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; }
 .subset-path > span { display: flex; align-items: center; gap: 8px; }

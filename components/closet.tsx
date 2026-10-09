@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { CATEGORIES, OCCASIONS, SEASONS, wardrobePrompt, type Item, type ItemRecord, type Outfit, type OutfitRecord, type CalendarRecord, type ClosetState, type ClosetRecord, type ClosetArchive, type Subset, type SubsetRecord } from "@/lib/domain";
+import { Photo, OutfitCollage, ItemCard, OutfitCard } from "@/components/closet-cards";
 import { SubsetBrowser } from "@/components/subsets";
 import { subsetMemberIds } from "@/lib/subsets";
 import { ItemDetailsFields, ItemLabels } from "@/components/item-details";
@@ -34,9 +35,11 @@ type Editor = {
     kind: "item";
     record?: ItemRecord;
     initialCategory?: Item["category"];
+    subsetId?: string;
 } | {
     kind: "outfit";
     record?: OutfitRecord;
+    subsetId?: string;
 } | {
     kind: "calendar";
     record?: CalendarRecord;
@@ -44,14 +47,6 @@ type Editor = {
     date?: string;
 };
 type Save = (kind: ClosetRecord["kind"], data: unknown, record?: ClosetRecord) => Promise<void>;
-function Photo({ asset, name, className = "" }: {
-    asset: string | null;
-    name: string;
-    className?: string;
-}) {
-    const { t } = useI18n();
-    return <div className={`photo ${className}`}>{asset ? <img src={`/api/assets/${asset}`} alt={name} loading="lazy" onError={e => { e.currentTarget.style.opacity = ".2"; }}/> : <div className="photo-placeholder"><Shirt strokeWidth={1}/><span>{t("未添加照片")}</span></div>}</div>;
-}
 function Chips<T extends string>({ options, value, onChange }: {
     options: Record<T, string>;
     value: T[];
@@ -71,9 +66,6 @@ function Picker({ value, onChange, options, label }: {
 }) {
     return <Select value={value} onValueChange={onChange}><SelectTrigger className="w-full" aria-label={label}><SelectValue placeholder={label}/></SelectTrigger><SelectContent>{Object.entries(options).map(([key, name]) => <SelectItem key={key} value={key}>{name}</SelectItem>)}</SelectContent></Select>;
 }
-function OccasionLabels({ values }: {
-    values: Item["occasions"];
-}) { const { t } = useI18n(); return <div className="occasion-labels">{values.map(o => <span key={o}>{t(OCCASIONS[o])}</span>)}</div>; }
 function Navigation({ view, onView, state }: {
     view: View;
     onView: (v: View) => void;
@@ -154,7 +146,7 @@ export default function Home() {
         return; const onFocus = () => { if (document.visibilityState === "visible")
         void refresh(undefined, true); }; window.addEventListener("focus", onFocus); const interval = setInterval(onFocus, 45000); return () => { window.removeEventListener("focus", onFocus); clearInterval(interval); }; }, [editor, refresh]);
     const save: Save = async (kind, data, record) => {
-        const subsetId = !record && activeSubset?.data.scope === kind ? activeSubset.id : undefined;
+        const subsetId = !record && editor && "subsetId" in editor && editor.subsetId ? editor.subsetId : !record && activeSubset?.data.scope === kind ? activeSubset.id : undefined;
         await api("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "save", collectionId: selectedCollection.current || "main", kind, data, id: record?.id, version: record?.version, subsetId }) });
         setEditor(null);
         toast.success(t("已保存到衣橱"));
@@ -216,9 +208,10 @@ export default function Home() {
       {error && <div className="error-banner" role="alert"><AlertCircle size={19}/><div><strong>{t("暂时无法同步衣橱")}</strong><p>{error}</p>{authRequired && <a href="/login">{t("登录后继续")}</a>}</div><Button variant="outline" onClick={() => void refresh()}>{t("重试")}</Button></div>}
       {loading ? <div className="loading-grid">{[1, 2, 3, 4].map(n => <Skeleton key={n} className="h-72 rounded-2xl"/>)}</div> : state && <>
         {view === "wardrobe" && <><div className="stats-strip"><Stat label={t("衣橱单品")} count={activeItems.length} suffix={t("件")}/><Stat label={t("收藏搭配")} count={activeOutfits.length} suffix={t("套")}/><Stat label={t("已穿记录")} count={calendar.filter(c => c.data.status === "worn").length} suffix={t("次")}/><div className="stats-note"><span className="tiny-dot"/>{t("从已有的喜欢，穿出更多可能")}</div></div><div className="wardrobe-toolbar"><div className="category-tabs" role="group" aria-label={t("单品分类")}>{Object.entries({ all: t("全部"), ...translatedOptions(CATEGORIES, t) }).map(([key, label]) => <button key={key} onClick={() => { setCategory(key); setSelectedSubsetId(null); }} className={category === key ? "active" : ""}>{label}<span>{key === "all" ? items.filter(i => i.data.archived === archived).length : items.filter(i => i.data.category === key && i.data.archived === archived).length}</span></button>)}</div></div></>}
-        {(view === "wardrobe" || view === "outfits") && <><SubsetBrowser records={state.records} scope={scope} root={subsetRoot} activeId={activeSubset?.id || null} archived={archived} disabled={!!error || syncing} onSelect={setSelectedSubsetId} onSave={saveSubset} /><div className="filter-row"><div className="search-box"><Search size={17}/><Input value={search} onChange={e => setSearch(e.target.value)} placeholder={view === "wardrobe" ? t("找一件单品、颜色或备注\u2026") : t("寻找我的搭配\u2026")} aria-label={t("搜索")}/>{search && <button aria-label={t("清空搜索")} onClick={() => setSearch("")}><X size={14}/></button>}</div><div className="filter-controls"><Picker label={t("场合筛选")} value={occasion} onChange={setOccasion} options={{ all: t("所有场合"), ...translatedOptions(OCCASIONS, t) }}/><button className={`archive-filter ${archived ? "on" : ""}`} aria-pressed={archived} onClick={() => setArchived(!archived)} title={t("查看已收起的单品或搭配")}><Archive size={16}/><span>{t("已收起")}</span></button></div></div>
-        {view === "wardrobe" && (filteredItems.length ? <div className="item-grid">{filteredItems.map(item => <button className="item-card" key={item.id} onClick={() => setEditor({ kind: "item", record: item })}><Photo asset={item.data.asset} name={item.data.name}/><div className="item-card-body"><div className="item-category">{t(CATEGORIES[item.data.category])}{item.data.color && ` / ${item.data.color}`}</div><h3>{item.data.name}</h3><OccasionLabels values={item.data.occasions}/><ItemLabels item={item.data}/></div><span className="card-edit"><ArrowUpRight size={18}/></span></button>)}</div> : items.length === 0 && !search && category === "all" && occasion === "all" && !archived ? <Welcome onAdd={() => setEditor({ kind: "item" })} onImport={() => goView("backup")}/> : <EmptyState icon={Search} title={activeSubset ? t("这个子集还没有内容") : t("这里还没有单品")} text={activeSubset ? t("编辑子集可加入已有单品，新建单品会自动加入当前子集。") : t("试试其他分类，或清空筛选条件。")} action={activeSubset ? t("添加单品") : t("清空筛选")} onAction={() => { if (activeSubset) setEditor({ kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"] }); else { setSearch(""); setCategory("all"); setSelectedSubsetId(null); setOccasion("all"); setArchived(false); } }}/>)}
-        {view === "outfits" && (filteredOutfits.length ? <div className="outfit-grid">{filteredOutfits.map(outfit => <div className="outfit-card" key={outfit.id}><button className="outfit-open" onClick={() => setEditor({ kind: "outfit", record: outfit })}><OutfitCollage asset={outfit.data.asset} itemIds={outfit.data.itemIds} items={items}/><div className="outfit-body"><div className="item-category">{outfit.data.asset ? t("搭配照片 \u00B7 ") : ""}{outfit.data.itemIds.length ? t("{value1} 件单品", { value1: outfit.data.itemIds.length }) : t("未关联单品")}</div><h3>{outfit.data.name}</h3><OccasionLabels values={outfit.data.occasions}/></div></button><div className="outfit-footer"><span>{outfit.data.notes || t("喜欢的组合，留给刚好的日子。")}</span><Button variant="ghost" size="icon" aria-label={t("安排 {value1} 的穿搭日期", { value1: outfit.data.name })} onClick={() => setEditor({ kind: "calendar", outfitId: outfit.id, date: localDate() })}><CalendarDays size={19}/></Button></div></div>)}</div> : <EmptyState icon={Layers3} title={activeSubset ? t("这个子集还没有搭配") : outfits.length ? t("没有找到这个搭配") : t("第一套搭配，从喜欢的单品开始")} text={activeSubset ? t("新建搭配会自动加入当前子集，也可以编辑子集选择已有搭配。") : t("拍照、导入搭配照片，或从单品组合一套穿搭。")} action={t("新建搭配")} onAction={() => setEditor({ kind: "outfit" })}/>)}</>}
+        {(view === "wardrobe" || view === "outfits") && <><div className="filter-row"><div className="search-box"><Search size={17}/><Input value={search} onChange={e => setSearch(e.target.value)} placeholder={view === "wardrobe" ? t("找一件单品、颜色或备注\u2026") : t("寻找我的搭配\u2026")} aria-label={t("搜索")}/>{search && <button aria-label={t("清空搜索")} onClick={() => setSearch("")}><X size={14}/></button>}</div><div className="filter-controls"><Picker label={t("场合筛选")} value={occasion} onChange={setOccasion} options={{ all: t("所有场合"), ...translatedOptions(OCCASIONS, t) }}/><button className={`archive-filter ${archived ? "on" : ""}`} aria-pressed={archived} onClick={() => setArchived(!archived)} title={t("查看已收起的单品或搭配")}><Archive size={16}/><span>{t("已收起")}</span></button></div></div>
+        <SubsetBrowser key={state.collectionId + ":" + view + ":" + subsetRoot + ":" + (activeSubset?.id || "root")} records={state.records} scope={scope} root={subsetRoot} activeId={activeSubset?.id || null} disabled={!!error || syncing} onSelect={setSelectedSubsetId} onSave={saveSubset} visibleRecords={view === "wardrobe" ? filteredItems : filteredOutfits} onAdd={subsetId => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"], subsetId } : { kind: "outfit", subsetId })} renderCards={records => view === "wardrobe" ? <div className="item-grid">{records.map(record => record.kind === "item" && <ItemCard key={record.id} item={record} onOpen={() => setEditor({ kind: "item", record })}/>)}</div> : <div className="outfit-grid">{records.map(record => record.kind === "outfit" && <OutfitCard key={record.id} outfit={record} items={items} onOpen={() => setEditor({ kind: "outfit", record })} onCalendar={() => setEditor({ kind: "calendar", outfitId: record.id, date: localDate() })}/>)}</div>} />
+        {view === "wardrobe" && !filteredItems.length && (items.length === 0 && !search && category === "all" && occasion === "all" && !archived ? <Welcome onAdd={() => setEditor({ kind: "item" })} onImport={() => goView("backup")}/> : <EmptyState icon={Search} title={t("这里还没有单品")} text={t("试试其他分类，或清空筛选条件。")} action={t("清空筛选")} onAction={() => { setSearch(""); setOccasion("all"); setArchived(false); }}/>) }
+        {view === "outfits" && !filteredOutfits.length && <EmptyState icon={Layers3} title={t("没有找到这个搭配")} text={t("拍照、导入搭配照片，或从单品组合一套穿搭。")} action={t("新建搭配")} onAction={() => setEditor({ kind: "outfit" })}/>}</>}
         {view === "calendar" && <CalendarPanel entries={calendar} onAdd={date => setEditor({ kind: "calendar", date })} onEdit={record => setEditor({ kind: "calendar", record })}/>}
         {view === "backup" && <BackupPanel state={state} onImported={async (id) => { await refresh(id); goView("wardrobe"); }}/>}
         {view === "assistant" && <AssistantPanel state={state}/>}
@@ -249,16 +242,6 @@ function EmptyState({ icon: Icon, title, text, action, onAction }: {
     action: string;
     onAction: () => void;
 }) { return <div className="empty-state"><div className="empty-icon"><Icon size={30} strokeWidth={1.3}/></div><h2>{title}</h2><p>{text}</p><Button variant="outline" onClick={onAction}>{action}<ArrowRight size={16}/></Button></div>; }
-function OutfitCollage({ asset, itemIds, items }: {
-    asset?: string | null;
-    itemIds: string[];
-    items: ItemRecord[];
-}) {
-    const { t } = useI18n();
-    return <div className="outfit-visual">{asset && <Photo asset={asset} name={t("搭配照片")} className="outfit-cover-photo"/>}
-    {!!itemIds.length && <div className={asset ? "outfit-piece-strip" : `outfit-collage count-${Math.min(itemIds.length, 4)}`}>{itemIds.slice(0, 4).map(id => { const item = items.find(i => i.id === id); return item ? <Photo key={id} asset={item.data.asset} name={item.data.name}/> : null; })}{itemIds.length > 4 && <span className="more-pieces">+{itemIds.length - 4}</span>}</div>}
-  </div>;
-}
 function FormError({ message }: {
     message: string;
 }) { return message ? <div className="form-error" role="alert"><AlertCircle size={16}/><span>{message}</span></div> : null; }

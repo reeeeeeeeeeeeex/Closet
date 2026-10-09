@@ -47,3 +47,29 @@ export function subsetTrail(records: ClosetRecord[], id: string): SubsetRecord[]
   while (current && !seen.has(current.id)) { seen.add(current.id); trail.unshift(current); current = current.data.parentId ? map.get(current.data.parentId) : undefined; }
   return trail;
 }
+
+export type SubsetSection = { subset: SubsetRecord; count: number; records: (ItemRecord | OutfitRecord)[]; children: SubsetSection[] };
+/** Render each branch at its deepest membership; siblings retain independent memberships. */
+export function subsetSections(records: ClosetRecord[], scope: Subset["scope"], root: Subset["root"], parentId: string | null, visible: (ItemRecord | OutfitRecord)[]) {
+  const subsets = records.filter((record): record is SubsetRecord => record.kind === "subset" && record.data.scope === scope && record.data.root === root);
+  const children = new Map<string | null, SubsetRecord[]>();
+  for (const subset of subsets) children.set(subset.data.parentId, [...(children.get(subset.data.parentId) || []), subset]);
+  const aggregate = new Map<string, Set<string>>();
+  function members(subset: SubsetRecord): Set<string> {
+    const found = aggregate.get(subset.id); if (found) return found;
+    const ids = new Set(subset.data.memberIds); aggregate.set(subset.id, ids);
+    for (const child of children.get(subset.id) || []) for (const id of members(child)) ids.add(id);
+    return ids;
+  }
+  function build(parent: string | null, eligible: (ItemRecord | OutfitRecord)[]): { sections: SubsetSection[]; ungrouped: (ItemRecord | OutfitRecord)[] } {
+    const grouped = new Set<string>();
+    const sections = (children.get(parent) || []).map(subset => {
+      const ids = members(subset); for (const id of ids) grouped.add(id);
+      const contents = eligible.filter(record => ids.has(record.id));
+      const nested = build(subset.id, contents);
+      return { subset, count: contents.length, records: nested.ungrouped, children: nested.sections };
+    });
+    return { sections, ungrouped: eligible.filter(record => !grouped.has(record.id)) };
+  }
+  return build(parentId, visible);
+}
