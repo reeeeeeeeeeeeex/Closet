@@ -1,0 +1,83 @@
+# Closet / New Closet
+
+独立实现的私人数字衣橱，现已从云端 Sites 环境转换为本地服务。Libre Closet 只作为功能参考，没有复制它的实现代码。
+
+## 本地启动
+
+需要 Node.js 24 或更新版本、pnpm 11.25.0。
+
+```powershell
+cd 'D:\New Closet'
+pnpm install --frozen-lockfile
+pnpm build
+pnpm start
+```
+
+打开 http://127.0.0.1:4320。首次打开设置至少 8 个字符的衣橱密码，之后登录使用同一密码。Windows 也可以双击 `启动Closet.cmd`；首次运行自动安装依赖、构建，后续直接启动。源码修改后先重新执行 `pnpm build`。
+
+开发模式使用 `pnpm dev`。服务默认仅监听本机，不需要 ChatGPT 登录、Cloudflare、D1 或 R2。
+
+## 在手机或其他电脑上使用
+
+先在本机地址完成密码设置，停止服务，再在 PowerShell 中启动：
+
+```powershell
+$env:CLOSET_HOST = '0.0.0.0'
+pnpm start
+```
+
+同一局域网内的设备打开 `http://电脑的局域网IP:4320`，使用同一衣橱密码。电脑需保持运行，Windows 防火墙需允许该端口；本次迁移没有修改防火墙。所有设备访问同一个 SQLite 数据源，页面回到前台或每 45 秒刷新，旧版本提交返回 409。它是单人衣橱，多设备共用一个账号。
+
+可用 `CLOSET_PORT` 更换端口，用 `CLOSET_DATA_DIR` 指定数据目录，例如：
+
+```powershell
+$env:CLOSET_PORT = '4325'
+$env:CLOSET_DATA_DIR = 'D:\ClosetData'
+pnpm start
+```
+
+这些配置传给启动命令的环境变量；不要把它们仅写入 `.env.local`，启动器需要在 Next.js 启动前读取。
+
+## 数据保存与备份
+
+默认数据位于项目的 `data/`：
+
+- `closet.sqlite`：单品、搭配、日历、原图元数据与迁移记录。
+- `assets/<owner-hash>/<image-sha256>`：未压缩、未重新编码的原始图片。
+- `auth.json`：加盐 scrypt 密码哈希及会话签名密钥，不保存明文密码。
+
+`data/`、运行日志、依赖和构建产物都被 Git 忽略，上传源码不会上传照片或登录密钥。应用使用 HttpOnly 签名会话，客户端伪造原平台身份 header 无法登录。
+
+在“数据与备份”中可完整导出 ZIP，并导入为一个新衣橱，不覆盖原数据。原云端版本导出的 `new-closet` v1 ZIP 可直接使用。下载源码本身不包含云端账号里的个人记录；已有记录通过该 ZIP 流程迁移。
+
+也可以停止服务后复制整个 `data/`，保留全部衣橱与登录状态。SQLite 运行中有 WAL 文件，直接复制单个数据库文件不能保证完整备份。
+
+## 保留的功能与格式
+
+- 原始图片按 SHA-256 去重；上装、下装、鞋包、配饰分类，场合、季节和备注。
+- 单品组成搭配，月历安排与已穿记录；保存不可变历史快照。
+- ZIP 中有 `manifest.json`、`README.txt` 和 `assets/<sha256>.<extension>`。
+- 数据格式为 `format: "new-closet"`、`schemaVersion: 1`，不包含平台用户 ID、物理路径或凭据。
+- 导入先检查版本、唯一 ID、关联、图片大小和 SHA-256；数据库事务建立新衣橱，失败回滚。
+- AI 页面生成可复制的真实衣橱上下文，尚未接入外部模型。
+
+首版仍是联网 Web 应用：没有离线编辑、原生 App、自动抠图或自动 AI 推荐。单张照片最多 20 MB，支持 JPG / PNG / WebP / GIF / AVIF；HEIC 需转换。每个衣橱最多 2000 条记录，导入包最多 2 GB，清单最多 3 MB。
+
+## 开发与验证
+
+```powershell
+pnpm lint
+pnpm typecheck
+pnpm build
+pnpm test
+```
+
+`pnpm test` 需要先完成生产构建。测试使用随机本地端口和隔离的 `.test-runtime/`，不会写入个人 `data/`。
+
+- `tests/portability.mjs`：原图 ZIP 字节往返、快照独立性与损坏备份拒绝。
+- `tests/runtime.mjs`：真实生产 Node 服务的密码登录、授权、SQLite CRUD、冲突、事务回滚、重启持久化和实际 ZIP 导入导出。
+- `drizzle/`：SQLite 迁移，首次使用数据库时自动按文件顺序执行并记录。
+- `lib/local-storage.ts` / `lib/local-auth.ts`：本地磁盘、数据库与认证适配层。
+- `legacy/cloud/`：原云端构建和连接器模板，仅作参考，不进入本地运行、构建或检查。
+
+源码上传到私人 GitHub 仓库；目前没有指定对外开源许可证。
