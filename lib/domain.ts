@@ -12,13 +12,19 @@ const note = z.string().max(3000);
 const occasions = z.array(z.enum(["work", "casual", "party", "formal", "vacation", "sport"])).max(6);
 const centimeters = z.number().finite().positive("尺寸必须大于 0").max(500, "尺寸不能超过 500 cm").optional();
 const measurementsSchema = z.object({ shoulderWidth: centimeters, chest: centimeters, waist: centimeters, hips: centimeters, thigh: centimeters, legOpening: centimeters, length: centimeters, sleeveLength: centimeters, rise: centimeters, hem: centimeters }).strict();
+export const shoeSizeSchema = z.object({ eu: z.number().finite().min(10, "欧码需在 10 到 60 之间").max(60, "欧码需在 10 到 60 之间").nullable().default(null), cn: z.number().int().min(100, "中国码需在 100 到 350 mm 之间").max(350, "中国码需在 100 到 350 mm 之间").multipleOf(5, "中国码以 5 mm 为间隔").nullable().default(null) }).strict().default({ eu: null, cn: null });
+export const personalSizesSchema = z.object({
+  measurements: z.object({ height: centimeters, shoulderWidth: centimeters, chest: centimeters, waist: centimeters, hips: centimeters, thigh: centimeters, armLength: centimeters, inseam: centimeters, outseam: centimeters, footLength: centimeters }).strict().default({}),
+  shoeSize: shoeSizeSchema,
+}).strict();
+export type PersonalSizes = z.infer<typeof personalSizesSchema>;
 export const itemSchema = z.object({
   name: title, category: z.enum(["top", "bottom", "dress", "outerwear", "shoes", "bag", "accessory"]),
   color: z.string().max(50), seasons: z.array(z.enum(["spring", "summer", "autumn", "winter"])).max(4),
   occasions, notes: note, asset: hashSchema.nullable(), archived: z.boolean(),
   fit: z.enum(["tight", "fitted", "regular", "loose"]).nullable().default(null),
   shoeFit: z.enum(["trueToSize", "large", "small"]).nullable().default(null),
-  shoeSize: z.object({ eu: z.number().finite().min(10, "欧码需在 10 到 60 之间").max(60, "欧码需在 10 到 60 之间").nullable().default(null), cn: z.number().int().min(100, "中国码需在 100 到 350 mm 之间").max(350, "中国码需在 100 到 350 mm 之间").multipleOf(5, "中国码以 5 mm 为间隔").nullable().default(null) }).strict().default({ eu: null, cn: null }),
+  shoeSize: shoeSizeSchema,
   measurements: measurementsSchema.default({}),
 }).strict().superRefine((item, ctx) => {
   if (!garmentCategory(item.category) && item.fit) ctx.addIssue({ code: "custom", message: "此分类不适用服装版型", path: ["fit"] });
@@ -46,8 +52,10 @@ export const itemRecordSchema = z.object({ ...metadata, kind: z.literal("item"),
 export const outfitRecordSchema = z.object({ ...metadata, kind: z.literal("outfit"), data: outfitSchema }).strict();
 export const calendarRecordSchema = z.object({ ...metadata, kind: z.literal("calendar"), data: calendarSchema }).strict();
 export const subsetRecordSchema = z.object({ ...metadata, kind: z.literal("subset"), data: subsetSchema }).strict();
+export const personalSizesRecordSchema = z.object({ ...metadata, kind: z.literal("personalSizes"), data: personalSizesSchema }).strict();
+export type PersonalSizesRecord = z.infer<typeof personalSizesRecordSchema>;
 export type SubsetRecord = z.infer<typeof subsetRecordSchema>;
-export const recordSchema = z.discriminatedUnion("kind", [itemRecordSchema, outfitRecordSchema, calendarRecordSchema, subsetRecordSchema]);
+export const recordSchema = z.discriminatedUnion("kind", [itemRecordSchema, outfitRecordSchema, calendarRecordSchema, subsetRecordSchema, personalSizesRecordSchema]);
 export type ItemRecord = z.infer<typeof itemRecordSchema>;
 export type OutfitRecord = z.infer<typeof outfitRecordSchema>;
 export type CalendarRecord = z.infer<typeof calendarRecordSchema>;
@@ -55,7 +63,7 @@ export type ClosetRecord = z.infer<typeof recordSchema>;
 export const assetSchema = z.object({ hash: hashSchema, name: z.string().max(255), mime: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]), size: z.number().int().positive().max(20 * 1024 * 1024) }).strict();
 export type Asset = z.infer<typeof assetSchema>;
 export const archiveSchema = z.object({
-  format: z.literal("new-closet"), schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
+  format: z.literal("new-closet"), schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
   records: z.array(recordSchema).max(2000), assets: z.array(assetSchema).max(2000),
 }).strict();
 export type ClosetArchive = z.infer<typeof archiveSchema>;
@@ -87,7 +95,8 @@ export function validateArchive(input: unknown): ClosetArchive {
   }
   for (const hash of referencedAssets(a.records)) if (!media.has(hash)) throw new Error("备份缺少原图");
   validateSubsets(a.records);
-  return { ...a, schemaVersion: 4 };
+  if (a.records.filter(record => record.kind === "personalSizes").length > 1) throw new Error("每个衣橱只能保存一份我的尺码");
+  return { ...a, schemaVersion: 5 };
 }
 export function makeSnapshot(outfit: Outfit, items: ItemRecord[]): CalendarEntry["snapshot"] {
   const map = new Map(items.map(i => [i.id, i]));

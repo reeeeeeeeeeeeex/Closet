@@ -4,7 +4,7 @@ import { tr, translatedOptions } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Shirt, Layers3, CalendarDays, Database, Sparkles, Plus, Search, ArrowUpRight, ArrowRight, RefreshCw, Download, Upload, Check, X, ImagePlus, Archive, ChevronLeft, ChevronRight, ChevronDown, Cloud, LockKeyhole, Copy, Loader2, Camera, AlertCircle, CheckCircle2, PackageOpen, } from "lucide-react";
+import { Shirt, Layers3, CalendarDays, Database, Sparkles, Plus, Search, ArrowUpRight, ArrowRight, RefreshCw, Download, Upload, Check, X, ImagePlus, Archive, ChevronLeft, ChevronRight, ChevronDown, Cloud, LockKeyhole, Copy, Loader2, Camera, AlertCircle, CheckCircle2, PackageOpen, Ruler, } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,8 +16,9 @@ import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter,
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { CATEGORIES, OCCASIONS, SEASONS, wardrobePrompt, type Item, type ItemRecord, type Outfit, type OutfitRecord, type CalendarRecord, type ClosetState, type ClosetRecord, type ClosetArchive, type Subset, type SubsetRecord } from "@/lib/domain";
+import { CATEGORIES, OCCASIONS, SEASONS, wardrobePrompt, type Item, type ItemRecord, type Outfit, type OutfitRecord, type CalendarRecord, type ClosetState, type ClosetRecord, type ClosetArchive, type Subset, type SubsetRecord, type PersonalSizesRecord, type PersonalSizes } from "@/lib/domain";
 import { Photo, OutfitCollage, ItemCard, OutfitCard } from "@/components/closet-cards";
+import { PersonalSizesPanel } from "@/components/personal-sizes";
 import { SubsetBrowser } from "@/components/subsets";
 import { subsetMemberIds } from "@/lib/subsets";
 import { ItemDetailsFields, ItemLabels } from "@/components/item-details";
@@ -30,7 +31,7 @@ const blankOutfit: Outfit = { name: "", itemIds: [], asset: null, occasions: [],
 const errorMessage = (e: unknown) => e instanceof Error ? tr(e.message) : tr("操作失败，请重试");
 const localDate = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const formatSize = (bytes: number) => bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-type View = "wardrobe" | "outfits" | "calendar" | "backup" | "assistant";
+type View = "personalSizes" | "wardrobe" | "outfits" | "calendar" | "backup" | "assistant";
 type Editor = {
     kind: "item";
     record?: ItemRecord;
@@ -82,6 +83,7 @@ function Navigation({ view, onView, state }: {
         { id: "wardrobe", name: t("我的衣橱"), icon: Shirt, count: state?.records.filter(r => r.kind === "item" && !r.data.archived).length },
         { id: "outfits", name: t("搭配集"), icon: Layers3, count: state?.records.filter(r => r.kind === "outfit" && !r.data.archived).length },
         { id: "calendar", name: t("穿搭日历"), icon: CalendarDays },
+        { id: "personalSizes", name: t("我的尺码"), icon: Ruler },
     ];
     const go = (v: View) => { onView(v); setOpenMobile(false); };
     return <Sidebar className="closet-sidebar"><SidebarHeader className="brand-header"><button onClick={() => go("wardrobe")} className="brand" aria-label={t("New Closet 首页")}><div className="brand-icon"><Shirt size={22} strokeWidth={1.6}/></div><div><strong>{t("new closet")}<span>•</span></strong><small>{t("衣橱，由你定义")}</small></div></button></SidebarHeader>
@@ -127,6 +129,7 @@ export default function Home() {
             setError("");
             setAuthRequired(false);
             setSynced(new Date().toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }));
+            return next;
         }
         catch (e) {
             if (id === refreshId.current) {
@@ -192,7 +195,11 @@ export default function Home() {
                 throw new Error(t("Wardrobe is not available")); setEditor({ kind: "item" }); return { status: "form_opened", saved: false }; } });
         return () => controller.abort();
     }, [t]);
-    const titles = { wardrobe: t("我的衣橱"), outfits: t("搭配集"), calendar: t("穿搭日历"), backup: t("数据与备份"), assistant: t("AI 穿搭灵感") };
+    const savePersonalSizes = async (data: PersonalSizes, record?: PersonalSizesRecord) => {
+        const result = await api<{ record: PersonalSizesRecord }>("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "save", collectionId: state?.collectionId || "main", kind: "personalSizes", data, id: record?.id, version: record?.version }) });
+        await refresh(); return result.record;
+    };
+    const titles = { personalSizes: t("我的尺码"), wardrobe: t("我的衣橱"), outfits: t("搭配集"), calendar: t("穿搭日历"), backup: t("数据与备份"), assistant: t("AI 穿搭灵感") };
     return <SidebarProvider style={{ "--sidebar-width": "248px" } as React.CSSProperties}><Navigation view={view} onView={goView} state={state}/><SidebarInset className="main-inset"><header className="topbar"><div className="flex items-center gap-3"><SidebarTrigger className="md:hidden"/><span className="breadcrumb">{t("我的空间")}<span>/</span> <strong>{titles[view]}</strong></span></div><div className="topbar-right"><span className={`sync-label ${error ? "sync-error" : ""}`}><Cloud size={15}/> {error ? t("连接待恢复") : loading ? t("正在连接") : t("已同步 {value1}", { value1: synced })}</span><Button variant="ghost" size="icon" aria-label={t("刷新衣橱")} onClick={() => void refresh()} disabled={syncing}><RefreshCw size={16} className={syncing ? "animate-spin" : ""}/></Button><Button variant="ghost" onClick={async () => { try {
         await api("/api/auth", { method: "DELETE" });
         router.replace("/login");
@@ -203,7 +210,7 @@ export default function Home() {
     } }}>{t("退出")}</Button></div></header>
     <main className="workspace">
       {state && state.collections.length > 1 && <div className="collection-switch"><span>{t("当前衣橱")}</span><Picker label={t("切换衣橱")} value={state.collectionId} options={Object.fromEntries(state.collections.map(c => [c.id, c.name]))} onChange={v => void refresh(v)}/></div>}
-      <div className="page-heading"><div><div className="eyebrow">{view === "wardrobe" ? t("YOUR PERSONAL WARDROBE") : view === "outfits" ? t("A LITTLE INSPIRATION, EVERY DAY") : view === "calendar" ? t("DRESS FOR YOUR DAYS") : view === "backup" ? t("YOUR WARDROBE, YOUR DATA") : t("MAKE ROOM FOR IDEAS")}</div><h1>{titles[view]}<span className="heading-period">.</span></h1><p>{view === "wardrobe" ? t("收好每一件喜欢，把灵感穿进日常。") : view === "outfits" ? t("从熟悉的单品里，发现新的组合。") : view === "calendar" ? t("安排未来的穿搭，留住当天的样子。") : view === "backup" ? t("带上原图和每一条记录，自由迁移。") : t("让你常用的 AI，先认识你的衣橱。")}</p></div>
+      <div className="page-heading"><div><div className="eyebrow">{view === "wardrobe" ? t("YOUR PERSONAL WARDROBE") : view === "outfits" ? t("A LITTLE INSPIRATION, EVERY DAY") : view === "calendar" ? t("DRESS FOR YOUR DAYS") : view === "backup" ? t("YOUR WARDROBE, YOUR DATA") : view === "personalSizes" ? t("MY MEASUREMENTS") : t("MAKE ROOM FOR IDEAS")}</div><h1>{titles[view]}<span className="heading-period">.</span></h1><p>{view === "wardrobe" ? t("收好每一件喜欢，把灵感穿进日常。") : view === "outfits" ? t("从熟悉的单品里，发现新的组合。") : view === "calendar" ? t("安排未来的穿搭，留住当天的样子。") : view === "backup" ? t("带上原图和每一条记录，自由迁移。") : view === "personalSizes" ? t("记下自己的尺寸，挑选合适的喜欢。") : t("让你常用的 AI，先认识你的衣橱。")}</p></div>
       {(view === "wardrobe" || view === "outfits" || view === "calendar") && <Button className="main-action" disabled={!state || !!error} onClick={() => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"] } : view === "outfits" ? { kind: "outfit" } : { kind: "calendar", date: localDate() })}><Plus size={18}/>{view === "wardrobe" ? t("添加单品") : view === "outfits" ? t("新建搭配") : t("添加穿搭")}</Button>}</div>
       {error && <div className="error-banner" role="alert"><AlertCircle size={19}/><div><strong>{t("暂时无法同步衣橱")}</strong><p>{error}</p>{authRequired && <a href="/login">{t("登录后继续")}</a>}</div><Button variant="outline" onClick={() => void refresh()}>{t("重试")}</Button></div>}
       {loading ? <div className="loading-grid">{[1, 2, 3, 4].map(n => <Skeleton key={n} className="h-72 rounded-2xl"/>)}</div> : state && <>
@@ -215,6 +222,7 @@ export default function Home() {
         {view === "calendar" && <CalendarPanel entries={calendar} onAdd={date => setEditor({ kind: "calendar", date })} onEdit={record => setEditor({ kind: "calendar", record })}/>}
         {view === "backup" && <BackupPanel state={state} onImported={async (id) => { await refresh(id); goView("wardrobe"); }}/>}
         {view === "assistant" && <AssistantPanel state={state}/>}
+        {view === "personalSizes" && <PersonalSizesPanel key={state.collectionId} record={state.records.find((record): record is PersonalSizesRecord => record.kind === "personalSizes")} collectionName={state.collections.find(collection => collection.id === state.collectionId)?.name || t("我的衣橱")} disabled={!!error || syncing} onSave={savePersonalSizes} onRefresh={() => refresh()}/> }
       </>}
       <footer className="workspace-footer"><span>{t("NEW CLOSET")}<span className="footer-divider">/</span>{t("少一点纠结，多一点喜欢。")}</span><span><LockKeyhole size={12}/>{t("私人空间")}</span></footer>
     </main></SidebarInset><Toaster theme="light" position="top-center" richColors/>
@@ -500,12 +508,12 @@ function BackupPanel({ state, onImported }: {
         setBusy(false);
         setProgress("");
     } };
-    return <div className="backup-area"><div className="data-summary"><div className="data-icon"><Database size={30} strokeWidth={1.4}/></div><div><h2>{t("整个衣橱，放进行李箱。")}</h2><p>{t("原始照片、单品资料、搭配关系与日历快照，一起带走。")}</p></div><span className="format-badge">{t("开放格式 \u00B7 ZIP + JSON")}</span></div><div className="backup-grid"><section className="backup-card"><span className="step-index">{t("01 / EXPORT")}</span><Download size={28} strokeWidth={1.3}/><h3>{t("完整导出")}</h3><p>{t("每张原图保持原始文件内容。解压后，照片与清单都可以直接打开。")}</p><div className="backup-stats"><span>{t("{count} 条记录", { count: state.records.length })}</span><span>{t("{count} 张原图", { count: state.assets.length })}</span><span>{formatSize(state.assets.reduce((n, a) => n + a.size, 0))}</span></div><Button onClick={() => void exportAll()} disabled={busy}><Download size={16}/>{t("下载完整备份")}</Button>{lastExport && <small className="last-export">{t("已于 {time} 生成下载", { time: lastExport })}</small>}</section><section className="backup-card"><span className="step-index">{t("02 / IMPORT")}</span><Upload size={28} strokeWidth={1.3}/><h3>{t("导入与恢复")}</h3><p>{t("先核对原图和记录，再建立一个新的衣橱。原有衣橱和资料完整保留。")}</p><div className="import-drop"><PackageOpen size={25} strokeWidth={1.3}/><span>{t("选择 New Closet 的 .zip 备份包")}</span><small>{t("首版支持 2 GB / 2000 条记录以内的备份")}</small></div><input ref={fileInput} type="file" accept=".zip,application/zip" className="sr-only" aria-label={t("选择备份文件")} onChange={e => { const f = e.target.files?.[0]; if (f)
+    return <div className="backup-area"><div className="data-summary"><div className="data-icon"><Database size={30} strokeWidth={1.4}/></div><div><h2>{t("整个衣橱，放进行李箱。")}</h2><p>{t("原始照片、单品资料、搭配关系、日历快照与我的尺码，一起带走。")}</p></div><span className="format-badge">{t("开放格式 \u00B7 ZIP + JSON")}</span></div><div className="backup-grid"><section className="backup-card"><span className="step-index">{t("01 / EXPORT")}</span><Download size={28} strokeWidth={1.3}/><h3>{t("完整导出")}</h3><p>{t("每张原图保持原始文件内容。解压后，照片与清单都可以直接打开。")}</p><div className="backup-stats"><span>{t("{count} 条记录", { count: state.records.length })}</span><span>{t("{count} 张原图", { count: state.assets.length })}</span><span>{formatSize(state.assets.reduce((n, a) => n + a.size, 0))}</span></div><Button onClick={() => void exportAll()} disabled={busy}><Download size={16}/>{t("下载完整备份")}</Button>{lastExport && <small className="last-export">{t("已于 {time} 生成下载", { time: lastExport })}</small>}</section><section className="backup-card"><span className="step-index">{t("02 / IMPORT")}</span><Upload size={28} strokeWidth={1.3}/><h3>{t("导入与恢复")}</h3><p>{t("先核对原图和记录，再建立一个新的衣橱。原有衣橱和资料完整保留。")}</p><div className="import-drop"><PackageOpen size={25} strokeWidth={1.3}/><span>{t("选择 New Closet 的 .zip 备份包")}</span><small>{t("首版支持 2 GB / 2000 条记录以内的备份")}</small></div><input ref={fileInput} type="file" accept=".zip,application/zip" className="sr-only" aria-label={t("选择备份文件")} onChange={e => { const f = e.target.files?.[0]; if (f)
         void inspect(f); }}/><Button variant="outline" onClick={() => fileInput.current?.click()} disabled={busy}><Upload size={16}/>{t("选择备份并检查")}</Button></section></div>{busy && <div className="progress-banner" role="status"><Loader2 size={19} className="animate-spin"/><span>{progress || t("正在处理\u2026")} <small>{t("请保持此页面打开")}</small></span></div>}<FormError message={error}/><div className="data-principles"><div><CheckCircle2 size={18}/><div><h4>{t("照片可独立使用")}</h4><p>{t("原图以内容哈希命名，清单保留原文件名。")}</p></div></div><div><CheckCircle2 size={18}/><div><h4>{t("记录可理解")}</h4><p>{t("JSON 保存字段与关联，包含数据格式版本。")}</p></div></div><div><CheckCircle2 size={18}/><div><h4>{t("历史有快照")}</h4><p>{t("日历里的穿搭，不随之后的编辑而改变。")}</p></div></div></div><div className="sync-explainer"><Cloud size={20}/><div><strong>{t("在 iOS、Android 和电脑上接着用")}</strong><p>{t("在同一网络中打开本机服务地址，使用同一衣橱密码即可访问。联网时自动刷新；离线编辑和原生 App 暂未提供。")}</p></div></div>
     <Dialog open={!!manifest} onOpenChange={(open: boolean) => { if (!open && !busy) {
         setManifest(null);
         setFile(null);
-    } }}><DialogContent><DialogHeader><DialogTitle>{t("备份检查通过")}</DialogTitle><DialogDescription>{t("图片内容与 SHA-256 一致，记录关联完整。确认后建立新衣橱。")}</DialogDescription></DialogHeader>{manifest && <div className="import-preview"><h3>{manifest.collection.name}</h3><p>{file?.name} · {formatSize(file?.size || 0)}</p><div><span>{t("单品")}<strong>{manifest.records.filter(r => r.kind === "item").length}</strong></span><span>{t("搭配")}<strong>{manifest.records.filter(r => r.kind === "outfit").length}</strong></span><span>{t("日历")}<strong>{manifest.records.filter(r => r.kind === "calendar").length}</strong></span><span>{t("子集")}<strong>{manifest.records.filter(record => record.kind === "subset").length}</strong></span><span>{t("原图")}<strong>{manifest.assets.length}</strong></span></div></div>}{busy && <p className="inline-progress"><Loader2 size={16} className="animate-spin"/>{progress}</p>}<FormError message={error}/><DialogFooter><Button variant="outline" disabled={busy} onClick={() => { setManifest(null); setFile(null); }}>{t("取消")}</Button><Button disabled={busy} onClick={() => void restore()}>{busy ? t("恢复中\u2026") : t("导入为新衣橱")}<ArrowRight size={16}/></Button></DialogFooter></DialogContent></Dialog>
+    } }}><DialogContent><DialogHeader><DialogTitle>{t("备份检查通过")}</DialogTitle><DialogDescription>{t("图片内容与 SHA-256 一致，记录关联完整。确认后建立新衣橱。")}</DialogDescription></DialogHeader>{manifest && <div className="import-preview"><h3>{manifest.collection.name}</h3><p>{file?.name} · {formatSize(file?.size || 0)}</p><div><span>{t("单品")}<strong>{manifest.records.filter(r => r.kind === "item").length}</strong></span><span>{t("搭配")}<strong>{manifest.records.filter(r => r.kind === "outfit").length}</strong></span><span>{t("日历")}<strong>{manifest.records.filter(r => r.kind === "calendar").length}</strong></span><span>{t("子集")}<strong>{manifest.records.filter(record => record.kind === "subset").length}</strong></span><span>{t("我的尺码")}<strong>{manifest.records.some(record => record.kind === "personalSizes") ? t("已包含") : t("未填写")}</strong></span><span>{t("原图")}<strong>{manifest.assets.length}</strong></span></div></div>}{busy && <p className="inline-progress"><Loader2 size={16} className="animate-spin"/>{progress}</p>}<FormError message={error}/><DialogFooter><Button variant="outline" disabled={busy} onClick={() => { setManifest(null); setFile(null); }}>{t("取消")}</Button><Button disabled={busy} onClick={() => void restore()}>{busy ? t("恢复中\u2026") : t("导入为新衣橱")}<ArrowRight size={16}/></Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }
 function AssistantPanel({ state }: {

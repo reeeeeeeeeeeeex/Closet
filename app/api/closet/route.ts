@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { context, json, failure, getState, getRecords, getRecordsSync, insertRecord, sameOrigin, limitedJson, ApiError } from "@/lib/server";
-import { itemSchema, outfitSchema, subsetSchema, dateSchema, validateArchive, makeSnapshot, type ClosetRecord, type ItemRecord, type OutfitRecord, type Asset } from "@/lib/domain";
+import { itemSchema, outfitSchema, subsetSchema, personalSizesSchema, dateSchema, validateArchive, makeSnapshot, type ClosetRecord, type ItemRecord, type OutfitRecord, type Asset } from "@/lib/domain";
 import { validateSubsets } from "@/lib/subsets";
 import type { LocalDatabase } from "@/lib/local-storage";
 
@@ -8,6 +8,7 @@ function storeRecords(db: LocalDatabase, owner: string, collectionId: string, ch
   return db.transaction(() => {
     const latest = getRecordsSync(db, owner, collectionId); const record = changes[0];
     const existing = latest.find(value => value.id === record.id);
+    if (record.kind === "personalSizes" && latest.some(value => value.kind === "personalSizes" && value.id !== record.id)) throw new ApiError(409, "此衣橱已有尺码资料，请刷新后编辑。草稿仍保留。");
     if (expectedVersion !== undefined && (!existing || existing.version !== expectedVersion || existing.kind !== record.kind)) throw new ApiError(409, "记录已在其他设备更改，请刷新");
     if (existing?.kind === "subset" && record.kind === "subset" && (record.data.scope !== existing.data.scope || record.data.root !== existing.data.root || record.data.parentId !== existing.data.parentId)) throw new ApiError(400, "子集的父集和所属分类不能修改");
     if (latest.length + changes.length - (existing ? 1 : 0) > 2000) throw new ApiError(400, "此衣橱已达首版的 2000 条记录上限");
@@ -36,14 +37,14 @@ function storeRecords(db: LocalDatabase, owner: string, collectionId: string, ch
       if (!result.changes) throw new ApiError(409, "记录已在其他设备更改，请刷新");
     } else for (const change of changes) insertRecord(db, owner, collectionId, change).run();
     if (membership) db.prepare("UPDATE records SET data=?,version=version+1,updated_at=? WHERE owner=? AND collection_id=? AND id=?").bind(JSON.stringify(membership.data), membership.updatedAt, owner, collectionId, membership.id).run();
-    return { ok: true, id: record.id };
+    return { ok: true, id: record.id, ...(record.kind === "personalSizes" ? { record } : {}) };
   });
 }
 export async function GET(request: Request) {
   try { const { db, owner } = await context(); return json(await getState(db, owner, new URL(request.url).searchParams.get("collection") || undefined)); }
   catch (e) { return failure(e); }
 }
-const mutationSchema = z.object({ op: z.enum(["save", "deleteCalendar"]), collectionId: z.string().min(1).max(100), id: z.string().uuid().optional(), version: z.number().int().positive().optional(), subsetId: z.string().uuid().optional(), kind: z.enum(["item", "outfit", "calendar", "subset"]), data: z.unknown() });
+const mutationSchema = z.object({ op: z.enum(["save", "deleteCalendar"]), collectionId: z.string().min(1).max(100), id: z.string().uuid().optional(), version: z.number().int().positive().optional(), subsetId: z.string().uuid().optional(), kind: z.enum(["item", "outfit", "calendar", "subset", "personalSizes"]), data: z.unknown() });
 export async function POST(request: Request) {
   try {
     sameOrigin(request); const { db, owner } = await context(); const body = mutationSchema.parse(await limitedJson(request, 128 * 1024));
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
     else if (!await db.prepare("SELECT id FROM collections WHERE owner=? AND id=?").bind(owner, collectionId).first()) throw new ApiError(404, "衣橱不存在");
     const records = await getRecords(db, owner, collectionId); const existing = body.id ? records.find(r => r.id === body.id) : undefined;
     if (body.id && (!existing || existing.kind !== kind)) throw new ApiError(404, "记录不存在");
-    if (existing && existing.version !== body.version) throw new ApiError(409, "另一台设备已修改这条记录。草稿仍保留，请关闭编辑、刷新后重新确认。");
+    if (existing && existing.version !== body.version) throw new ApiError(409, kind === "personalSizes" ? "另一台设备已修改尺码。草稿仍保留，请载入最新尺码后重新确认。" : "另一台设备已修改这条记录。草稿仍保留，请关闭编辑、刷新后重新确认。");
     if (body.op === "deleteCalendar") {
       if (!existing || existing.kind !== "calendar") throw new ApiError(400, "只能删除日历记录");
       const result = await db.prepare("DELETE FROM records WHERE owner=? AND collection_id=? AND id=? AND version=? RETURNING id").bind(owner, collectionId, existing.id, existing.version).first();
@@ -60,8 +61,9 @@ export async function POST(request: Request) {
     }
     let data: ClosetRecord["data"];
     if (kind === "item") {
-      data = itemSchema.parse(body.data);
-      if (data.asset && !await db.prepare("SELECT hash FROM assets WHERE owner=? AND hash=?").bind(owner, data.asset).first()) throw new ApiError(400, "原图尚未上传完成");
+      const item = itemSchema.parse(body.data);
+      if (item.asset && !await db.prepare("SELECT hash FROM assets WHERE owner=? AND hash=?").bind(owner, item.asset).first()) throw new ApiError(400, "原图尚未上传完成");
+      data = item;
     } else if (kind === "outfit") {
       data = outfitSchema.parse(body.data);
       if (data.asset && !await db.prepare("SELECT hash FROM assets WHERE owner=? AND hash=?").bind(owner, data.asset).first()) throw new ApiError(400, "搭配原图尚未上传完成");
@@ -69,6 +71,8 @@ export async function POST(request: Request) {
       if (data.itemIds.some(id => !records.some(r => r.id === id && r.kind === "item"))) throw new ApiError(400, "搭配中的单品不存在");
     } else if (kind === "subset") {
       data = subsetSchema.parse(body.data);
+    } else if (kind === "personalSizes") {
+      data = personalSizesSchema.parse(body.data);
     } else {
       const input = z.object({ date: dateSchema, status: z.enum(["planned", "worn"]), outfitId: z.string().uuid().optional(), newOutfit: outfitSchema.optional(), notes: z.string().max(3000) }).strict()
         .refine(v => !!v.outfitId !== !!v.newOutfit, "请选择已有搭配或添加新搭配照片").parse(body.data);

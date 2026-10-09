@@ -7,10 +7,11 @@ import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
 
 const require = createRequire(import.meta.url);
-await build({ entryPoints: ['components/item-details.tsx','lib/domain.ts','lib/i18n/core.ts'], outdir: '.test-runtime/item-details-build', outExtension: { '.js': '.cjs' }, bundle: true, platform: 'node', format: 'cjs', external: ['react','react-dom','react/jsx-runtime'], logLevel: 'error' });
+await build({ entryPoints: ['components/item-details.tsx','components/personal-sizes.tsx','lib/domain.ts','lib/i18n/core.ts'], outdir: '.test-runtime/item-details-build', outExtension: { '.js': '.cjs' }, bundle: true, platform: 'node', format: 'cjs', external: ['react','react-dom','react/jsx-runtime'], logLevel: 'error' });
 const root = process.cwd() + '/.test-runtime/item-details-build/';
 const { itemSchema, makeSnapshot } = require(root + 'lib/domain.cjs');
 const { ItemLabels, ItemDetailsFields } = require(root + 'components/item-details.cjs');
+const { PersonalSizesPanel } = require(root + 'components/personal-sizes.cjs');
 const { messageForLocale, catalogs, resolveLocale } = require(root + 'lib/i18n/core.cjs');
 const base = { name: 'Jacket', category: 'top', color: '', seasons: [], occasions: [], notes: '', asset: null, archived: false };
 for (const category of ['top','bottom','dress','outerwear']) for (const fit of ['tight','fitted','regular','loose']) assert.equal(itemSchema.parse({ ...base, category, fit }).fit, fit);
@@ -36,10 +37,14 @@ assert.equal(messageForLocale('en','{label} {value} cm',{ label: 'Waist', value:
 assert.equal(messageForLocale('en','未填写'), '未填写'); assert.equal(resolveLocale('not-registered'), 'zh-CN');
 assert.equal(messageForLocale('en','constructor'), 'constructor'); assert.equal(messageForLocale('en','__proto__'), '__proto__');
 delete catalogs.en;
+const personalHtml = render(PersonalSizesPanel,{collectionName:'Main',disabled:false,onSave:async()=>{},onRefresh:async()=>undefined});
+for(const label of ['身高','肩宽','胸围','腰围','臀围','大腿围','臂长','内腿长','外腿长','脚长','欧码','中国码','保存我的尺码']) assert.match(personalHtml,new RegExp(label));
+assert.match(personalHtml,/从裆部沿腿内侧量到脚底/);
+assert.match(personalHtml,/从自然腰线沿腿外侧量到脚底/);
 const sourceCatalog = JSON.parse(await readFile('lib/i18n/messages/zh-CN.json','utf8'));
 const template = JSON.parse(await readFile('lib/i18n/messages/locale.template.json','utf8'));
 assert.deepEqual(Object.keys(template).sort(), Object.keys(sourceCatalog).sort());
-for (const file of ['components/closet.tsx','components/closet-cards.tsx','components/outfit-fields.tsx','components/item-details.tsx','components/subsets.tsx','components/subset-content-picker.tsx','app/login/login-form.tsx','lib/portable.ts']) {
+for (const file of ['components/closet.tsx','components/closet-cards.tsx','components/outfit-fields.tsx','components/item-details.tsx','components/personal-sizes.tsx','components/shoe-size-fields.tsx','components/subsets.tsx','components/subset-content-picker.tsx','app/login/login-form.tsx','lib/portable.ts']) {
   const source = ts.createSourceFile(file, await readFile(file,'utf8'), ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   function visit(node) {
     if (ts.isCallExpression(node) && ['t','tr'].includes(node.expression.getText(source)) && ts.isStringLiteral(node.arguments[0])) assert(Object.hasOwn(sourceCatalog,node.arguments[0].text), `${file}: missing catalog key ${node.arguments[0].text}`);

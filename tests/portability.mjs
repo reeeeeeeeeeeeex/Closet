@@ -7,7 +7,7 @@ const require = createRequire(import.meta.url);
 const { build } = require('esbuild');
 await build({ entryPoints: ['lib/portable.ts', 'lib/domain.ts', 'lib/calendar.ts'], outdir: '.test-build', bundle: true, platform: 'node', format: 'esm', logLevel: 'error' });
 const { exportArchive, inspectArchive, importArchive, hashBytes } = await import(pathToFileURL(process.cwd() + '/.test-build/portable.js'));
-const { validateArchive, makeSnapshot, itemSchema, outfitSchema, referencedAssets } = await import(pathToFileURL(process.cwd() + '/.test-build/domain.js'));
+const { validateArchive, makeSnapshot, itemSchema, outfitSchema, personalSizesSchema, referencedAssets } = await import(pathToFileURL(process.cwd() + '/.test-build/domain.js'));
 const { dayInMonth } = await import(pathToFileURL(process.cwd() + '/.test-build/calendar.js'));
 assert.equal(dayInMonth('2026-01-31', 2026, 1), '2026-02-28');
 assert.equal(dayInMonth('2024-01-31', 2024, 1), '2024-02-29');
@@ -30,6 +30,12 @@ assert.equal(photoEntry.data.snapshot.asset, photoHash); assert.equal(photoEntry
 assert(referencedAssets([photoOnly, photoEntry]).has(photoHash));
 assert.throws(() => outfitSchema.parse({ ...photoOnly.data, itemIds: [], asset: null }), /照片/);
 const state = { collections: [{ id: 'main', name: 'Round trip', createdAt: item.createdAt }], collectionId: 'main', records: [item, outfit, entry, photoOnly, photoEntry], assets: [{ hash, name: '原始照片.png', mime: 'image/png', size: png.length }, { hash: photoHash, name: '穿搭原图.png', mime: 'image/png', size: outfitPhoto.length }] };
+const personal = {...metadata(),kind:'personalSizes',data:personalSizesSchema.parse({measurements:{height:168,waist:68,inseam:77,outseam:103},shoeSize:{eu:38.5,cn:240}})};
+state.records.push(personal);
+assert.throws(()=>personalSizesSchema.parse({measurements:{waist:0}}));
+assert.throws(()=>personalSizesSchema.parse({measurements:{height:Infinity}}));
+assert.throws(()=>personalSizesSchema.parse({measurements:{length:90}}));
+assert.throws(()=>personalSizesSchema.parse({shoeSize:{cn:242}}));
 let written = null; let uploadCount = 0;
 globalThis.fetch = async (url, init = {}) => {
   if (url === `/api/assets/${hash}`) return new Response(png);
@@ -42,7 +48,7 @@ const blob = await exportArchive(state, () => {});
 const file = new File([blob], 'test.zip');
 const manifest = await inspectArchive(file, () => {});
 assert.deepEqual(manifest.records, state.records); assert.deepEqual(manifest.assets, state.assets);
-assert.equal(manifest.schemaVersion, 4);
+assert.equal(manifest.schemaVersion, 5);
 assert.equal(await importArchive(file, manifest, () => {}), 'restored'); assert.equal(uploadCount, 2); assert.deepEqual(written.records, state.records);
 const files = unzipSync(new Uint8Array(await blob.arrayBuffer()));
 assert.deepEqual(files[`assets/${hash}.png`], png);
@@ -51,16 +57,17 @@ const corrupt = { ...files, [`assets/${hash}.png`]: strToU8('changed bytes') };
 await assert.rejects(() => inspectArchive(new File([zipSync(corrupt)], 'bad.zip'), () => {}), /SHA-256/);
 const missing = { ...files }; delete missing[`assets/${hash}.png`];
 await assert.rejects(() => inspectArchive(new File([zipSync(missing)], 'missing.zip'), () => {}), /原图缺失/);
-assert.throws(() => validateArchive({ ...manifest, schemaVersion: 5 }));
+assert.throws(() => validateArchive({ ...manifest, schemaVersion: 6 }));
 assert.throws(() => validateArchive({ ...manifest, assets: [state.assets[0]] }), /缺少原图/);
 const legacy = { ...manifest, schemaVersion: 1, records: structuredClone([item, outfit, entry]), assets: [state.assets[0]] };
 delete legacy.records[1].data.asset; delete legacy.records[2].data.snapshot.asset;
 for (const data of [legacy.records[0].data, legacy.records[2].data.snapshot.items[0].data]) for (const key of ['fit','shoeFit','shoeSize','measurements']) delete data[key];
-for (const version of [1,2,3]) {
-  const upgraded = validateArchive({ ...legacy, schemaVersion: version }); assert.equal(upgraded.schemaVersion, 4); assert.equal(upgraded.records[1].data.asset, null); assert.equal(upgraded.records[2].data.snapshot.asset, null);
+for (const version of [1,2,3,4]) {
+  const upgraded = validateArchive({ ...legacy, schemaVersion: version }); assert.equal(upgraded.schemaVersion, 5); assert.equal(upgraded.records[1].data.asset, null); assert.equal(upgraded.records[2].data.snapshot.asset, null);
   assert.equal(upgraded.records[0].data.fit, null); assert.deepEqual(upgraded.records[0].data.shoeSize, { eu: null, cn: null }); assert.deepEqual(upgraded.records[0].data.measurements, {});
 }
 assert.throws(() => validateArchive({ ...manifest, records: [outfit] }), /不存在/);
 assert.throws(() => validateArchive({ ...manifest, records: [...manifest.records, item] }), /重复/);
+assert.throws(()=>validateArchive({...manifest,records:[...manifest.records,{...personal,id:crypto.randomUUID()}]}),/一份我的尺码/);
 await rm('.test-build', { recursive: true, force: true });
-console.log('PASS: exact item/outfit original bytes + all records round trip; immutable photo-only snapshots; legacy v1 backup upgrade; leap-year month jumps; corrupt/missing media, future version, duplicate IDs and broken references rejected.');
+console.log('PASS: exact item/outfit original bytes + all records round trip; immutable photo-only snapshots; legacy v1-v4 backup upgrades and personal sizes v5 round trip; leap-year month jumps; corrupt/missing media, future version, duplicate IDs and broken references rejected.');
