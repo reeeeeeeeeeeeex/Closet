@@ -8,23 +8,23 @@ export function validateSubsets(records: ClosetRecord[]) {
   const subsets = records.filter((record): record is SubsetRecord => record.kind === "subset");
   for (const subset of subsets) {
     const data = subset.data;
-    if (data.scope === "outfit" && data.root !== "all") throw new Error("搭配子集只能属于搭配集");
+    if (data.scope === "outfit" && data.root !== "all") throw new Error("搭配分组只能属于搭配集");
     if (data.parentId) {
       const parent = map.get(data.parentId);
-      if (!parent || parent.kind !== "subset") throw new Error("父子集不存在");
-      if (parent.data.scope !== data.scope || parent.data.root !== data.root) throw new Error("子集必须沿用父集的范围和分类");
+      if (!parent || parent.kind !== "subset") throw new Error("上级分组不存在");
+      if (parent.data.scope !== data.scope || parent.data.root !== data.root) throw new Error("分组必须沿用上级分组的范围和分类");
     }
     const visited = new Set([subset.id]); let parentId = data.parentId;
     while (parentId) {
-      if (visited.has(parentId)) throw new Error("子集不能形成循环嵌套");
+      if (visited.has(parentId)) throw new Error("分组不能形成循环嵌套");
       visited.add(parentId); const parent = map.get(parentId);
-      if (!parent || parent.kind !== "subset") throw new Error("父子集不存在");
+      if (!parent || parent.kind !== "subset") throw new Error("上级分组不存在");
       parentId = parent.data.parentId;
     }
     for (const id of data.memberIds) {
       const member = map.get(id);
-      if (!member || member.kind !== data.scope) throw new Error("子集引用了不存在或类型不匹配的记录");
-      if (data.root !== "all" && member.kind === "item" && member.data.category !== data.root) throw new Error("单品仍在原分类的子集中，请先移出子集再修改分类");
+      if (!member || member.kind !== data.scope) throw new Error("分组引用了不存在或类型不匹配的记录");
+      if (data.root !== "all" && member.kind === "item" && member.data.category !== data.root) throw new Error("单品仍在原分类的分组中，请先移出分组再修改分类");
     }
   }
 }

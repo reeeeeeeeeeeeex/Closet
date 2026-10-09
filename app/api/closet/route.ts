@@ -10,15 +10,15 @@ function storeRecords(db: LocalDatabase, owner: string, collectionId: string, ch
     const existing = latest.find(value => value.id === record.id);
     if (record.kind === "personalSizes" && latest.some(value => value.kind === "personalSizes" && value.id !== record.id)) throw new ApiError(409, "此衣橱已有尺码资料，请刷新后编辑。草稿仍保留。");
     if (expectedVersion !== undefined && (!existing || existing.version !== expectedVersion || existing.kind !== record.kind)) throw new ApiError(409, "记录已在其他设备更改，请刷新");
-    if (existing?.kind === "subset" && record.kind === "subset" && (record.data.scope !== existing.data.scope || record.data.root !== existing.data.root || record.data.parentId !== existing.data.parentId)) throw new ApiError(400, "子集的父集和所属分类不能修改");
+    if (existing?.kind === "subset" && record.kind === "subset" && (record.data.scope !== existing.data.scope || record.data.root !== existing.data.root || record.data.parentId !== existing.data.parentId)) throw new ApiError(400, "分组的上级分组和所属分类不能修改");
     if (latest.length + changes.length - (existing ? 1 : 0) > 2000) throw new ApiError(400, "此衣橱已达首版的 2000 条记录上限");
     let next = [...latest.filter(value => !changes.some(change => change.id === value.id)), ...changes];
     let membership;
     if (subsetId) {
-      if (existing || (record.kind !== "item" && record.kind !== "outfit")) throw new ApiError(400, "只能在新增单品或搭配时指定子集");
+      if (existing || (record.kind !== "item" && record.kind !== "outfit")) throw new ApiError(400, "只能在新增单品或搭配时指定分组");
       const subset = latest.find(value => value.id === subsetId);
-      if (!subset || subset.kind !== "subset") throw new ApiError(404, "子集不存在");
-      if (subset.data.scope !== record.kind) throw new ApiError(400, "子集范围与记录类型不匹配");
+      if (!subset || subset.kind !== "subset") throw new ApiError(404, "分组不存在");
+      if (subset.data.scope !== record.kind) throw new ApiError(400, "分组范围与记录类型不匹配");
       membership = { ...subset, data: { ...subset.data, memberIds: [...new Set([...subset.data.memberIds, record.id])] }, version: subset.version + 1, updatedAt: record.updatedAt };
       next = next.map(value => value.id === subset.id ? membership! : value);
     }
@@ -31,7 +31,7 @@ function storeRecords(db: LocalDatabase, owner: string, collectionId: string, ch
       const updated: ClosetRecord = { ...change, data: { ...change.data, snapshot: makeSnapshot(outfit.data, next.filter((value): value is ItemRecord => value.kind === "item")) } };
       changes[index] = updated; next = next.map(value => value.id === updated.id ? updated : value);
     }
-    try { validateSubsets(next); } catch (error) { throw new ApiError(400, error instanceof Error ? error.message : "子集关系无效"); }
+    try { validateSubsets(next); } catch (error) { throw new ApiError(400, error instanceof Error ? error.message : "分组关系无效"); }
     if (existing) {
       const result = db.prepare("UPDATE records SET data=?,version=version+1,updated_at=? WHERE owner=? AND collection_id=? AND id=? AND version=?").bind(JSON.stringify(record.data), record.updatedAt, owner, collectionId, record.id, expectedVersion!).run();
       if (!result.changes) throw new ApiError(409, "记录已在其他设备更改，请刷新");

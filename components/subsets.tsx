@@ -29,19 +29,19 @@ export function SubsetBrowser({ records, scope, root, activeId, disabled, onSele
     const { subset, count } = section; const open = !collapsed.has(subset.id); const contentId = "subset-content-" + subset.id;
     return <section className="subset-section" key={subset.id} data-subset-id={subset.id}>
       <div className="subset-section-heading">
-        <button type="button" className="subset-toggle" aria-expanded={open} aria-controls={contentId} aria-label={t("展开或折叠子集 {name}", { name: subset.data.name })} onClick={() => toggle(subset.id)}>{open ? <ChevronDown size={18}/> : <ChevronRight size={18}/>}</button>
+        <button type="button" className="subset-toggle" aria-expanded={open} aria-controls={contentId} aria-label={t("展开或折叠分组 {name}", { name: subset.data.name })} onClick={() => toggle(subset.id)}>{open ? <ChevronDown size={18}/> : <ChevronRight size={18}/>}</button>
         <button type="button" className="subset-title" onClick={() => onSelect(subset.id)}>{subset.data.name}</button><span className="subset-count">{t("{count} 条内容", { count })}</span>
-        <div className="subset-actions"><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDialog({ record: subset, parentId: subset.data.parentId })}><Pencil size={14}/>{t("编辑")}</Button><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDialog({ record: subset, parentId: subset.data.parentId })}>{t("添加内容")}</Button><Button variant="ghost" size="sm" disabled={disabled} onClick={() => onAdd(subset.id)}><Plus size={14}/>{scope === "item" ? t("添加单品") : t("新建搭配")}</Button><Button variant="outline" size="sm" disabled={disabled} onClick={() => setDialog({ parentId: subset.id })}><FolderPlus size={14}/>{t("新建子集")}</Button></div>
+        <div className="subset-actions"><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDialog({ record: subset, parentId: subset.data.parentId })}><Pencil size={14}/>{t("编辑")}</Button><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDialog({ record: subset, parentId: subset.data.parentId })}>{t("添加内容")}</Button><Button variant="ghost" size="sm" disabled={disabled} onClick={() => onAdd(subset.id)}><Plus size={14}/>{scope === "item" ? t("添加单品") : t("新建搭配")}</Button><Button variant="outline" size="sm" disabled={disabled} onClick={() => setDialog({ parentId: subset.id })}><FolderPlus size={14}/>{t("新建分组")}</Button></div>
       </div>
-      {open && <div id={contentId} className="subset-section-content">{section.children.map(renderSection)}{!!section.records.length && renderCards(section.records)}{!count && <p className="field-hint">{t("此子集在当前筛选下没有内容。")}</p>}</div>}
+      {open && <div id={contentId} className="subset-section-content">{section.children.map(renderSection)}{!!section.records.length && renderCards(section.records)}{!count && <p className="field-hint">{t("此分组在当前筛选下没有内容。")}</p>}</div>}
     </section>;
   }
-  return <section className="subset-browser" aria-label={t("子集管理")}>
-    <div className="subset-toolbar"><nav className="subset-path" aria-label={t("子集路径")}><button type="button" onClick={() => onSelect(null)}>{rootName}</button>{trail.map(record => <span key={record.id}><ChevronRight size={14} /><button type="button" aria-current={record.id === active?.id ? "page" : undefined} onClick={() => onSelect(record.id)}>{record.data.name}</button></span>)}</nav>
-      <div className="subset-actions">{active && <><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDialog({ record: active, parentId: active.data.parentId })}><Pencil size={15}/>{t("编辑子集")}</Button><Button variant="ghost" size="sm" disabled={disabled} onClick={() => onAdd(active.id)}><Plus size={15}/>{scope === "item" ? t("添加单品") : t("新建搭配")}</Button></>}<Button variant="outline" size="sm" disabled={disabled} onClick={() => setDialog({ parentId: active?.id || null })}><FolderPlus size={16}/>{t("新建子集")}</Button></div>
+  return <section className="subset-browser" aria-label={t("分组管理")}>
+    <div className="subset-toolbar"><nav className="subset-path" aria-label={t("分组路径")}><button type="button" onClick={() => onSelect(null)}>{rootName}</button>{trail.map(record => <span key={record.id}><ChevronRight size={14} /><button type="button" aria-current={record.id === active?.id ? "page" : undefined} onClick={() => onSelect(record.id)}>{record.data.name}</button></span>)}</nav>
+      <div className="subset-actions">{active && <><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDialog({ record: active, parentId: active.data.parentId })}><Pencil size={15}/>{t("编辑分组")}</Button><Button variant="ghost" size="sm" disabled={disabled} onClick={() => onAdd(active.id)}><Plus size={15}/>{scope === "item" ? t("添加单品") : t("新建搭配")}</Button></>}<Button variant="outline" size="sm" disabled={disabled} onClick={() => setDialog({ parentId: active?.id || null })}><FolderPlus size={16}/>{t("新建分组")}</Button></div>
     </div>
     {sections.map(renderSection)}
-    {!!ungrouped.length && <section className="subset-ungrouped">{!!sections.length && <h2>{active ? t("当前子集的其他内容") : t("未加入当前页面子集")}</h2>}{renderCards(ungrouped)}</section>}
+    {!!ungrouped.length && <section className="subset-ungrouped">{!!sections.length && <h2>{t("未分组")}</h2>}{renderCards(ungrouped)}</section>}
     {dialog && <SubsetEditor key={dialog.record?.id || dialog.parentId || "root"} record={dialog.record} preset={{ scope, root, parentId: dialog.parentId }} records={records} onClose={() => setDialog(null)} onSave={async (data, record) => { await onSave(data, record); setDialog(null); }} />}
   </section>;
 }
@@ -59,12 +59,12 @@ export function SubsetEditor({ record, preset, records, onClose, onSave }: {
   }, [record, records]);
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
-    try { if (!data.name.trim()) throw new Error(t("请填写子集名称")); await onSave(data, record); }
-    catch (error) { setError(error instanceof Error ? tr(error.message) : t("保存子集失败，请重试")); setBusy(false); }
+    try { if (!data.name.trim()) throw new Error(t("请填写分组名称")); await onSave(data, record); }
+    catch (error) { setError(error instanceof Error ? tr(error.message) : t("保存分组失败，请重试")); setBusy(false); }
   }
-  return <Dialog open onOpenChange={(open: boolean) => { if (!open && !busy) onClose(); }}><DialogContent className="editor-dialog subset-dialog"><DialogHeader><DialogTitle>{record ? t("编辑子集") : t("新建子集")}</DialogTitle><DialogDescription>{t("可以先创建空子集，再添加内容。下级子集的内容会自动汇总到父集。")}</DialogDescription></DialogHeader>
-    <form onSubmit={event => void submit(event)}><fieldset disabled={busy}><div className="form-fields"><div className="field"><Label htmlFor="subset-name">{t("子集名称")}</Label><Input id="subset-name" autoFocus required maxLength={100} value={data.name} onChange={event => setData({ ...data, name: event.target.value })} placeholder={t("例如：春季通勤、运动鞋、旅行穿搭")} /></div>
+  return <Dialog open onOpenChange={(open: boolean) => { if (!open && !busy) onClose(); }}><DialogContent className="editor-dialog subset-dialog"><DialogHeader><DialogTitle>{record ? t("编辑分组") : t("新建分组")}</DialogTitle><DialogDescription>{t("可以先创建空分组，再添加内容。下级分组的内容会自动汇总到上级分组。")}</DialogDescription></DialogHeader>
+    <form onSubmit={event => void submit(event)}><fieldset disabled={busy}><div className="form-fields"><div className="field"><Label htmlFor="subset-name">{t("分组名称")}</Label><Input id="subset-name" autoFocus required maxLength={100} value={data.name} onChange={event => setData({ ...data, name: event.target.value })} placeholder={t("例如：春季通勤、运动鞋、旅行穿搭")} /></div>
       <SubsetContentPicker records={records} data={data} inherited={inherited} onChange={memberIds => setData({ ...data, memberIds })}/>
-    </div></fieldset>{error && <p className="form-error" role="alert">{error}</p>}<DialogFooter className="editor-footer"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy}>{busy ? t("保存中…") : t("保存子集")}</Button></DialogFooter></form>
+    </div></fieldset>{error && <p className="form-error" role="alert">{error}</p>}<DialogFooter className="editor-footer"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy}>{busy ? t("保存中…") : t("保存分组")}</Button></DialogFooter></form>
   </DialogContent></Dialog>;
 }

@@ -42,7 +42,7 @@ export const snapshotSchema = z.object({ name: title, occasions, notes: note, as
   .refine(s => !!s.asset || s.items.length > 0, "日历快照需要照片或单品");
 export const calendarSchema = z.object({ date: dateSchema, status: z.enum(["planned", "worn"]), outfitId: id, notes: note, snapshot: snapshotSchema }).strict();
 export const subsetSchema = z.object({ name: title, scope: z.enum(["item", "outfit"]), root: z.enum(["all", "top", "bottom", "dress", "outerwear", "shoes", "bag", "accessory"]), parentId: id.nullable(), memberIds: z.array(id).max(2000).default([]) }).strict()
-  .refine(data => new Set(data.memberIds).size === data.memberIds.length, "子集不能重复添加同一记录");
+  .refine(data => new Set(data.memberIds).size === data.memberIds.length, "分组不能重复添加同一记录");
 export type Subset = z.infer<typeof subsetSchema>;
 export type Item = z.infer<typeof itemSchema>;
 export type Outfit = z.infer<typeof outfitSchema>;
