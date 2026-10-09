@@ -1,13 +1,13 @@
 "use client";
 import { useMemo, useState, type ReactNode } from "react";
-import { ChevronRight, ChevronDown, FolderPlus, Pencil, Plus, X } from "lucide-react";
+import { ChevronRight, ChevronDown, FolderPlus, Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ItemLabels } from "@/components/item-details";
+import { SubsetContentPicker } from "@/components/subset-content-picker";
 import { CATEGORIES, type ClosetRecord, type ItemRecord, type OutfitRecord, type Subset, type SubsetRecord } from "@/lib/domain";
-import { rootRecords, subsetMemberIds, subsetTrail, subsetSections, type SubsetSection } from "@/lib/subsets";
+import { subsetMemberIds, subsetTrail, subsetSections, type SubsetSection } from "@/lib/subsets";
 import { tr } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
 
@@ -51,14 +51,12 @@ export function SubsetEditor({ record, preset, records, onClose, onSave }: {
   onClose: () => void; onSave: (data: Subset, record?: SubsetRecord) => Promise<void>;
 }) {
   const { t } = useI18n(); const [data, setData] = useState<Subset>(record?.data || { ...preset, name: "", memberIds: [] });
-  const [search, setSearch] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  const candidates = rootRecords(records, data.scope, data.root);
+  const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const inherited = useMemo(() => {
     const members = new Set<string>();
     if (record) for (const child of records) if (child.kind === "subset" && child.data.parentId === record.id) for (const member of subsetMemberIds(records, child.id)) members.add(member);
     return members;
   }, [record, records]);
-  const visible = candidates.filter(candidate => (!candidate.data.archived || data.memberIds.includes(candidate.id)) && candidate.data.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try { if (!data.name.trim()) throw new Error(t("请填写子集名称")); await onSave(data, record); }
@@ -66,10 +64,7 @@ export function SubsetEditor({ record, preset, records, onClose, onSave }: {
   }
   return <Dialog open onOpenChange={(open: boolean) => { if (!open && !busy) onClose(); }}><DialogContent className="editor-dialog subset-dialog"><DialogHeader><DialogTitle>{record ? t("编辑子集") : t("新建子集")}</DialogTitle><DialogDescription>{t("可以先创建空子集，再添加内容。下级子集的内容会自动汇总到父集。")}</DialogDescription></DialogHeader>
     <form onSubmit={event => void submit(event)}><fieldset disabled={busy}><div className="form-fields"><div className="field"><Label htmlFor="subset-name">{t("子集名称")}</Label><Input id="subset-name" autoFocus required maxLength={100} value={data.name} onChange={event => setData({ ...data, name: event.target.value })} placeholder={t("例如：春季通勤、运动鞋、旅行穿搭")} /></div>
-      <div className="field"><Label htmlFor="subset-search">{t("选择内容（可选）")}</Label><Input id="subset-search" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder={t("搜索可加入的单品或搭配")} /></div>
-      <div className="subset-members">{visible.map(candidate => <label className="subset-member" key={candidate.id}><input type="checkbox" checked={data.memberIds.includes(candidate.id)} onChange={event => setData({ ...data, memberIds: event.target.checked ? [...data.memberIds, candidate.id] : data.memberIds.filter(id => id !== candidate.id) })} /><div><strong>{candidate.data.name}</strong>{candidate.kind === "item" && <ItemLabels item={candidate.data} />}{inherited.has(candidate.id) && <small>{t("已包含在下级子集中")}</small>}{candidate.data.archived && <small>{t("已收起")}</small>}</div></label>)}</div>
-      {!visible.length && <p className="field-hint">{t("暂无可选择的内容，仍然可以创建空子集。")}</p>}
-      {!!data.memberIds.length && <div className="selected-summary"><span>{t("直接加入 {count} 条", { count: data.memberIds.length })}</span>{data.memberIds.map(id => <button type="button" key={id} onClick={() => setData({ ...data, memberIds: data.memberIds.filter(value => value !== id) })}>{candidates.find(candidate => candidate.id === id)?.data.name || t("记录不存在")}<X size={12} /></button>)}</div>}
+      <SubsetContentPicker records={records} data={data} inherited={inherited} onChange={memberIds => setData({ ...data, memberIds })}/>
     </div></fieldset>{error && <p className="form-error" role="alert">{error}</p>}<DialogFooter className="editor-footer"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy}>{busy ? t("保存中…") : t("保存子集")}</Button></DialogFooter></form>
   </DialogContent></Dialog>;
 }

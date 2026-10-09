@@ -395,12 +395,15 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 .subset-card > span { color: #77869a; font-size: 13px; white-space: nowrap; }
 .subset-card > svg { flex-shrink: 0; color: #77869a; }
 .subset-hint { margin-top: 10px; font-size: 14px; color: #77869a; line-height: 1.7; }
-.subset-dialog { max-width: min(95vw, 600px); }
-.subset-members { max-height: 300px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
-.subset-member { display: flex; align-items: flex-start; gap: 12px; padding: 13px; border-bottom: 1px solid var(--border); cursor: pointer; }
-.subset-member:last-child { border-bottom: 0; }
-.subset-member > input { margin-top: 3px; width: 17px; height: 17px; flex-shrink: 0; }
-.subset-member > div { flex: 1; min-width: 0; }
-.subset-member strong { font-size: 15px; overflow-wrap: anywhere; }
-.subset-member small { display: block; color: #77869a; font-size: 13px; margin-top: 5px; }
+.subset-dialog { width: min(95vw, 980px) !important; max-width: 980px !important; }
+.subset-picker { display: grid; gap: 14px; min-width: 0; }
+.subset-picker-tabs { gap: 20px; }
+.subset-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; max-height: 46dvh; overflow: auto; padding: 3px; align-items: start; }
+.subset-pick-card { width: 100%; }
+.subset-pick-card.picked { outline: 2px solid #576c8a; outline-offset: -2px; }
+.subset-pick-card > .photo, .subset-pick-card .outfit-cover-photo, .subset-pick-card .outfit-collage { height: 180px; }
+.subset-pick-card .item-card-body { min-height: 0; padding: 12px; }
+.subset-pick-card small { display: block; color: #77869a; font-size: 12px; margin-top: 7px; }
+.subset-pick-card:focus-visible { outline: 3px solid #576c8a; }
+@media (max-width: 767px) { .subset-pick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }.subset-pick-card > .photo, .subset-pick-card .outfit-cover-photo, .subset-pick-card .outfit-collage { height: 140px; } }
 @media (max-width: 767px) { .subset-grid { grid-template-columns: 1fr; }.subset-actions { margin-left: auto; } }
