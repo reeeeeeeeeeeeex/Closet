@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CATEGORY_MEASUREMENTS, garmentCategory, type Measurement } from "./item-details";
+import { DEFAULT_LOCALE, messageForLocale } from "./i18n/core";
 export const CATEGORIES = { top: "上装", bottom: "下装", dress: "连体 / 裙装", outerwear: "外套", shoes: "鞋履", bag: "包袋", accessory: "配饰" } as const;
 export const OCCASIONS = { work: "通勤", casual: "日常", party: "聚会", formal: "正式", vacation: "旅行", sport: "运动" } as const;
 export const SEASONS = { spring: "春", summer: "夏", autumn: "秋", winter: "冬" } as const;
@@ -86,8 +87,8 @@ export function makeSnapshot(outfit: Outfit, items: ItemRecord[]): CalendarEntry
   return snapshotSchema.parse({ name: outfit.name, occasions: outfit.occasions, notes: outfit.notes, asset: outfit.asset,
     items: outfit.itemIds.map(itemId => { const item = map.get(itemId); if (!item) throw new Error("搭配中的单品不存在，请刷新重试"); return { id: item.id, data: item.data }; }) });
 }
-export function wardrobePrompt(state: ClosetState, request: string): string {
-  return ["你是我的穿搭助手。仅使用以下真实衣橱中的单品，保留单品 ID，说明上身/下身/鞋履的比例、场合和舒适度。不虚构衣物。", "我的需求：" + request,
+export function wardrobePrompt(state: ClosetState, request: string, locale = DEFAULT_LOCALE): string {
+  return [messageForLocale(locale, "你是我的穿搭助手。仅使用以下真实衣橱中的单品，保留单品 ID，说明上身/下身/鞋履的比例、场合和舒适度。不虚构衣物。"), messageForLocale(locale, "我的需求：{request}", { request }),
     JSON.stringify(state.records.filter(r => r.kind === "item" && !r.data.archived).map(r => ({ id: r.id, ...r.data, asset: undefined })), null, 2)
   ].join("\n\n");
 }

@@ -4,13 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Item } from "@/lib/domain";
 import { CATEGORY_MEASUREMENTS, FITS, SHOE_FITS, garmentCategory, measurementName } from "@/lib/item-details";
-const t = (source: string, params: Record<string, string | number> = {}) => source.replace(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g, (match, name: string) => Object.hasOwn(params, name) ? String(params[name]) : match);
-
+import { useI18n } from "@/lib/i18n/provider";
 export function ItemDetailsFields({ item, onChange }: {
     item: Item;
     onChange: (item: Item) => void;
 }) {
-
+    const { t } = useI18n();
     const id = useId();
     const measurements = CATEGORY_MEASUREMENTS[item.category] || [];
     return <div className="item-details-fields">
@@ -34,7 +33,7 @@ export function ItemDetailsFields({ item, onChange }: {
 export function ItemLabels({ item }: {
     item: Item;
 }) {
-    const locale = "zh-CN";
+    const { t, locale } = useI18n();
     const number = (value: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(value);
     const tags: string[] = [];
     if (garmentCategory(item.category) && item.fit)
