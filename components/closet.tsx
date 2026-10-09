@@ -16,7 +16,9 @@ import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter,
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { CATEGORIES, OCCASIONS, SEASONS, wardrobePrompt, type Item, type ItemRecord, type Outfit, type OutfitRecord, type CalendarRecord, type ClosetState, type ClosetRecord, type ClosetArchive } from "@/lib/domain";
+import { CATEGORIES, OCCASIONS, SEASONS, wardrobePrompt, type Item, type ItemRecord, type Outfit, type OutfitRecord, type CalendarRecord, type ClosetState, type ClosetRecord, type ClosetArchive, type Subset, type SubsetRecord } from "@/lib/domain";
+import { SubsetBrowser } from "@/components/subsets";
+import { subsetMemberIds } from "@/lib/subsets";
 import { ItemDetailsFields, ItemLabels } from "@/components/item-details";
 import { CATEGORY_MEASUREMENTS, garmentCategory } from "@/lib/item-details";
 import { OutfitFields } from "@/components/outfit-fields";
@@ -31,6 +33,7 @@ type View = "wardrobe" | "outfits" | "calendar" | "backup" | "assistant";
 type Editor = {
     kind: "item";
     record?: ItemRecord;
+    initialCategory?: Item["category"];
 } | {
     kind: "outfit";
     record?: OutfitRecord;
@@ -108,6 +111,7 @@ export default function Home() {
     const [editor, setEditor] = useState<Editor | null>(null);
     const [search, setSearch] = useState("");
     const [category, setCategory] = useState("all");
+    const [selectedSubsetId, setSelectedSubsetId] = useState<string | null>(null);
     const [occasion, setOccasion] = useState("all");
     const [archived, setArchived] = useState(false);
     const selectedCollection = useRef<string | undefined>(undefined);
@@ -116,8 +120,10 @@ export default function Home() {
     useEffect(() => { stateRef.current = state; }, [state]);
     const refresh = useCallback(async (collectionId?: string, silent = false) => {
         const id = ++refreshId.current;
-        if (collectionId)
+        if (collectionId) {
+            if (selectedCollection.current !== collectionId) setSelectedSubsetId(null);
             selectedCollection.current = collectionId;
+        }
         if (!silent)
             setSyncing(true);
         try {
@@ -148,10 +154,15 @@ export default function Home() {
         return; const onFocus = () => { if (document.visibilityState === "visible")
         void refresh(undefined, true); }; window.addEventListener("focus", onFocus); const interval = setInterval(onFocus, 45000); return () => { window.removeEventListener("focus", onFocus); clearInterval(interval); }; }, [editor, refresh]);
     const save: Save = async (kind, data, record) => {
-        await api("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "save", collectionId: selectedCollection.current || "main", kind, data, id: record?.id, version: record?.version }) });
+        const subsetId = !record && activeSubset?.data.scope === kind ? activeSubset.id : undefined;
+        await api("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "save", collectionId: selectedCollection.current || "main", kind, data, id: record?.id, version: record?.version, subsetId }) });
         setEditor(null);
         toast.success(t("已保存到衣橱"));
         await refresh();
+    };
+    const saveSubset = async (data: Subset, record?: SubsetRecord) => {
+        const result = await api<{ id: string }>("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "save", collectionId: selectedCollection.current || "main", kind: "subset", data, id: record?.id, version: record?.version }) });
+        toast.success(t("子集已保存")); await refresh(); return result.id;
     };
     const removeCalendar = async (record: CalendarRecord) => { await api("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "deleteCalendar", collectionId: selectedCollection.current || "main", kind: "calendar", id: record.id, version: record.version }) }); setEditor(null); toast.success(t("日历记录已删除")); await refresh(); };
     const items = useMemo(() => (state?.records || []).filter((r): r is ItemRecord => r.kind === "item"), [state]);
@@ -159,9 +170,13 @@ export default function Home() {
     const calendar = useMemo(() => (state?.records || []).filter((r): r is CalendarRecord => r.kind === "calendar"), [state]);
     const activeItems = items.filter(i => !i.data.archived);
     const activeOutfits = outfits.filter(o => !o.data.archived);
-    const filteredItems = items.filter(i => i.data.archived === archived && (category === "all" || i.data.category === category) && (occasion === "all" || i.data.occasions.includes(occasion as Item["occasions"][number])) && [i.data.name, i.data.color, i.data.notes].join(" ").toLowerCase().includes(search.toLowerCase()));
-    const filteredOutfits = outfits.filter(o => o.data.archived === archived && (occasion === "all" || o.data.occasions.includes(occasion as Item["occasions"][number])) && [o.data.name, o.data.notes].join(" ").toLowerCase().includes(search.toLowerCase()));
-    const goView = (v: View) => { setView(v); setSearch(""); setCategory("all"); setOccasion("all"); setArchived(false); };
+    const scope = view === "wardrobe" ? "item" : "outfit";
+    const subsetRoot = view === "wardrobe" ? category as Subset["root"] : "all";
+    const activeSubset = state?.records.find((record): record is SubsetRecord => record.kind === "subset" && record.id === selectedSubsetId && record.data.scope === scope && record.data.root === subsetRoot);
+    const subsetMembers = activeSubset ? subsetMemberIds(state!.records, activeSubset.id) : null;
+    const filteredItems = items.filter(i => (!subsetMembers || subsetMembers.has(i.id)) && i.data.archived === archived && (category === "all" || i.data.category === category) && (occasion === "all" || i.data.occasions.includes(occasion as Item["occasions"][number])) && [i.data.name, i.data.color, i.data.notes].join(" ").toLowerCase().includes(search.toLowerCase()));
+    const filteredOutfits = outfits.filter(o => (!subsetMembers || subsetMembers.has(o.id)) && o.data.archived === archived && (occasion === "all" || o.data.occasions.includes(occasion as Item["occasions"][number])) && [o.data.name, o.data.notes].join(" ").toLowerCase().includes(search.toLowerCase()));
+    const goView = (v: View) => { setView(v); setSearch(""); setCategory("all"); setSelectedSubsetId(null); setOccasion("all"); setArchived(false); };
     useEffect(() => {
         const mc = (document as Document & {
             modelContext?: {
@@ -197,20 +212,20 @@ export default function Home() {
     <main className="workspace">
       {state && state.collections.length > 1 && <div className="collection-switch"><span>{t("当前衣橱")}</span><Picker label={t("切换衣橱")} value={state.collectionId} options={Object.fromEntries(state.collections.map(c => [c.id, c.name]))} onChange={v => void refresh(v)}/></div>}
       <div className="page-heading"><div><div className="eyebrow">{view === "wardrobe" ? t("YOUR PERSONAL WARDROBE") : view === "outfits" ? t("A LITTLE INSPIRATION, EVERY DAY") : view === "calendar" ? t("DRESS FOR YOUR DAYS") : view === "backup" ? t("YOUR WARDROBE, YOUR DATA") : t("MAKE ROOM FOR IDEAS")}</div><h1>{titles[view]}<span className="heading-period">.</span></h1><p>{view === "wardrobe" ? t("收好每一件喜欢，把灵感穿进日常。") : view === "outfits" ? t("从熟悉的单品里，发现新的组合。") : view === "calendar" ? t("安排未来的穿搭，留住当天的样子。") : view === "backup" ? t("带上原图和每一条记录，自由迁移。") : t("让你常用的 AI，先认识你的衣橱。")}</p></div>
-      {(view === "wardrobe" || view === "outfits" || view === "calendar") && <Button className="main-action" disabled={!state || !!error} onClick={() => setEditor(view === "wardrobe" ? { kind: "item" } : view === "outfits" ? { kind: "outfit" } : { kind: "calendar", date: localDate() })}><Plus size={18}/>{view === "wardrobe" ? t("添加单品") : view === "outfits" ? t("新建搭配") : t("添加穿搭")}</Button>}</div>
+      {(view === "wardrobe" || view === "outfits" || view === "calendar") && <Button className="main-action" disabled={!state || !!error} onClick={() => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"] } : view === "outfits" ? { kind: "outfit" } : { kind: "calendar", date: localDate() })}><Plus size={18}/>{view === "wardrobe" ? t("添加单品") : view === "outfits" ? t("新建搭配") : t("添加穿搭")}</Button>}</div>
       {error && <div className="error-banner" role="alert"><AlertCircle size={19}/><div><strong>{t("暂时无法同步衣橱")}</strong><p>{error}</p>{authRequired && <a href="/login">{t("登录后继续")}</a>}</div><Button variant="outline" onClick={() => void refresh()}>{t("重试")}</Button></div>}
       {loading ? <div className="loading-grid">{[1, 2, 3, 4].map(n => <Skeleton key={n} className="h-72 rounded-2xl"/>)}</div> : state && <>
-        {view === "wardrobe" && <><div className="stats-strip"><Stat label={t("衣橱单品")} count={activeItems.length} suffix={t("件")}/><Stat label={t("收藏搭配")} count={activeOutfits.length} suffix={t("套")}/><Stat label={t("已穿记录")} count={calendar.filter(c => c.data.status === "worn").length} suffix={t("次")}/><div className="stats-note"><span className="tiny-dot"/>{t("从已有的喜欢，穿出更多可能")}</div></div><div className="wardrobe-toolbar"><div className="category-tabs" role="group" aria-label={t("单品分类")}>{Object.entries({ all: t("全部"), ...translatedOptions(CATEGORIES, t) }).map(([key, label]) => <button key={key} onClick={() => setCategory(key)} className={category === key ? "active" : ""}>{label}<span>{key === "all" ? items.filter(i => i.data.archived === archived).length : items.filter(i => i.data.category === key && i.data.archived === archived).length}</span></button>)}</div></div></>}
-        {(view === "wardrobe" || view === "outfits") && <><div className="filter-row"><div className="search-box"><Search size={17}/><Input value={search} onChange={e => setSearch(e.target.value)} placeholder={view === "wardrobe" ? t("找一件单品、颜色或备注\u2026") : t("寻找我的搭配\u2026")} aria-label={t("搜索")}/>{search && <button aria-label={t("清空搜索")} onClick={() => setSearch("")}><X size={14}/></button>}</div><div className="filter-controls"><Picker label={t("场合筛选")} value={occasion} onChange={setOccasion} options={{ all: t("所有场合"), ...translatedOptions(OCCASIONS, t) }}/><button className={`archive-filter ${archived ? "on" : ""}`} aria-pressed={archived} onClick={() => setArchived(!archived)} title={t("查看已收起的单品或搭配")}><Archive size={16}/><span>{t("已收起")}</span></button></div></div>
-        {view === "wardrobe" && (filteredItems.length ? <div className="item-grid">{filteredItems.map(item => <button className="item-card" key={item.id} onClick={() => setEditor({ kind: "item", record: item })}><Photo asset={item.data.asset} name={item.data.name}/><div className="item-card-body"><div className="item-category">{t(CATEGORIES[item.data.category])}{item.data.color && ` / ${item.data.color}`}</div><h3>{item.data.name}</h3><OccasionLabels values={item.data.occasions}/><ItemLabels item={item.data}/></div><span className="card-edit"><ArrowUpRight size={18}/></span></button>)}</div> : items.length === 0 && !search && category === "all" && occasion === "all" && !archived ? <Welcome onAdd={() => setEditor({ kind: "item" })} onImport={() => goView("backup")}/> : <EmptyState icon={Search} title={t("这里还没有单品")} text={t("试试其他分类，或清空筛选条件。")} action={t("清空筛选")} onAction={() => { setSearch(""); setCategory("all"); setOccasion("all"); setArchived(false); }}/>)}
-        {view === "outfits" && (filteredOutfits.length ? <div className="outfit-grid">{filteredOutfits.map(outfit => <div className="outfit-card" key={outfit.id}><button className="outfit-open" onClick={() => setEditor({ kind: "outfit", record: outfit })}><OutfitCollage asset={outfit.data.asset} itemIds={outfit.data.itemIds} items={items}/><div className="outfit-body"><div className="item-category">{outfit.data.asset ? t("搭配照片 \u00B7 ") : ""}{outfit.data.itemIds.length ? t("{value1} 件单品", { value1: outfit.data.itemIds.length }) : t("未关联单品")}</div><h3>{outfit.data.name}</h3><OccasionLabels values={outfit.data.occasions}/></div></button><div className="outfit-footer"><span>{outfit.data.notes || t("喜欢的组合，留给刚好的日子。")}</span><Button variant="ghost" size="icon" aria-label={t("安排 {value1} 的穿搭日期", { value1: outfit.data.name })} onClick={() => setEditor({ kind: "calendar", outfitId: outfit.id, date: localDate() })}><CalendarDays size={19}/></Button></div></div>)}</div> : <EmptyState icon={Layers3} title={outfits.length ? t("没有找到这个搭配") : t("第一套搭配，从喜欢的单品开始")} text={t("拍照、导入搭配照片，或从单品组合一套穿搭。")} action={t("新建搭配")} onAction={() => setEditor({ kind: "outfit" })}/>)}</>}
+        {view === "wardrobe" && <><div className="stats-strip"><Stat label={t("衣橱单品")} count={activeItems.length} suffix={t("件")}/><Stat label={t("收藏搭配")} count={activeOutfits.length} suffix={t("套")}/><Stat label={t("已穿记录")} count={calendar.filter(c => c.data.status === "worn").length} suffix={t("次")}/><div className="stats-note"><span className="tiny-dot"/>{t("从已有的喜欢，穿出更多可能")}</div></div><div className="wardrobe-toolbar"><div className="category-tabs" role="group" aria-label={t("单品分类")}>{Object.entries({ all: t("全部"), ...translatedOptions(CATEGORIES, t) }).map(([key, label]) => <button key={key} onClick={() => { setCategory(key); setSelectedSubsetId(null); }} className={category === key ? "active" : ""}>{label}<span>{key === "all" ? items.filter(i => i.data.archived === archived).length : items.filter(i => i.data.category === key && i.data.archived === archived).length}</span></button>)}</div></div></>}
+        {(view === "wardrobe" || view === "outfits") && <><SubsetBrowser records={state.records} scope={scope} root={subsetRoot} activeId={activeSubset?.id || null} archived={archived} disabled={!!error || syncing} onSelect={setSelectedSubsetId} onSave={saveSubset} /><div className="filter-row"><div className="search-box"><Search size={17}/><Input value={search} onChange={e => setSearch(e.target.value)} placeholder={view === "wardrobe" ? t("找一件单品、颜色或备注\u2026") : t("寻找我的搭配\u2026")} aria-label={t("搜索")}/>{search && <button aria-label={t("清空搜索")} onClick={() => setSearch("")}><X size={14}/></button>}</div><div className="filter-controls"><Picker label={t("场合筛选")} value={occasion} onChange={setOccasion} options={{ all: t("所有场合"), ...translatedOptions(OCCASIONS, t) }}/><button className={`archive-filter ${archived ? "on" : ""}`} aria-pressed={archived} onClick={() => setArchived(!archived)} title={t("查看已收起的单品或搭配")}><Archive size={16}/><span>{t("已收起")}</span></button></div></div>
+        {view === "wardrobe" && (filteredItems.length ? <div className="item-grid">{filteredItems.map(item => <button className="item-card" key={item.id} onClick={() => setEditor({ kind: "item", record: item })}><Photo asset={item.data.asset} name={item.data.name}/><div className="item-card-body"><div className="item-category">{t(CATEGORIES[item.data.category])}{item.data.color && ` / ${item.data.color}`}</div><h3>{item.data.name}</h3><OccasionLabels values={item.data.occasions}/><ItemLabels item={item.data}/></div><span className="card-edit"><ArrowUpRight size={18}/></span></button>)}</div> : items.length === 0 && !search && category === "all" && occasion === "all" && !archived ? <Welcome onAdd={() => setEditor({ kind: "item" })} onImport={() => goView("backup")}/> : <EmptyState icon={Search} title={activeSubset ? t("这个子集还没有内容") : t("这里还没有单品")} text={activeSubset ? t("编辑子集可加入已有单品，新建单品会自动加入当前子集。") : t("试试其他分类，或清空筛选条件。")} action={activeSubset ? t("添加单品") : t("清空筛选")} onAction={() => { if (activeSubset) setEditor({ kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"] }); else { setSearch(""); setCategory("all"); setSelectedSubsetId(null); setOccasion("all"); setArchived(false); } }}/>)}
+        {view === "outfits" && (filteredOutfits.length ? <div className="outfit-grid">{filteredOutfits.map(outfit => <div className="outfit-card" key={outfit.id}><button className="outfit-open" onClick={() => setEditor({ kind: "outfit", record: outfit })}><OutfitCollage asset={outfit.data.asset} itemIds={outfit.data.itemIds} items={items}/><div className="outfit-body"><div className="item-category">{outfit.data.asset ? t("搭配照片 \u00B7 ") : ""}{outfit.data.itemIds.length ? t("{value1} 件单品", { value1: outfit.data.itemIds.length }) : t("未关联单品")}</div><h3>{outfit.data.name}</h3><OccasionLabels values={outfit.data.occasions}/></div></button><div className="outfit-footer"><span>{outfit.data.notes || t("喜欢的组合，留给刚好的日子。")}</span><Button variant="ghost" size="icon" aria-label={t("安排 {value1} 的穿搭日期", { value1: outfit.data.name })} onClick={() => setEditor({ kind: "calendar", outfitId: outfit.id, date: localDate() })}><CalendarDays size={19}/></Button></div></div>)}</div> : <EmptyState icon={Layers3} title={activeSubset ? t("这个子集还没有搭配") : outfits.length ? t("没有找到这个搭配") : t("第一套搭配，从喜欢的单品开始")} text={activeSubset ? t("新建搭配会自动加入当前子集，也可以编辑子集选择已有搭配。") : t("拍照、导入搭配照片，或从单品组合一套穿搭。")} action={t("新建搭配")} onAction={() => setEditor({ kind: "outfit" })}/>)}</>}
         {view === "calendar" && <CalendarPanel entries={calendar} onAdd={date => setEditor({ kind: "calendar", date })} onEdit={record => setEditor({ kind: "calendar", record })}/>}
         {view === "backup" && <BackupPanel state={state} onImported={async (id) => { await refresh(id); goView("wardrobe"); }}/>}
         {view === "assistant" && <AssistantPanel state={state}/>}
       </>}
       <footer className="workspace-footer"><span>{t("NEW CLOSET")}<span className="footer-divider">/</span>{t("少一点纠结，多一点喜欢。")}</span><span><LockKeyhole size={12}/>{t("私人空间")}</span></footer>
     </main></SidebarInset><Toaster theme="light" position="top-center" richColors/>
-    {editor?.kind === "item" && <ItemEditor key={editor.record?.id || "new-item"} record={editor.record} onClose={() => setEditor(null)} onSave={save}/>}
+    {editor?.kind === "item" && <ItemEditor key={editor.record?.id || "new-item"} record={editor.record} initialCategory={editor.initialCategory} onClose={() => setEditor(null)} onSave={save}/>}
     {editor?.kind === "outfit" && <OutfitEditor key={editor.record?.id || "new-outfit"} record={editor.record} items={items} onClose={() => setEditor(null)} onSave={save}/>}
     {editor?.kind === "calendar" && <CalendarEditor key={editor.record?.id || "new-calendar"} record={editor.record} date={editor.date} outfitId={editor.outfitId} outfits={outfits} items={items} onClose={() => setEditor(null)} onSave={save} onDelete={removeCalendar}/>}
   </SidebarProvider>;
@@ -247,13 +262,14 @@ function OutfitCollage({ asset, itemIds, items }: {
 function FormError({ message }: {
     message: string;
 }) { return message ? <div className="form-error" role="alert"><AlertCircle size={16}/><span>{message}</span></div> : null; }
-function ItemEditor({ record, onClose, onSave }: {
+function ItemEditor({ record, initialCategory, onClose, onSave }: {
     record?: ItemRecord;
+    initialCategory?: Item["category"];
     onClose: () => void;
     onSave: Save;
 }) {
     const { t } = useI18n();
-    const [data, setData] = useState<Item>(record?.data || { ...blankItem });
+    const [data, setData] = useState<Item>(record?.data || { ...blankItem, category: initialCategory || "top" });
     const [file, setFile] = useState<File | null>(null);
     const [preview, setPreview] = useState("");
     const [busy, setBusy] = useState(false);
@@ -506,7 +522,7 @@ function BackupPanel({ state, onImported }: {
     <Dialog open={!!manifest} onOpenChange={(open: boolean) => { if (!open && !busy) {
         setManifest(null);
         setFile(null);
-    } }}><DialogContent><DialogHeader><DialogTitle>{t("备份检查通过")}</DialogTitle><DialogDescription>{t("图片内容与 SHA-256 一致，记录关联完整。确认后建立新衣橱。")}</DialogDescription></DialogHeader>{manifest && <div className="import-preview"><h3>{manifest.collection.name}</h3><p>{file?.name} · {formatSize(file?.size || 0)}</p><div><span>{t("单品")}<strong>{manifest.records.filter(r => r.kind === "item").length}</strong></span><span>{t("搭配")}<strong>{manifest.records.filter(r => r.kind === "outfit").length}</strong></span><span>{t("日历")}<strong>{manifest.records.filter(r => r.kind === "calendar").length}</strong></span><span>{t("原图")}<strong>{manifest.assets.length}</strong></span></div></div>}{busy && <p className="inline-progress"><Loader2 size={16} className="animate-spin"/>{progress}</p>}<FormError message={error}/><DialogFooter><Button variant="outline" disabled={busy} onClick={() => { setManifest(null); setFile(null); }}>{t("取消")}</Button><Button disabled={busy} onClick={() => void restore()}>{busy ? t("恢复中\u2026") : t("导入为新衣橱")}<ArrowRight size={16}/></Button></DialogFooter></DialogContent></Dialog>
+    } }}><DialogContent><DialogHeader><DialogTitle>{t("备份检查通过")}</DialogTitle><DialogDescription>{t("图片内容与 SHA-256 一致，记录关联完整。确认后建立新衣橱。")}</DialogDescription></DialogHeader>{manifest && <div className="import-preview"><h3>{manifest.collection.name}</h3><p>{file?.name} · {formatSize(file?.size || 0)}</p><div><span>{t("单品")}<strong>{manifest.records.filter(r => r.kind === "item").length}</strong></span><span>{t("搭配")}<strong>{manifest.records.filter(r => r.kind === "outfit").length}</strong></span><span>{t("日历")}<strong>{manifest.records.filter(r => r.kind === "calendar").length}</strong></span><span>{t("子集")}<strong>{manifest.records.filter(record => record.kind === "subset").length}</strong></span><span>{t("原图")}<strong>{manifest.assets.length}</strong></span></div></div>}{busy && <p className="inline-progress"><Loader2 size={16} className="animate-spin"/>{progress}</p>}<FormError message={error}/><DialogFooter><Button variant="outline" disabled={busy} onClick={() => { setManifest(null); setFile(null); }}>{t("取消")}</Button><Button disabled={busy} onClick={() => void restore()}>{busy ? t("恢复中\u2026") : t("导入为新衣橱")}<ArrowRight size={16}/></Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }
 function AssistantPanel({ state }: {

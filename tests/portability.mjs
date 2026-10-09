@@ -42,7 +42,7 @@ const blob = await exportArchive(state, () => {});
 const file = new File([blob], 'test.zip');
 const manifest = await inspectArchive(file, () => {});
 assert.deepEqual(manifest.records, state.records); assert.deepEqual(manifest.assets, state.assets);
-assert.equal(manifest.schemaVersion, 3);
+assert.equal(manifest.schemaVersion, 4);
 assert.equal(await importArchive(file, manifest, () => {}), 'restored'); assert.equal(uploadCount, 2); assert.deepEqual(written.records, state.records);
 const files = unzipSync(new Uint8Array(await blob.arrayBuffer()));
 assert.deepEqual(files[`assets/${hash}.png`], png);
@@ -51,13 +51,13 @@ const corrupt = { ...files, [`assets/${hash}.png`]: strToU8('changed bytes') };
 await assert.rejects(() => inspectArchive(new File([zipSync(corrupt)], 'bad.zip'), () => {}), /SHA-256/);
 const missing = { ...files }; delete missing[`assets/${hash}.png`];
 await assert.rejects(() => inspectArchive(new File([zipSync(missing)], 'missing.zip'), () => {}), /原图缺失/);
-assert.throws(() => validateArchive({ ...manifest, schemaVersion: 4 }));
+assert.throws(() => validateArchive({ ...manifest, schemaVersion: 5 }));
 assert.throws(() => validateArchive({ ...manifest, assets: [state.assets[0]] }), /缺少原图/);
 const legacy = { ...manifest, schemaVersion: 1, records: structuredClone([item, outfit, entry]), assets: [state.assets[0]] };
 delete legacy.records[1].data.asset; delete legacy.records[2].data.snapshot.asset;
 for (const data of [legacy.records[0].data, legacy.records[2].data.snapshot.items[0].data]) for (const key of ['fit','shoeFit','shoeSize','measurements']) delete data[key];
-for (const version of [1,2]) {
-  const upgraded = validateArchive({ ...legacy, schemaVersion: version }); assert.equal(upgraded.schemaVersion, 3); assert.equal(upgraded.records[1].data.asset, null); assert.equal(upgraded.records[2].data.snapshot.asset, null);
+for (const version of [1,2,3]) {
+  const upgraded = validateArchive({ ...legacy, schemaVersion: version }); assert.equal(upgraded.schemaVersion, 4); assert.equal(upgraded.records[1].data.asset, null); assert.equal(upgraded.records[2].data.snapshot.asset, null);
   assert.equal(upgraded.records[0].data.fit, null); assert.deepEqual(upgraded.records[0].data.shoeSize, { eu: null, cn: null }); assert.deepEqual(upgraded.records[0].data.measurements, {});
 }
 assert.throws(() => validateArchive({ ...manifest, records: [outfit] }), /不存在/);

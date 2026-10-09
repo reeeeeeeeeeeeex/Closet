@@ -36,6 +36,9 @@ export async function getRecords(db: LocalDatabase, owner: string, collectionId:
   const rows = await db.prepare("SELECT id,kind,data,version,created_at,updated_at FROM records WHERE owner=? AND collection_id=? ORDER BY created_at DESC,id").bind(owner, collectionId).all<Row>();
   return rows.results.map(fromRow);
 }
+export function getRecordsSync(db: LocalDatabase, owner: string, collectionId: string) {
+  return db.prepare("SELECT id,kind,data,version,created_at,updated_at FROM records WHERE owner=? AND collection_id=? ORDER BY created_at DESC,id").bind(owner, collectionId).rows<Row>().map(fromRow);
+}
 export async function getState(db: LocalDatabase, owner: string, collectionId?: string): Promise<ClosetState> {
   const collections = (await db.prepare("SELECT id,name,created_at AS createdAt FROM collections WHERE owner=? ORDER BY created_at,id").bind(owner).all<{ id: string; name: string; createdAt: string }>()).results;
   const selected = collectionId || collections[0]?.id || "main";

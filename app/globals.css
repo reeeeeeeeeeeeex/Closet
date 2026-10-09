@@ -371,3 +371,26 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 .pick-item .item-attribute-tags { padding: 0 7px 9px; }
 .snapshot-photos.large .item-attribute-tags > span { margin-top: 0; }
 @media (max-width: 420px) { .measurement-grid { gap: 10px; }.item-attribute-tags > span { font-size: 13px; } }
+
+.subset-browser { margin: 0 0 22px; }
+.subset-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+.subset-path { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; }
+.subset-path > span { display: flex; align-items: center; gap: 8px; }
+.subset-path button { padding: 5px 0; color: #738096; }
+.subset-path button[aria-current] { font-weight: 600; color: #273547; }
+.subset-actions { display: flex; align-items: center; gap: 8px; }
+.subset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.subset-card { display: flex; align-items: center; gap: 10px; padding: 15px; border: 1px solid var(--border); border-radius: 9px; background: white; text-align: left; }
+.subset-card strong { flex: 1; font-size: 15px; overflow-wrap: anywhere; }
+.subset-card > span { color: #77869a; font-size: 13px; white-space: nowrap; }
+.subset-card > svg { flex-shrink: 0; color: #77869a; }
+.subset-hint { margin-top: 10px; font-size: 14px; color: #77869a; line-height: 1.7; }
+.subset-dialog { max-width: min(95vw, 600px); }
+.subset-members { max-height: 300px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+.subset-member { display: flex; align-items: flex-start; gap: 12px; padding: 13px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.subset-member:last-child { border-bottom: 0; }
+.subset-member > input { margin-top: 3px; width: 17px; height: 17px; flex-shrink: 0; }
+.subset-member > div { flex: 1; min-width: 0; }
+.subset-member strong { font-size: 15px; overflow-wrap: anywhere; }
+.subset-member small { display: block; color: #77869a; font-size: 13px; margin-top: 5px; }
+@media (max-width: 767px) { .subset-grid { grid-template-columns: 1fr; }.subset-actions { margin-left: auto; } }

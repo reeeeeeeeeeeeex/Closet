@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { CATEGORY_MEASUREMENTS, garmentCategory, type Measurement } from "./item-details";
 import { DEFAULT_LOCALE, messageForLocale } from "./i18n/core";
+import { validateSubsets } from "./subsets";
 export const CATEGORIES = { top: "上装", bottom: "下装", dress: "连体 / 裙装", outerwear: "外套", shoes: "鞋履", bag: "包袋", accessory: "配饰" } as const;
 export const OCCASIONS = { work: "通勤", casual: "日常", party: "聚会", formal: "正式", vacation: "旅行", sport: "运动" } as const;
 export const SEASONS = { spring: "春", summer: "夏", autumn: "秋", winter: "冬" } as const;
@@ -34,6 +35,9 @@ export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(s => {
 export const snapshotSchema = z.object({ name: title, occasions, notes: note, asset: hashSchema.nullable().default(null), items: z.array(z.object({ id, data: itemSchema }).strict()).max(30) }).strict()
   .refine(s => !!s.asset || s.items.length > 0, "日历快照需要照片或单品");
 export const calendarSchema = z.object({ date: dateSchema, status: z.enum(["planned", "worn"]), outfitId: id, notes: note, snapshot: snapshotSchema }).strict();
+export const subsetSchema = z.object({ name: title, scope: z.enum(["item", "outfit"]), root: z.enum(["all", "top", "bottom", "dress", "outerwear", "shoes", "bag", "accessory"]), parentId: id.nullable(), memberIds: z.array(id).max(2000).default([]) }).strict()
+  .refine(data => new Set(data.memberIds).size === data.memberIds.length, "子集不能重复添加同一记录");
+export type Subset = z.infer<typeof subsetSchema>;
 export type Item = z.infer<typeof itemSchema>;
 export type Outfit = z.infer<typeof outfitSchema>;
 export type CalendarEntry = z.infer<typeof calendarSchema>;
@@ -41,7 +45,9 @@ const metadata = { id, version: z.number().int().min(1), createdAt: z.string().d
 export const itemRecordSchema = z.object({ ...metadata, kind: z.literal("item"), data: itemSchema }).strict();
 export const outfitRecordSchema = z.object({ ...metadata, kind: z.literal("outfit"), data: outfitSchema }).strict();
 export const calendarRecordSchema = z.object({ ...metadata, kind: z.literal("calendar"), data: calendarSchema }).strict();
-export const recordSchema = z.discriminatedUnion("kind", [itemRecordSchema, outfitRecordSchema, calendarRecordSchema]);
+export const subsetRecordSchema = z.object({ ...metadata, kind: z.literal("subset"), data: subsetSchema }).strict();
+export type SubsetRecord = z.infer<typeof subsetRecordSchema>;
+export const recordSchema = z.discriminatedUnion("kind", [itemRecordSchema, outfitRecordSchema, calendarRecordSchema, subsetRecordSchema]);
 export type ItemRecord = z.infer<typeof itemRecordSchema>;
 export type OutfitRecord = z.infer<typeof outfitRecordSchema>;
 export type CalendarRecord = z.infer<typeof calendarRecordSchema>;
@@ -49,7 +55,7 @@ export type ClosetRecord = z.infer<typeof recordSchema>;
 export const assetSchema = z.object({ hash: hashSchema, name: z.string().max(255), mime: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]), size: z.number().int().positive().max(20 * 1024 * 1024) }).strict();
 export type Asset = z.infer<typeof assetSchema>;
 export const archiveSchema = z.object({
-  format: z.literal("new-closet"), schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
+  format: z.literal("new-closet"), schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
   records: z.array(recordSchema).max(2000), assets: z.array(assetSchema).max(2000),
 }).strict();
 export type ClosetArchive = z.infer<typeof archiveSchema>;
@@ -80,7 +86,8 @@ export function validateArchive(input: unknown): ClosetArchive {
     }
   }
   for (const hash of referencedAssets(a.records)) if (!media.has(hash)) throw new Error("备份缺少原图");
-  return { ...a, schemaVersion: 3 };
+  validateSubsets(a.records);
+  return { ...a, schemaVersion: 4 };
 }
 export function makeSnapshot(outfit: Outfit, items: ItemRecord[]): CalendarEntry["snapshot"] {
   const map = new Map(items.map(i => [i.id, i]));

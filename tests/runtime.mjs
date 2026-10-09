@@ -86,6 +86,34 @@ try {
   assert.equal(entry.data.snapshot.items[0].data.fit, 'fitted'); assert.equal(entry.data.snapshot.items[0].data.measurements.shoulderWidth, 42.5);
   const savedShoes = state.records.find(r => r.kind === 'item' && r.data.category === 'shoes');
   assert.equal(savedShoes.data.shoeFit, 'small'); assert.deepEqual(savedShoes.data.shoeSize, { eu: 38.5, cn: 240 });
+  const createSubset = async data => { const result = await post({ kind: 'subset', data }); assert.equal(result.status, 200, await result.clone().text()); return (await result.json()).id; };
+  const parentId = await createSubset({ name: 'Commuting', scope: 'item', root: 'all', parentId: null, memberIds: [item.id] });
+  const childId = await createSubset({ name: 'Light', scope: 'item', root: 'all', parentId, memberIds: [item.id, savedShoes.id] });
+  const otherId = await createSubset({ name: 'Vacation', scope: 'item', root: 'all', parentId: null, memberIds: [item.id] });
+  assert.notEqual(otherId,parentId);
+  const outerwearId = await createSubset({ name: 'Outerwear folder', scope: 'item', root: 'outerwear', parentId: null, memberIds: [item.id] });
+  const outfitSubsetId = await createSubset({ name: 'Photo looks', scope: 'outfit', root: 'all', parentId: null, memberIds: [photoOutfit.id] });
+  const beforeInvalid = (await (await request('/api/closet')).json()).records.length;
+  assert.equal((await post({ kind: 'subset', data: { name: 'Bad parent', scope: 'item', root: 'all', parentId: crypto.randomUUID(), memberIds: [] } })).status, 400);
+  assert.equal((await post({ kind: 'subset', data: { name: 'Wrong scope', scope: 'outfit', root: 'all', parentId: null, memberIds: [item.id] } })).status, 400);
+  assert.equal((await post({ kind: 'item', subsetId: outerwearId, data: { ...shoes, name: 'Wrong category' } })).status, 400);
+  assert.equal((await post({ kind: 'item', subsetId: crypto.randomUUID(), data: { ...itemData, name: 'Missing folder' } })).status, 404);
+  assert.equal((await (await request('/api/closet')).json()).records.length, beforeInvalid);
+  const parallel = await Promise.all(['One','Two'].map(name => post({ kind: 'item', subsetId: childId, data: { ...itemData, name } })));
+  for (const result of parallel) assert.equal(result.status,200,await result.clone().text());
+  const addedIds = await Promise.all(parallel.map(result => result.json().then(body => body.id)));
+  let subsetState = await (await request('/api/closet')).json();
+  const childSubset = subsetState.records.find(record => record.id === childId);
+  for (const id of addedIds) assert(childSubset.data.memberIds.includes(id));
+  assert.equal((await post({ kind: 'subset', id: childId, version: 1, data: childSubset.data })).status,409);
+  const parentSubset = subsetState.records.find(record => record.id === parentId);
+  assert.equal((await post({ kind: 'subset', id: parentId, version: parentSubset.version, data: { ...parentSubset.data, parentId: childId } })).status,400);
+  const freshItem = subsetState.records.find(record => record.id === item.id);
+  assert.equal((await post({ kind: 'item', id: item.id, version: freshItem.version, data: { ...shoes, name: 'Moved category' } })).status,400);
+  const nestedPhoto = await post({ kind: 'calendar', subsetId: outfitSubsetId, data: { date: '2026-10-12', status: 'worn', notes: '', newOutfit: photoData } });
+  assert.equal(nestedPhoto.status,200,await nestedPhoto.clone().text()); const nestedPhotoId = (await nestedPhoto.json()).outfitId;
+  subsetState = await (await request('/api/closet')).json(); assert(subsetState.records.find(record => record.id === outfitSubsetId).data.memberIds.includes(nestedPhotoId));
+  state = subsetState;
   await stop(); await start();
   assert.deepEqual((await (await request('/api/closet')).json()).records, state.records);
   assert.deepEqual(Buffer.from(await (await request('/api/assets/' + asset.hash)).arrayBuffer()), png);
@@ -112,6 +140,9 @@ try {
   assert.equal(legacyRead.records.find(r => r.id === entry.id).data.snapshot.asset, null);
   assert.equal(legacyRead.records.find(r => r.id === item.id).data.fit, null);
   assert.deepEqual(legacyRead.records.find(r => r.id === item.id).data.measurements, {});
+  const cyclic = structuredClone(manifest); cyclic.records.find(record => record.id === parentId).data.parentId = childId;
+  assert.equal((await request('/api/closet', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cyclic) })).status,400);
+  assert.equal((await (await request('/api/closet')).json()).collections.length,2);
   local.close();
   res = await post({ kind: 'calendar', id: entry.id, version: entry.version, op: 'deleteCalendar' }); assert.equal(res.status, 200);
   assert.equal((await (await request('/api/closet?collection=main')).json()).records.some(r => r.id === entry.id), false);
@@ -121,7 +152,7 @@ try {
   const stored = persisted.prepare('SELECT storage_key FROM assets').get();
   assert.deepEqual(await readFile(path.join(directory, 'assets', stored.storage_key)), png); persisted.close();
   assert.equal((await request('/api/auth', { method: 'DELETE' })).status, 200);
-  console.log('PASS: production Node server; authenticated CRUD; photo-only calendar + outfit creation; optional item association without changing historical photo snapshots; invalid photo writes leave no orphan outfit; legacy SQLite records; 409 conflicts, transaction rollback, restart persistence and ZIP export/import.');
+  console.log('PASS: production Node server; nested category/item/outfit subsets, multiple membership, concurrent auto-add without lost members, stale edits blocked, invalid parent/scope/category and cyclic imports rejected; photo/calendar/subset transactions, original bytes, legacy records, restart persistence and complete ZIP recovery.');
 } catch (error) { console.error(logs); throw error; }
 finally {
   globalThis.fetch = originalFetch; await stop();

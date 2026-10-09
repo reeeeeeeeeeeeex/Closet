@@ -10,6 +10,7 @@ export class LocalStatement {
   constructor(private database: DatabaseSync, private sql: string, private values: SQLInputValue[] = []) {}
   bind(...values: SQLInputValue[]) { return new LocalStatement(this.database, this.sql, values); }
   async first<T = Record<string, unknown>>(): Promise<T | null> { return (this.database.prepare(this.sql).get(...this.values) as T | undefined) ?? null; }
+  rows<T = Record<string, unknown>>(): T[] { return this.database.prepare(this.sql).all(...this.values) as T[]; }
   async all<T = Record<string, unknown>>(): Promise<{ results: T[] }> { return { results: this.database.prepare(this.sql).all(...this.values) as T[] }; }
   // Transactions call this synchronously so requests cannot interleave.
   run() { return this.database.prepare(this.sql).run(...this.values); }
@@ -34,6 +35,11 @@ export class LocalDatabase {
   }
   prepare(sql: string) { return new LocalStatement(this.database, sql); }
   close() { this.database.close(); }
+  transaction<T>(operation: () => T): T {
+    this.database.exec("BEGIN IMMEDIATE");
+    try { const result = operation(); this.database.exec("COMMIT"); return result; }
+    catch (error) { this.database.exec("ROLLBACK"); throw error; }
+  }
   async batch(statements: LocalStatement[]) {
     this.database.exec("BEGIN IMMEDIATE");
     try { const results = statements.map(statement => statement.run()); this.database.exec("COMMIT"); return results; }

@@ -1,14 +1,52 @@
 import { z } from "zod";
-import { context, json, failure, getState, getRecords, insertRecord, sameOrigin, limitedJson, ApiError } from "@/lib/server";
-import { itemSchema, outfitSchema, dateSchema, validateArchive, makeSnapshot, type ClosetRecord, type ItemRecord, type OutfitRecord, type Asset } from "@/lib/domain";
+import { context, json, failure, getState, getRecords, getRecordsSync, insertRecord, sameOrigin, limitedJson, ApiError } from "@/lib/server";
+import { itemSchema, outfitSchema, subsetSchema, dateSchema, validateArchive, makeSnapshot, type ClosetRecord, type ItemRecord, type OutfitRecord, type Asset } from "@/lib/domain";
+import { validateSubsets } from "@/lib/subsets";
+import type { LocalDatabase } from "@/lib/local-storage";
+
+function storeRecords(db: LocalDatabase, owner: string, collectionId: string, changes: ClosetRecord[], expectedVersion?: number, subsetId?: string) {
+  return db.transaction(() => {
+    const latest = getRecordsSync(db, owner, collectionId); const record = changes[0];
+    const existing = latest.find(value => value.id === record.id);
+    if (expectedVersion !== undefined && (!existing || existing.version !== expectedVersion || existing.kind !== record.kind)) throw new ApiError(409, "记录已在其他设备更改，请刷新");
+    if (existing?.kind === "subset" && record.kind === "subset" && (record.data.scope !== existing.data.scope || record.data.root !== existing.data.root || record.data.parentId !== existing.data.parentId)) throw new ApiError(400, "子集的父集和所属分类不能修改");
+    if (latest.length + changes.length - (existing ? 1 : 0) > 2000) throw new ApiError(400, "此衣橱已达首版的 2000 条记录上限");
+    let next = [...latest.filter(value => !changes.some(change => change.id === value.id)), ...changes];
+    let membership;
+    if (subsetId) {
+      if (existing || (record.kind !== "item" && record.kind !== "outfit")) throw new ApiError(400, "只能在新增单品或搭配时指定子集");
+      const subset = latest.find(value => value.id === subsetId);
+      if (!subset || subset.kind !== "subset") throw new ApiError(404, "子集不存在");
+      if (subset.data.scope !== record.kind) throw new ApiError(400, "子集范围与记录类型不匹配");
+      membership = { ...subset, data: { ...subset.data, memberIds: [...new Set([...subset.data.memberIds, record.id])] }, version: subset.version + 1, updatedAt: record.updatedAt };
+      next = next.map(value => value.id === subset.id ? membership! : value);
+    }
+    // Capture the current committed item/outfit data while holding the write lock.
+    for (let index = 0; index < changes.length; index++) {
+      const change = changes[index];
+      if (change.kind !== "calendar" || existing) continue;
+      const outfit = next.find(value => value.id === change.data.outfitId);
+      if (!outfit || outfit.kind !== "outfit") throw new ApiError(400, "请选择有效搭配");
+      const updated: ClosetRecord = { ...change, data: { ...change.data, snapshot: makeSnapshot(outfit.data, next.filter((value): value is ItemRecord => value.kind === "item")) } };
+      changes[index] = updated; next = next.map(value => value.id === updated.id ? updated : value);
+    }
+    try { validateSubsets(next); } catch (error) { throw new ApiError(400, error instanceof Error ? error.message : "子集关系无效"); }
+    if (existing) {
+      const result = db.prepare("UPDATE records SET data=?,version=version+1,updated_at=? WHERE owner=? AND collection_id=? AND id=? AND version=?").bind(JSON.stringify(record.data), record.updatedAt, owner, collectionId, record.id, expectedVersion!).run();
+      if (!result.changes) throw new ApiError(409, "记录已在其他设备更改，请刷新");
+    } else for (const change of changes) insertRecord(db, owner, collectionId, change).run();
+    if (membership) db.prepare("UPDATE records SET data=?,version=version+1,updated_at=? WHERE owner=? AND collection_id=? AND id=?").bind(JSON.stringify(membership.data), membership.updatedAt, owner, collectionId, membership.id).run();
+    return { ok: true, id: record.id };
+  });
+}
 export async function GET(request: Request) {
   try { const { db, owner } = await context(); return json(await getState(db, owner, new URL(request.url).searchParams.get("collection") || undefined)); }
   catch (e) { return failure(e); }
 }
-const mutationSchema = z.object({ op: z.enum(["save", "deleteCalendar"]), collectionId: z.string().min(1).max(100), id: z.string().uuid().optional(), version: z.number().int().positive().optional(), kind: z.enum(["item", "outfit", "calendar"]), data: z.unknown() });
+const mutationSchema = z.object({ op: z.enum(["save", "deleteCalendar"]), collectionId: z.string().min(1).max(100), id: z.string().uuid().optional(), version: z.number().int().positive().optional(), subsetId: z.string().uuid().optional(), kind: z.enum(["item", "outfit", "calendar", "subset"]), data: z.unknown() });
 export async function POST(request: Request) {
   try {
-    sameOrigin(request); const { db, owner } = await context(); const body = mutationSchema.parse(await limitedJson(request, 64000));
+    sameOrigin(request); const { db, owner } = await context(); const body = mutationSchema.parse(await limitedJson(request, 128 * 1024));
     const { collectionId, kind } = body;
     if (collectionId === "main") await db.prepare("INSERT OR IGNORE INTO collections (owner,id,name,created_at) VALUES (?,?,?,?)").bind(owner, "main", "我的衣橱", new Date().toISOString()).run();
     else if (!await db.prepare("SELECT id FROM collections WHERE owner=? AND id=?").bind(owner, collectionId).first()) throw new ApiError(404, "衣橱不存在");
@@ -29,6 +67,8 @@ export async function POST(request: Request) {
       if (data.asset && !await db.prepare("SELECT hash FROM assets WHERE owner=? AND hash=?").bind(owner, data.asset).first()) throw new ApiError(400, "搭配原图尚未上传完成");
       if (new Set(data.itemIds).size !== data.itemIds.length) throw new ApiError(400, "搭配不能重复添加同一单品");
       if (data.itemIds.some(id => !records.some(r => r.id === id && r.kind === "item"))) throw new ApiError(400, "搭配中的单品不存在");
+    } else if (kind === "subset") {
+      data = subsetSchema.parse(body.data);
     } else {
       const input = z.object({ date: dateSchema, status: z.enum(["planned", "worn"]), outfitId: z.string().uuid().optional(), newOutfit: outfitSchema.optional(), notes: z.string().max(3000) }).strict()
         .refine(v => !!v.outfitId !== !!v.newOutfit, "请选择已有搭配或添加新搭配照片").parse(body.data);
@@ -42,7 +82,7 @@ export async function POST(request: Request) {
         const now = new Date().toISOString();
         const outfit: OutfitRecord = { id: crypto.randomUUID(), kind: "outfit", data: { ...outfitData, archived: false }, version: 1, createdAt: now, updatedAt: now };
         const calendar: ClosetRecord = { id: crypto.randomUUID(), kind: "calendar", data: { date: input.date, status: input.status, notes: input.notes, outfitId: outfit.id, snapshot: makeSnapshot(outfit.data, records.filter((r): r is ItemRecord => r.kind === "item")) }, version: 1, createdAt: now, updatedAt: now };
-        await db.batch([insertRecord(db, owner, collectionId, outfit), insertRecord(db, owner, collectionId, calendar)]);
+        storeRecords(db, owner, collectionId, [outfit, calendar], undefined, body.subsetId);
         return json({ ok: true, outfitId: outfit.id });
       }
       const calendarInput = { date: input.date, status: input.status, outfitId: input.outfitId!, notes: input.notes };
@@ -57,13 +97,10 @@ export async function POST(request: Request) {
     }
     const now = new Date().toISOString();
     if (existing) {
-      const result = await db.prepare("UPDATE records SET data=?,version=version+1,updated_at=? WHERE owner=? AND collection_id=? AND id=? AND version=? RETURNING id").bind(JSON.stringify(data), now, owner, collectionId, existing.id, existing.version).first();
-      if (!result) throw new ApiError(409, "另一台设备刚刚修改了记录，请刷新后重试");
+      return json(storeRecords(db, owner, collectionId, [{ ...existing, data, updatedAt: now, version: existing.version + 1 } as ClosetRecord], existing.version, body.subsetId));
     } else {
-      if (records.length >= 2000) throw new ApiError(400, "此衣橱已达首版的 2000 条记录上限");
-      await insertRecord(db, owner, collectionId, { id: crypto.randomUUID(), kind, data, version: 1, createdAt: now, updatedAt: now } as ClosetRecord).run();
+      return json(storeRecords(db, owner, collectionId, [{ id: crypto.randomUUID(), kind, data, version: 1, createdAt: now, updatedAt: now } as ClosetRecord], undefined, body.subsetId));
     }
-    return json({ ok: true });
   } catch (e) { return failure(e); }
 }
 export async function PUT(request: Request) {

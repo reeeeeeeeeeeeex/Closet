@@ -39,7 +39,7 @@ delete catalogs.en;
 const sourceCatalog = JSON.parse(await readFile('lib/i18n/messages/zh-CN.json','utf8'));
 const template = JSON.parse(await readFile('lib/i18n/messages/locale.template.json','utf8'));
 assert.deepEqual(Object.keys(template).sort(), Object.keys(sourceCatalog).sort());
-for (const file of ['components/closet.tsx','components/outfit-fields.tsx','components/item-details.tsx','app/login/login-form.tsx','lib/portable.ts']) {
+for (const file of ['components/closet.tsx','components/outfit-fields.tsx','components/item-details.tsx','components/subsets.tsx','app/login/login-form.tsx','lib/portable.ts']) {
   const source = ts.createSourceFile(file, await readFile(file,'utf8'), ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   function visit(node) {
     if (ts.isCallExpression(node) && ['t','tr'].includes(node.expression.getText(source)) && ts.isStringLiteral(node.arguments[0])) assert(Object.hasOwn(sourceCatalog,node.arguments[0].text), `${file}: missing catalog key ${node.arguments[0].text}`);
