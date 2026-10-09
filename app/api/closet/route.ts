@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { context, json, failure, getState, getRecords, insertRecord, sameOrigin, limitedJson, ApiError } from "@/lib/server";
-import { itemSchema, outfitSchema, dateSchema, validateArchive, makeSnapshot, type ClosetRecord, type ItemRecord, type Asset } from "@/lib/domain";
+import { itemSchema, outfitSchema, dateSchema, validateArchive, makeSnapshot, type ClosetRecord, type ItemRecord, type OutfitRecord, type Asset } from "@/lib/domain";
 export async function GET(request: Request) {
   try { const { db, owner } = await context(); return json(await getState(db, owner, new URL(request.url).searchParams.get("collection") || undefined)); }
   catch (e) { return failure(e); }
@@ -26,17 +26,33 @@ export async function POST(request: Request) {
       if (data.asset && !await db.prepare("SELECT hash FROM assets WHERE owner=? AND hash=?").bind(owner, data.asset).first()) throw new ApiError(400, "原图尚未上传完成");
     } else if (kind === "outfit") {
       data = outfitSchema.parse(body.data);
+      if (data.asset && !await db.prepare("SELECT hash FROM assets WHERE owner=? AND hash=?").bind(owner, data.asset).first()) throw new ApiError(400, "搭配原图尚未上传完成");
       if (new Set(data.itemIds).size !== data.itemIds.length) throw new ApiError(400, "搭配不能重复添加同一单品");
       if (data.itemIds.some(id => !records.some(r => r.id === id && r.kind === "item"))) throw new ApiError(400, "搭配中的单品不存在");
     } else {
-      const input = z.object({ date: dateSchema, status: z.enum(["planned", "worn"]), outfitId: z.string().uuid(), notes: z.string().max(3000) }).parse(body.data);
+      const input = z.object({ date: dateSchema, status: z.enum(["planned", "worn"]), outfitId: z.string().uuid().optional(), newOutfit: outfitSchema.optional(), notes: z.string().max(3000) }).strict()
+        .refine(v => !!v.outfitId !== !!v.newOutfit, "请选择已有搭配或添加新搭配照片").parse(body.data);
+      if (input.newOutfit) {
+        if (existing) throw new ApiError(400, "历史搭配快照不可替换，请新建记录");
+        const outfitData = input.newOutfit;
+        if (!outfitData.asset) throw new ApiError(400, "请添加搭配照片");
+        if (!await db.prepare("SELECT hash FROM assets WHERE owner=? AND hash=?").bind(owner, outfitData.asset).first()) throw new ApiError(400, "搭配原图尚未上传完成");
+        if (outfitData.itemIds.some(id => !records.some(r => r.id === id && r.kind === "item"))) throw new ApiError(400, "搭配中的单品不存在");
+        if (records.length > 1998) throw new ApiError(400, "添加照片穿搭需要两条记录，此衣橱容量不足");
+        const now = new Date().toISOString();
+        const outfit: OutfitRecord = { id: crypto.randomUUID(), kind: "outfit", data: { ...outfitData, archived: false }, version: 1, createdAt: now, updatedAt: now };
+        const calendar: ClosetRecord = { id: crypto.randomUUID(), kind: "calendar", data: { date: input.date, status: input.status, notes: input.notes, outfitId: outfit.id, snapshot: makeSnapshot(outfit.data, records.filter((r): r is ItemRecord => r.kind === "item")) }, version: 1, createdAt: now, updatedAt: now };
+        await db.batch([insertRecord(db, owner, collectionId, outfit), insertRecord(db, owner, collectionId, calendar)]);
+        return json({ ok: true, outfitId: outfit.id });
+      }
+      const calendarInput = { date: input.date, status: input.status, outfitId: input.outfitId!, notes: input.notes };
       if (existing?.kind === "calendar") {
         if (input.outfitId !== existing.data.outfitId) throw new ApiError(400, "历史搭配快照不可替换，请新建记录");
-        data = { ...input, snapshot: existing.data.snapshot };
+        data = { ...calendarInput, snapshot: existing.data.snapshot };
       } else {
         const outfit = records.find(r => r.id === input.outfitId && r.kind === "outfit");
         if (!outfit || outfit.kind !== "outfit") throw new ApiError(400, "请选择有效搭配");
-        data = { ...input, snapshot: makeSnapshot(outfit.data, records.filter((r): r is ItemRecord => r.kind === "item")) };
+        data = { ...calendarInput, snapshot: makeSnapshot(outfit.data, records.filter((r): r is ItemRecord => r.kind === "item")) };
       }
     }
     const now = new Date().toISOString();

@@ -12,11 +12,14 @@ export const itemSchema = z.object({
   color: z.string().max(50), seasons: z.array(z.enum(["spring", "summer", "autumn", "winter"])).max(4),
   occasions, notes: note, asset: hashSchema.nullable(), archived: z.boolean(),
 }).strict();
-export const outfitSchema = z.object({ name: title, itemIds: z.array(id).min(1).max(30), occasions, notes: note, archived: z.boolean() }).strict();
+export const outfitSchema = z.object({ name: title, itemIds: z.array(id).max(30), asset: hashSchema.nullable().default(null), occasions, notes: note, archived: z.boolean() }).strict()
+  .refine(o => !!o.asset || o.itemIds.length > 0, "请添加搭配照片或选择至少一件单品")
+  .refine(o => new Set(o.itemIds).size === o.itemIds.length, "搭配不能重复添加同一单品");
 export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(s => {
   const d = new Date(s + "T12:00:00Z"); return !Number.isNaN(d.valueOf()) && d.toISOString().slice(0, 10) === s;
 }, "日期无效");
-export const snapshotSchema = z.object({ name: title, occasions, notes: note, items: z.array(z.object({ id, data: itemSchema }).strict()).min(1).max(30) }).strict();
+export const snapshotSchema = z.object({ name: title, occasions, notes: note, asset: hashSchema.nullable().default(null), items: z.array(z.object({ id, data: itemSchema }).strict()).max(30) }).strict()
+  .refine(s => !!s.asset || s.items.length > 0, "日历快照需要照片或单品");
 export const calendarSchema = z.object({ date: dateSchema, status: z.enum(["planned", "worn"]), outfitId: id, notes: note, snapshot: snapshotSchema }).strict();
 export type Item = z.infer<typeof itemSchema>;
 export type Outfit = z.infer<typeof outfitSchema>;
@@ -33,7 +36,7 @@ export type ClosetRecord = z.infer<typeof recordSchema>;
 export const assetSchema = z.object({ hash: hashSchema, name: z.string().max(255), mime: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]), size: z.number().int().positive().max(20 * 1024 * 1024) }).strict();
 export type Asset = z.infer<typeof assetSchema>;
 export const archiveSchema = z.object({
-  format: z.literal("new-closet"), schemaVersion: z.literal(1), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
+  format: z.literal("new-closet"), schemaVersion: z.union([z.literal(1), z.literal(2)]), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
   records: z.array(recordSchema).max(2000), assets: z.array(assetSchema).max(2000),
 }).strict();
 export type ClosetArchive = z.infer<typeof archiveSchema>;
@@ -43,7 +46,11 @@ export function referencedAssets(records: ClosetRecord[]): Set<string> {
   const hashes = new Set<string>();
   for (const r of records) {
     if (r.kind === "item" && r.data.asset) hashes.add(r.data.asset);
-    if (r.kind === "calendar") for (const i of r.data.snapshot.items) if (i.data.asset) hashes.add(i.data.asset);
+    if (r.kind === "outfit" && r.data.asset) hashes.add(r.data.asset);
+    if (r.kind === "calendar") {
+      if (r.data.snapshot.asset) hashes.add(r.data.snapshot.asset);
+      for (const i of r.data.snapshot.items) if (i.data.asset) hashes.add(i.data.asset);
+    }
   }
   return hashes;
 }
@@ -60,11 +67,11 @@ export function validateArchive(input: unknown): ClosetArchive {
     }
   }
   for (const hash of referencedAssets(a.records)) if (!media.has(hash)) throw new Error("备份缺少原图");
-  return a;
+  return { ...a, schemaVersion: 2 };
 }
 export function makeSnapshot(outfit: Outfit, items: ItemRecord[]): CalendarEntry["snapshot"] {
   const map = new Map(items.map(i => [i.id, i]));
-  return snapshotSchema.parse({ name: outfit.name, occasions: outfit.occasions, notes: outfit.notes,
+  return snapshotSchema.parse({ name: outfit.name, occasions: outfit.occasions, notes: outfit.notes, asset: outfit.asset,
     items: outfit.itemIds.map(itemId => { const item = map.get(itemId); if (!item) throw new Error("搭配中的单品不存在，请刷新重试"); return { id: item.id, data: item.data }; }) });
 }
 export function wardrobePrompt(state: ClosetState, request: string): string {

@@ -1,7 +1,7 @@
 import { getLocalUser } from "./local-auth";
 import { localStorage, type LocalDatabase } from "./local-storage";
 import { ZodError } from "zod";
-import { type ClosetRecord, type Asset, type ClosetState, referencedAssets } from "./domain";
+import { recordSchema, type ClosetRecord, type Asset, type ClosetState, referencedAssets } from "./domain";
 export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
 export async function context() {
   const user = await getLocalUser();
@@ -31,7 +31,7 @@ export async function limitedJson(request: Request, max = 3 * 1024 * 1024) {
   try { return JSON.parse(new TextDecoder().decode(body)); } catch { throw new ApiError(400, "JSON 格式不正确"); }
 }
 type Row = { id: string; kind: string; data: string; version: number; created_at: string; updated_at: string };
-export function fromRow(r: Row): ClosetRecord { return { id: r.id, kind: r.kind, data: JSON.parse(r.data), version: r.version, createdAt: r.created_at, updatedAt: r.updated_at } as ClosetRecord; }
+export function fromRow(r: Row): ClosetRecord { return recordSchema.parse({ id: r.id, kind: r.kind, data: JSON.parse(r.data), version: r.version, createdAt: r.created_at, updatedAt: r.updated_at }); }
 export async function getRecords(db: LocalDatabase, owner: string, collectionId: string) {
   const rows = await db.prepare("SELECT id,kind,data,version,created_at,updated_at FROM records WHERE owner=? AND collection_id=? ORDER BY created_at DESC,id").bind(owner, collectionId).all<Row>();
   return rows.results.map(fromRow);

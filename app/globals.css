@@ -322,3 +322,42 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 .login-card p { font-size: 16px; color: var(--muted-foreground); margin-bottom: 24px; }
 .login-card form { display: grid; gap: 20px; }
 .login-card [role=alert] { color: var(--destructive); margin: 0; }
+
+.calendar-month-title { font-size: 24px; font-weight: 500; height: auto; padding: 6px 8px; gap: 9px; }
+.calendar-month-title > span { color: #9da9bc; }
+.year-jump { display: flex; align-items: flex-end; gap: 12px; }
+.year-jump .field { flex: 1; }
+.year-jump > button { margin-bottom: 3px; }
+.month-jump-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.month-jump-grid > button { min-height: 44px; }
+.outfit-draft { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+.outfit-draft-photo > img { width: 100%; height: 240px; object-fit: contain; border-radius: 10px; background: #eef1f5; }
+.outfit-photo-placeholder { height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; border: 1px dashed #c6cfdd; border-radius: 10px; color: #718097; font-size: 14px; text-align: center; }
+.photo-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.outfit-draft > .item-picker-area { grid-column: 1 / -1; }
+.outfit-draft .field-hint { margin: 8px 0 14px; font-size: 14px; }
+.outfit-category-filter { min-height: 40px; padding: 6px 12px; border: 1px solid var(--input); border-radius: 7px; background: white; font-size: 14px; }
+.outfit-cover-photo { height: 250px; }
+.outfit-cover-photo img { object-fit: contain; }
+.outfit-piece-strip { display: flex; align-items: center; gap: 6px; padding: 8px; background: #eef1f5; }
+.outfit-piece-strip > .photo { height: 54px; flex: 1; min-width: 0; border-radius: 5px; }
+.outfit-piece-strip .photo-placeholder { min-height: 0; }
+.outfit-piece-strip .photo-placeholder span { display: none; }
+.outfit-piece-strip .more-pieces { position: static; font-size: 13px; }
+.day-outfit-photo { height: 150px; border-radius: 7px; margin-bottom: 10px; }
+.day-outfit-photo img { object-fit: contain; }
+.calendar-snapshot-photo { height: 260px; border-radius: 8px; }
+.calendar-snapshot-photo img { object-fit: contain; }
+.photo-calendar-dialog { width: min(95vw, 860px) !important; max-width: 860px !important; }
+.wear-mode { display: flex; flex-wrap: wrap; gap: 10px; }
+.wear-mode > button { flex: 1; min-width: 150px; }
+.editor-dialog fieldset { min-width: 0; }
+@media (max-width: 767px) {
+  .calendar-month-title { font-size: 20px; gap: 6px; padding: 6px 2px; }
+  .outfit-draft { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .outfit-draft-photo > img, .outfit-photo-placeholder { height: 220px; }
+  .outfit-draft > .item-picker-area { grid-column: auto; }
+  .outfit-cover-photo { height: 220px; }
+  .photo-actions > button { flex: 1; }
+  .calendar-heading { gap: 6px; }
+}
