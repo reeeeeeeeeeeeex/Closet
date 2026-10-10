@@ -8,7 +8,7 @@ export function validateSubsets(records: ClosetRecord[]) {
   const subsets = records.filter((record): record is SubsetRecord => record.kind === "subset");
   for (const subset of subsets) {
     const data = subset.data;
-    if (data.scope === "outfit" && data.root !== "all") throw new Error("搭配分组只能属于搭配集");
+    if (data.scope === "outfit" && data.root !== "all") throw new Error("搭配分组只能属于我的搭配");
     if (data.parentId) {
       const parent = map.get(data.parentId);
       if (!parent || parent.kind !== "subset") throw new Error("上级分组不存在");

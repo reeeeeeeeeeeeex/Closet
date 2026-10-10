@@ -85,7 +85,7 @@ function Navigation({ view, onView, state }: {
         count?: number;
     }[] = [
         { id: "wardrobe", name: t("我的衣橱"), icon: Shirt, count: state?.records.filter(r => r.kind === "item" && !r.data.archived).length },
-        { id: "outfits", name: t("搭配集"), icon: Layers3, count: state?.records.filter(r => r.kind === "outfit" && !r.data.archived).length },
+        { id: "outfits", name: t("我的搭配"), icon: Layers3, count: state?.records.filter(r => r.kind === "outfit" && !r.data.archived).length },
         { id: "calendar", name: t("穿搭日历"), icon: CalendarDays },
         { id: "personalSizes", name: t("我的尺码"), icon: Ruler },
     ];
@@ -203,7 +203,7 @@ export default function Home() {
         const result = await api<{ record: PersonalSizesRecord }>("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "save", collectionId: state?.collectionId || "main", kind: "personalSizes", data, id: record?.id, version: record?.version }) });
         await refresh(); return result.record;
     };
-    const titles = { personalSizes: t("我的尺码"), wardrobe: t("我的衣橱"), outfits: t("搭配集"), calendar: t("穿搭日历"), backup: t("数据与备份"), assistant: t("AI 穿搭灵感") };
+    const titles = { personalSizes: t("我的尺码"), wardrobe: t("我的衣橱"), outfits: t("我的搭配"), calendar: t("穿搭日历"), backup: t("数据与备份"), assistant: t("AI 穿搭灵感") };
     return <SidebarProvider style={{ "--sidebar-width": "248px" } as React.CSSProperties}><Navigation view={view} onView={goView} state={state}/><SidebarInset className="main-inset"><header className="topbar"><div className="flex items-center gap-3"><SidebarTrigger className="md:hidden"/><span className="breadcrumb">{t("我的空间")}<span>/</span> <strong>{titles[view]}</strong></span></div><div className="topbar-right"><span className={`sync-label ${error ? "sync-error" : ""}`}><Cloud size={15}/> {error ? t("连接待恢复") : loading ? t("正在连接") : t("已同步 {value1}", { value1: synced })}</span><Button variant="ghost" size="icon" aria-label={t("刷新衣橱")} onClick={() => void refresh()} disabled={syncing}><RefreshCw size={16} className={syncing ? "animate-spin" : ""}/></Button><Button variant="ghost" onClick={async () => { try {
         await api("/api/auth", { method: "DELETE" });
         router.replace("/login");
@@ -425,7 +425,7 @@ function CalendarEditor({ record, date, outfitId, outfits, items, onClose, onSav
     const selectedOutfit = outfits.find(o => o.id === data.outfitId);
     return <Dialog open onOpenChange={(open: boolean) => { if (!open && !busy)
         onClose(); }}><DialogContent className={`editor-dialog calendar-dialog ${!record && mode === "photo" ? "photo-calendar-dialog" : ""}`}>
-    <DialogHeader><DialogTitle>{record ? t("当天的穿搭") : t("添加当天穿搭")}</DialogTitle><DialogDescription>{record ? t("这里保留着保存时的照片与单品快照。") : t("直接记录照片，或选择已有搭配。照片穿搭会同时加入搭配集。")}</DialogDescription></DialogHeader>
+    <DialogHeader><DialogTitle>{record ? t("当天的穿搭") : t("添加当天穿搭")}</DialogTitle><DialogDescription>{record ? t("这里保留着保存时的照片与单品快照。") : t("直接记录照片，或选择已有搭配。照片穿搭会同时加入我的搭配。")}</DialogDescription></DialogHeader>
     <form onSubmit={event => { event.preventDefault(); void execute(); }}>
       <fieldset disabled={busy}><div className="form-fields">
         <div className="field-pair"><div className="field"><Label htmlFor="wear-date">{t("日期")}</Label><Input id="wear-date" type="date" required value={data.date} onChange={event => setData({ ...data, date: event.target.value })}/></div><div className="field"><Label>{t("状态")}</Label><Picker label={t("穿搭状态")} value={data.status} options={{ planned: t("已计划"), worn: t("已穿着") }} onChange={value => setData({ ...data, status: value as "planned" | "worn" })}/></div></div>
@@ -441,7 +441,7 @@ function CalendarEditor({ record, date, outfitId, outfits, items, onClose, onSav
       </div></fieldset>
       <FormError message={error}/><DialogFooter className="editor-footer">
         {record && <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" type="button" disabled={busy} className="mr-auto text-destructive">{t("删除记录")}</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t("删除这条日历记录？")}</AlertDialogTitle><AlertDialogDescription>{t("这一条记录和快照将被删除，衣橱单品和原搭配会保留。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("保留记录")}</AlertDialogCancel><AlertDialogAction onClick={() => void execute(true)}>{t("确认删除")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
-        <Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy || ((!record && mode === "photo") ? !photos.photos.length : !data.outfitId)}>{busy && <Loader2 size={16} className="animate-spin"/>}{!record && mode === "photo" ? t("保存穿搭并加入搭配集") : t("保存穿搭")}</Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy || ((!record && mode === "photo") ? !photos.photos.length : !data.outfitId)}>{busy && <Loader2 size={16} className="animate-spin"/>}{!record && mode === "photo" ? t("保存穿搭并加入我的搭配") : t("保存穿搭")}</Button>
       </DialogFooter>
     </form>
   </DialogContent></Dialog>;
