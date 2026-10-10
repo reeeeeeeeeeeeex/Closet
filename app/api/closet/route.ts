@@ -44,7 +44,7 @@ export async function GET(request: Request) {
   try { const { db, owner } = await context(); return json(await getState(db, owner, new URL(request.url).searchParams.get("collection") || undefined)); }
   catch (e) { return failure(e); }
 }
-const mutationSchema = z.object({ op: z.enum(["save", "deleteCalendar"]), collectionId: z.string().min(1).max(100), id: z.string().uuid().optional(), version: z.number().int().positive().optional(), subsetId: z.string().uuid().optional(), kind: z.enum(["item", "outfit", "calendar", "subset", "personalSizes"]), data: z.unknown() });
+const mutationSchema = z.object({ op: z.enum(["save", "deleteCalendar", "deleteSubset"]), collectionId: z.string().min(1).max(100), id: z.string().uuid().optional(), version: z.number().int().positive().optional(), subsetId: z.string().uuid().optional(), kind: z.enum(["item", "outfit", "calendar", "subset", "personalSizes"]), data: z.unknown() });
 export async function POST(request: Request) {
   try {
     sameOrigin(request); const { db, owner } = await context(); const body = mutationSchema.parse(await limitedJson(request, 128 * 1024));
@@ -54,6 +54,26 @@ export async function POST(request: Request) {
     const records = await getRecords(db, owner, collectionId); const existing = body.id ? records.find(r => r.id === body.id) : undefined;
     if (body.id && (!existing || existing.kind !== kind)) throw new ApiError(404, "记录不存在");
     if (existing && existing.version !== body.version) throw new ApiError(409, kind === "personalSizes" ? "另一台设备已修改尺码。草稿仍保留，请载入最新尺码后重新确认。" : "另一台设备已修改这条记录。草稿仍保留，请关闭编辑、刷新后重新确认。");
+    if (body.op === "deleteSubset") {
+      if (!existing || existing.kind !== "subset") throw new ApiError(400, "只能删除分组");
+      const result = db.transaction(() => {
+        const latest = getRecordsSync(db, owner, collectionId);
+        const target = latest.find(record => record.id === existing.id);
+        if (!target || target.kind !== "subset" || target.version !== body.version) throw new ApiError(409, "分组已在其他设备更改，请刷新后重试");
+        const now = new Date().toISOString();
+        const changes = latest.filter(record => record.kind === "subset" && (record.data.parentId === target.id || record.id === target.data.parentId)).map(record => {
+          if (record.kind !== "subset") throw new Error("Expected subset");
+          const data = record.id === target.data.parentId ? { ...record.data, memberIds: [...new Set([...record.data.memberIds, ...target.data.memberIds])] } : { ...record.data, parentId: target.data.parentId };
+          return { ...record, data, version: record.version + 1, updatedAt: now };
+        });
+        const changed = new Map(changes.map(record => [record.id, record]));
+        validateSubsets(latest.filter(record => record.id !== target.id).map(record => changed.get(record.id) || record));
+        for (const record of changes) db.prepare("UPDATE records SET data=?,version=?,updated_at=? WHERE owner=? AND collection_id=? AND id=?").bind(JSON.stringify(record.data), record.version, now, owner, collectionId, record.id).run();
+        db.prepare("DELETE FROM records WHERE owner=? AND collection_id=? AND id=?").bind(owner, collectionId, target.id).run();
+        return { ok: true, parentId: target.data.parentId };
+      });
+      return json(result);
+    }
     if (body.op === "deleteCalendar") {
       if (!existing || existing.kind !== "calendar") throw new ApiError(400, "只能删除日历记录");
       const result = await db.prepare("DELETE FROM records WHERE owner=? AND collection_id=? AND id=? AND version=? RETURNING id").bind(owner, collectionId, existing.id, existing.version).first();
