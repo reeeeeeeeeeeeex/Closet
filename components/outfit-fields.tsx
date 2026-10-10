@@ -1,58 +1,29 @@
-/* eslint-disable @next/next/no-img-element -- Originals and blob previews bypass image optimization. */
 "use client";
 import { translatedOptions } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
-import { useEffect, useId, useRef, useState } from "react";
-import { Camera, ImagePlus, Upload, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useId, useState } from "react";
+import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PhotoEditor } from "@/components/photo-gallery";
+import type { PhotoDraft } from "@/lib/photo-draft";
 import { ItemCard } from "@/components/closet-cards";
 import { CATEGORIES, OCCASIONS, type ItemRecord, type Outfit } from "@/lib/domain";
-export function OutfitFields({ data, onChange, file, onFile, items, onError }: {
+export function OutfitFields({ data, onChange, photos, onPhotos, items, onError }: {
     data: Outfit;
     onChange: (data: Outfit) => void;
-    file: File | null;
-    onFile: (file: File | null) => void;
+    photos: PhotoDraft;
+    onPhotos: (photos: PhotoDraft) => void;
     items: ItemRecord[];
     onError: (message: string) => void;
 }) {
     const { t } = useI18n();
     const id = useId();
-    const camera = useRef<HTMLInputElement>(null);
-    const library = useRef<HTMLInputElement>(null);
-    const [preview, setPreview] = useState("");
     const [filter, setFilter] = useState("all");
-    // Object URLs belong to the browser and must be released when the file changes.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    useEffect(() => { const url = file ? URL.createObjectURL(file) : ""; setPreview(url); return () => { if (url)
-        URL.revokeObjectURL(url); }; }, [file]);
-    function choose(input: HTMLInputElement) {
-        const selected = input.files?.[0];
-        input.value = "";
-        if (!selected)
-            return;
-        if (selected.size > 20 * 1024 * 1024) {
-            onError(t("单张图片最多 20 MB"));
-            return;
-        }
-        onFile(selected);
-        onError("");
-    }
-    const photo = preview || (data.asset ? `/api/assets/${data.asset}` : "");
     const available = items.filter(item => (!item.data.archived || data.itemIds.includes(item.id)) && (filter === "all" || item.data.category === filter));
     return <div className="outfit-draft">
-    <div className="outfit-draft-photo">
-      {photo ? <img src={photo} alt={t("搭配照片预览")}/> : <div className="outfit-photo-placeholder"><ImagePlus size={32} strokeWidth={1.4}/><span>{t("添加上身照或整套搭配照片")}</span></div>}
-      <div className="photo-actions">
-        <Button type="button" variant="outline" onClick={() => camera.current?.click()}><Camera size={16}/>{t("拍照")}</Button>
-        <Button type="button" variant="outline" onClick={() => library.current?.click()}><Upload size={16}/>{photo ? t("更换照片") : t("导入照片")}</Button>
-        {photo && <Button type="button" variant="ghost" onClick={() => { onFile(null); onChange({ ...data, asset: null }); }}>{t("移除照片")}</Button>}
-      </div>
-      <input ref={camera} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" capture="environment" aria-label={t("拍摄搭配照片")} onChange={event => choose(event.currentTarget)}/>
-      <input ref={library} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" aria-label={t("导入搭配照片")} onChange={event => choose(event.currentTarget)}/>
-    </div>
+    <PhotoEditor draft={photos} onChange={onPhotos} kind="outfit" onError={onError}/>
     <div className="form-fields">
       <div className="field"><Label htmlFor={`${id}-name`}>{t("搭配名称")}</Label><Input id={`${id}-name`} required maxLength={100} value={data.name} onChange={event => onChange({ ...data, name: event.target.value })} placeholder={t("例如：轻松的周五")}/></div>
       <div className="field"><Label>{t("适合场合")}</Label><div className="chip-row">{Object.entries(OCCASIONS).map(([value, name]) => <button type="button" key={value} className={`chip ${data.occasions.includes(value as Outfit["occasions"][number]) ? "selected" : ""}`} aria-pressed={data.occasions.includes(value as Outfit["occasions"][number])} onClick={() => { const occasion = value as Outfit["occasions"][number]; onChange({ ...data, occasions: data.occasions.includes(occasion) ? data.occasions.filter(o => o !== occasion) : [...data.occasions, occasion] }); }}>{t(name)}</button>)}</div></div>

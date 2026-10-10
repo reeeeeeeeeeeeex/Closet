@@ -417,7 +417,13 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 .photo-current-actions > button, .photo-current-actions > a { font-size: 12px; }
 .snapshot-photos .photo-gallery { width: 100%; }
 .snapshot-photos .photo-gallery-preview { height: 180px; }
+.snapshot-gallery-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.snapshot-gallery-items > div { min-width: 0; }
+.snapshot-gallery-items .photo-gallery-preview, .snapshot-item-placeholder { height: 180px; }
+.snapshot-gallery-items strong { display: block; margin-top: 9px; font-size: 13px; }
+.snapshot-gallery-items .photo-thumbnails span { margin: 0; }
 @media (max-width: 767px) { .photo-gallery-preview { height: 230px; }.photo-current-actions > button { padding: 0 8px; } }
+@media (max-width: 420px) { .snapshot-gallery-items { grid-template-columns: 1fr; } }
 .personal-sizes-context { margin-bottom: 8px; font-size: 15px; font-weight: 600; }
 .personal-sizes-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 24px; min-width: 0; }
 .personal-sizes-card { border: 1px solid var(--border); border-radius: 11px; padding: 24px; background: white; min-width: 0; }

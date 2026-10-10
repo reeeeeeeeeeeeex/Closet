@@ -51,7 +51,7 @@ const selectedLook = render(OutfitCard,{outfit:lookRecord,items:[cardRecord],onO
 const outfitContent = html => html.slice(html.indexOf('<div class="outfit-visual"'),html.indexOf('<div class="outfit-footer"')).replace(/<\/button>$/,'');
 assert.equal(outfitContent(selectedLook),outfitContent(lookCard));
 assert.match(selectedLook,/A useful note/); assert.match(selectedLook,/aria-pressed="false"/); assert.doesNotMatch(selectedLook,/安排 Photo look/);
-const outfitFields = render(OutfitFields,{data:{name:'Look',asset:null,itemIds:[cardRecord.id],occasions:[],notes:'',archived:false},onChange:()=>{},file:null,onFile:()=>{},items:[cardRecord],onError:()=>{}});
+const outfitFields = render(OutfitFields,{data:{name:'Look',asset:null,itemIds:[cardRecord.id],occasions:[],notes:'',archived:false},onChange:()=>{},photos:{photos:[],cover:null},onPhotos:()=>{},items:[cardRecord],onError:()=>{}});
 assert.match(outfitFields,/通勤/); assert.match(outfitFields,/日常/); assert.match(outfitFields,/修身/); assert.doesNotMatch(outfitFields,/肩宽|胸围|衣长/);
 assert.match(outfitFields,/item-card selectable-card picked/); assert.match(outfitFields,/item-card-body/); assert.doesNotMatch(outfitFields,/pick-name|pick-item/);
 catalogs.en = { '{count} 条记录': { one: '{count} record', other: '{count} records' }, '欧码 {size}': 'EU size {size}', '{label} {value} cm': '{value} cm — {label}' };
@@ -68,7 +68,7 @@ assert.match(personalHtml,/从自然腰线沿腿外侧量到脚底/);
 const sourceCatalog = JSON.parse(await readFile('lib/i18n/messages/zh-CN.json','utf8'));
 const template = JSON.parse(await readFile('lib/i18n/messages/locale.template.json','utf8'));
 assert.deepEqual(Object.keys(template).sort(), Object.keys(sourceCatalog).sort());
-for (const file of ['components/closet.tsx','components/closet-cards.tsx','components/outfit-fields.tsx','components/item-details.tsx','components/personal-sizes.tsx','components/shoe-size-fields.tsx','components/subsets.tsx','components/subset-content-picker.tsx','app/login/login-form.tsx','lib/portable.ts']) {
+for (const file of ['components/closet.tsx','components/closet-cards.tsx','components/outfit-fields.tsx','components/photo-gallery.tsx','components/item-details.tsx','components/personal-sizes.tsx','components/shoe-size-fields.tsx','components/subsets.tsx','components/subset-content-picker.tsx','app/login/login-form.tsx','lib/portable.ts']) {
   const source = ts.createSourceFile(file, await readFile(file,'utf8'), ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   function visit(node) {
     if (ts.isCallExpression(node) && ['t','tr'].includes(node.expression.getText(source)) && ts.isStringLiteral(node.arguments[0])) assert(Object.hasOwn(sourceCatalog,node.arguments[0].text), `${file}: missing catalog key ${node.arguments[0].text}`);

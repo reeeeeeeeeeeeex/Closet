@@ -114,7 +114,7 @@ export function makeSnapshot(outfit: Outfit, items: ItemRecord[]): CalendarEntry
 }
 export function wardrobePrompt(state: ClosetState, request: string, locale = DEFAULT_LOCALE): string {
   return [messageForLocale(locale, "你是我的穿搭助手。仅使用以下真实衣橱中的单品，保留单品 ID，说明上身/下身/鞋履的比例、场合和舒适度。不虚构衣物。"), messageForLocale(locale, "我的需求：{request}", { request }),
-    JSON.stringify(state.records.filter(r => r.kind === "item" && !r.data.archived).map(r => ({ id: r.id, ...r.data, asset: undefined })), null, 2)
+    JSON.stringify(state.records.filter(r => r.kind === "item" && !r.data.archived).map(r => ({ id: r.id, ...r.data, asset: undefined, photos: undefined })), null, 2)
   ].join("\n\n");
 }
 export interface OutfitAdvisor {

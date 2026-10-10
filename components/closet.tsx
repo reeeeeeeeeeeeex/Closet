@@ -23,11 +23,11 @@ import { SubsetBrowser } from "@/components/subsets";
 import { subsetMemberIds } from "@/lib/subsets";
 import { ItemDetailsFields, ItemLabels } from "@/components/item-details";
 import { CATEGORY_MEASUREMENTS, garmentCategory } from "@/lib/item-details";
-import { PhotoEditor } from "@/components/photo-gallery";
+import { PhotoEditor, PhotoGallery } from "@/components/photo-gallery";
 import { createPhotoDraft, savePhotoDraft } from "@/lib/photo-draft";
 import { OutfitFields } from "@/components/outfit-fields";
 import { dayInMonth } from "@/lib/calendar";
-import { ApiClientError, api, uploadAsset, exportArchive, inspectArchive, importArchive, downloadBlob } from "@/lib/portable";
+import { ApiClientError, api, exportArchive, inspectArchive, importArchive, downloadBlob } from "@/lib/portable";
 const blankItem: Item = { name: "", category: "top", color: "", seasons: [], occasions: [], notes: "", asset: null, archived: false, fit: null, shoeFit: null, shoeSize: { eu: null, cn: null }, measurements: {} };
 const blankOutfit: Outfit = { name: "", itemIds: [], asset: null, occasions: [], notes: "", archived: false };
 const errorMessage = (e: unknown) => e instanceof Error ? tr(e.message) : tr("操作失败，请重试");
@@ -289,7 +289,7 @@ function OutfitEditor({ record, items, onClose, onSave }: {
 }) {
     const { t } = useI18n();
     const [data, setData] = useState<Outfit>(record?.data || { ...blankOutfit });
-    const [file, setFile] = useState<File | null>(null);
+    const [photos, setPhotos] = useState(() => createPhotoDraft(record?.data || blankOutfit));
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const submit = async (archive = data.archived) => {
@@ -298,10 +298,10 @@ function OutfitEditor({ record, items, onClose, onSave }: {
         try {
             if (!data.name.trim())
                 throw new Error(t("请给搭配起个名字"));
-            if (!file && !data.asset && !data.itemIds.length)
+            if (!photos.photos.length && !data.itemIds.length)
                 throw new Error(t("请添加搭配照片或选择单品"));
-            const asset = file ? (await uploadAsset(file)).hash : data.asset;
-            await onSave("outfit", { ...data, asset, archived: archive }, record);
+            const gallery = await savePhotoDraft(photos);
+            await onSave("outfit", { ...data, ...gallery, archived: archive }, record);
         }
         catch (e) {
             setError(errorMessage(e));
@@ -314,7 +314,7 @@ function OutfitEditor({ record, items, onClose, onSave }: {
         onClose(); }}><DialogContent className="editor-dialog outfit-dialog">
     <DialogHeader><DialogTitle>{record ? t("编辑搭配") : t("新建搭配")}</DialogTitle><DialogDescription>{t("保存搭配照片，也可以关联单品。之后修改不会改变日历里已保存的快照。")}</DialogDescription></DialogHeader>
     <form onSubmit={event => { event.preventDefault(); void submit(); }}>
-      <fieldset disabled={busy}><OutfitFields data={data} onChange={setData} file={file} onFile={setFile} items={items} onError={setError}/></fieldset>
+      <fieldset disabled={busy}><OutfitFields data={data} onChange={setData} photos={photos} onPhotos={setPhotos} items={items} onError={setError}/></fieldset>
       <FormError message={error}/><DialogFooter className="editor-footer">
         {record && <Button variant="ghost" type="button" className="mr-auto" disabled={busy} onClick={() => void submit(!data.archived)}><Archive size={16}/>{data.archived ? t("恢复搭配") : t("收起搭配")}</Button>}
         <Button variant="outline" type="button" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy}>{busy && <Loader2 size={16} className="animate-spin"/>}{t("保存搭配")}</Button>
@@ -389,7 +389,7 @@ function CalendarEditor({ record, date, outfitId, outfits, items, onClose, onSav
     const [data, setData] = useState({ date: record?.data.date || date || localDate(), outfitId: record?.data.outfitId || outfitId || "", status: record?.data.status || (outfitId ? "planned" : "worn"), notes: record?.data.notes || "" });
     const [mode, setMode] = useState<"photo" | "existing">(record || outfitId ? "existing" : "photo");
     const [draft, setDraft] = useState<Outfit>({ ...blankOutfit, name: t("{value1} 的穿搭", { value1: date || localDate() }) });
-    const [file, setFile] = useState<File | null>(null);
+    const [photos, setPhotos] = useState(() => createPhotoDraft(blankOutfit));
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const execute = async (remove = false) => {
@@ -401,10 +401,10 @@ function CalendarEditor({ record, date, outfitId, outfits, items, onClose, onSav
             else if (!record && mode === "photo") {
                 if (!draft.name.trim())
                     throw new Error(t("请给搭配起个名字"));
-                if (!file && !draft.asset)
+                if (!photos.photos.length)
                     throw new Error(t("请拍照或导入一张搭配照片"));
-                const asset = file ? (await uploadAsset(file)).hash : draft.asset;
-                await onSave("calendar", { date: data.date, status: data.status, notes: data.notes, newOutfit: { ...draft, asset } });
+                const gallery = await savePhotoDraft(photos);
+                await onSave("calendar", { date: data.date, status: data.status, notes: data.notes, newOutfit: { ...draft, ...gallery } });
             }
             else {
                 if (!data.outfitId)
@@ -427,18 +427,18 @@ function CalendarEditor({ record, date, outfitId, outfits, items, onClose, onSav
       <fieldset disabled={busy}><div className="form-fields">
         <div className="field-pair"><div className="field"><Label htmlFor="wear-date">{t("日期")}</Label><Input id="wear-date" type="date" required value={data.date} onChange={event => setData({ ...data, date: event.target.value })}/></div><div className="field"><Label>{t("状态")}</Label><Picker label={t("穿搭状态")} value={data.status} options={{ planned: t("已计划"), worn: t("已穿着") }} onChange={value => setData({ ...data, status: value as "planned" | "worn" })}/></div></div>
         {record ? <>
-          {record.data.snapshot.asset && <Photo asset={record.data.snapshot.asset} name={record.data.snapshot.name} className="calendar-snapshot-photo"/>}
-          {!!record.data.snapshot.items.length && <div className="snapshot-photos large">{record.data.snapshot.items.map(item => <div key={item.id}><Photo asset={item.data.asset} name={item.data.name}/><span>{item.data.name}</span><ItemLabels item={item.data}/></div>)}</div>}
+          {record.data.snapshot.asset && <PhotoGallery data={record.data.snapshot} name={record.data.snapshot.name}/>}
+          {!!record.data.snapshot.items.length && <div className="snapshot-gallery-items">{record.data.snapshot.items.map(item => <div key={item.id}>{item.data.asset ? <PhotoGallery data={item.data} name={item.data.name}/> : <Photo asset={null} name={item.data.name} className="snapshot-item-placeholder"/>}<strong>{item.data.name}</strong><ItemLabels item={item.data}/></div>)}</div>}
           <strong>{record.data.snapshot.name}</strong>
         </> : <>
           <div className="wear-mode" role="group" aria-label={t("添加穿搭方式")}><Button type="button" variant={mode === "photo" ? "default" : "outline"} aria-pressed={mode === "photo"} onClick={() => { setMode("photo"); setError(""); }}><Camera size={16}/>{t("照片新搭配")}</Button><Button type="button" variant={mode === "existing" ? "default" : "outline"} aria-pressed={mode === "existing"} onClick={() => { setMode("existing"); setError(""); }}>{t("选择已有搭配")}</Button></div>
-          {mode === "photo" ? <OutfitFields data={draft} onChange={setDraft} file={file} onFile={setFile} items={items} onError={setError}/> : <div className="field"><Label>{t("选择搭配")}</Label><Picker label={t("选择一套搭配")} value={data.outfitId} options={Object.fromEntries(outfits.filter(o => !o.data.archived).map(o => [o.id, o.data.name]))} onChange={value => setData({ ...data, outfitId: value })}/>{!outfits.some(o => !o.data.archived) && <p className="field-hint">{t("还没有搭配，可以切换到「照片新搭配」直接保存穿搭照。")}</p>}{selectedOutfit && <OutfitCollage asset={selectedOutfit.data.asset} itemIds={selectedOutfit.data.itemIds} items={items}/>}</div>}
+          {mode === "photo" ? <OutfitFields data={draft} onChange={setDraft} photos={photos} onPhotos={setPhotos} items={items} onError={setError}/> : <div className="field"><Label>{t("选择搭配")}</Label><Picker label={t("选择一套搭配")} value={data.outfitId} options={Object.fromEntries(outfits.filter(o => !o.data.archived).map(o => [o.id, o.data.name]))} onChange={value => setData({ ...data, outfitId: value })}/>{!outfits.some(o => !o.data.archived) && <p className="field-hint">{t("还没有搭配，可以切换到「照片新搭配」直接保存穿搭照。")}</p>}{selectedOutfit && <OutfitCollage asset={selectedOutfit.data.asset} itemIds={selectedOutfit.data.itemIds} items={items}/>}</div>}
         </>}
         <div className="field"><Label htmlFor="wear-notes">{t("当天的备注")}</Label><Textarea id="wear-notes" value={data.notes} maxLength={3000} rows={3} placeholder={t("要去哪里？穿起来感觉怎么样？")} onChange={event => setData({ ...data, notes: event.target.value })}/></div>
       </div></fieldset>
       <FormError message={error}/><DialogFooter className="editor-footer">
         {record && <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" type="button" disabled={busy} className="mr-auto text-destructive">{t("删除记录")}</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t("删除这条日历记录？")}</AlertDialogTitle><AlertDialogDescription>{t("这一条记录和快照将被删除，衣橱单品和原搭配会保留。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("保留记录")}</AlertDialogCancel><AlertDialogAction onClick={() => void execute(true)}>{t("确认删除")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
-        <Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy || ((!record && mode === "photo") ? !file && !draft.asset : !data.outfitId)}>{busy && <Loader2 size={16} className="animate-spin"/>}{!record && mode === "photo" ? t("保存穿搭并加入搭配集") : t("保存穿搭")}</Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy || ((!record && mode === "photo") ? !photos.photos.length : !data.outfitId)}>{busy && <Loader2 size={16} className="animate-spin"/>}{!record && mode === "photo" ? t("保存穿搭并加入搭配集") : t("保存穿搭")}</Button>
       </DialogFooter>
     </form>
   </DialogContent></Dialog>;
