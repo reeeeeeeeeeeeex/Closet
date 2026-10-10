@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- Display authenticated original images. */
 "use client";
-import { ArrowUpRight, CalendarDays, Shirt } from "lucide-react";
+import { ArrowUpRight, CalendarDays, Check, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ItemLabels } from "@/components/item-details";
 import { CATEGORIES, OCCASIONS, type Item, type ItemRecord, type OutfitRecord } from "@/lib/domain";
@@ -28,9 +28,26 @@ export function OutfitCollage({ asset, itemIds, items }: {
   </div>;
 }
 
-export function ItemCard({ item, onOpen }: { item: ItemRecord; onOpen: () => void }) {
-const { t } = useI18n(); return <button className="item-card" onClick={onOpen}><Photo asset={item.data.asset} name={item.data.name}/><div className="item-card-body"><div className="item-category">{t(CATEGORIES[item.data.category])}{item.data.color && ` / ${item.data.color}`}</div><h3>{item.data.name}</h3><OccasionLabels values={item.data.occasions}/><ItemLabels item={item.data} showMeasurements={false}/></div><span className="card-edit"><ArrowUpRight size={18}/></span></button>;
+type CardSelection = { selected: boolean; label: string; indicators?: string[] };
+
+function SelectionMarker({ selection }: { selection: CardSelection }) {
+    return <><span className="pick-check" aria-hidden="true">{selection.selected && <Check size={13}/>}</span>{!!selection.indicators?.length && <div className="card-indicators">{selection.indicators.map(label => <small key={label}>{label}</small>)}</div>}</>;
 }
-export function OutfitCard({ outfit, items, onOpen, onCalendar }: { outfit: OutfitRecord; items: ItemRecord[]; onOpen: () => void; onCalendar: () => void }) {
-const { t } = useI18n(); return <div className="outfit-card"><button className="outfit-open" onClick={onOpen}><OutfitCollage asset={outfit.data.asset} itemIds={outfit.data.itemIds} items={items}/><div className="outfit-body"><div className="item-category">{outfit.data.asset ? t("搭配照片 \u00B7 ") : ""}{outfit.data.itemIds.length ? t("{value1} 件单品", { value1: outfit.data.itemIds.length }) : t("未关联单品")}</div><h3>{outfit.data.name}</h3><OccasionLabels values={outfit.data.occasions}/></div></button><div className="outfit-footer"><span>{outfit.data.notes || t("喜欢的组合，留给刚好的日子。")}</span><Button variant="ghost" size="icon" aria-label={t("安排 {value1} 的穿搭日期", { value1: outfit.data.name })} onClick={onCalendar}><CalendarDays size={19}/></Button></div></div>;
+
+export function ItemCard({ item, onOpen, selection }: { item: ItemRecord; onOpen: () => void; selection?: CardSelection }) {
+    const { t } = useI18n();
+    return <button type="button" className={`item-card ${selection ? "selectable-card" : ""} ${selection?.selected ? "picked" : ""}`} onClick={onOpen} aria-label={selection?.label} aria-pressed={selection?.selected}>
+        <Photo asset={item.data.asset} name={item.data.name}/>
+        <div className="item-card-body"><div className="item-category">{t(CATEGORIES[item.data.category])}{item.data.color && ` / ${item.data.color}`}</div><h3>{item.data.name}</h3><OccasionLabels values={item.data.occasions}/><ItemLabels item={item.data} showMeasurements={false}/></div>
+        {selection ? <SelectionMarker selection={selection}/> : <span className="card-edit"><ArrowUpRight size={18}/></span>}
+    </button>;
+}
+
+export function OutfitCard({ outfit, items, onOpen, onCalendar, selection }: { outfit: OutfitRecord; items: ItemRecord[]; onOpen: () => void; onCalendar?: () => void; selection?: CardSelection }) {
+    const { t } = useI18n();
+    const content = <><OutfitCollage asset={outfit.data.asset} itemIds={outfit.data.itemIds} items={items}/><div className="outfit-body"><div className="item-category">{outfit.data.asset ? t("搭配照片 \u00B7 ") : ""}{outfit.data.itemIds.length ? t("{value1} 件单品", { value1: outfit.data.itemIds.length }) : t("未关联单品")}</div><h3>{outfit.data.name}</h3><OccasionLabels values={outfit.data.occasions}/></div></>;
+    const footer = <div className="outfit-footer"><span>{outfit.data.notes || t("喜欢的组合，留给刚好的日子。")}</span>{!selection && onCalendar && <Button type="button" variant="ghost" size="icon" aria-label={t("安排 {value1} 的穿搭日期", { value1: outfit.data.name })} onClick={onCalendar}><CalendarDays size={19}/></Button>}</div>;
+    return selection
+        ? <button type="button" className={`outfit-card selectable-card ${selection.selected ? "picked" : ""}`} onClick={onOpen} aria-label={selection.label} aria-pressed={selection.selected}>{content}{footer}<SelectionMarker selection={selection}/></button>
+        : <div className="outfit-card"><button type="button" className="outfit-open" onClick={onOpen}>{content}</button>{footer}</div>;
 }

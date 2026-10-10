@@ -3,13 +3,12 @@
 import { translatedOptions } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
 import { useEffect, useId, useRef, useState } from "react";
-import { Camera, Check, ImagePlus, Shirt, Upload, X } from "lucide-react";
+import { Camera, ImagePlus, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ItemLabels } from "@/components/item-details";
-import { OccasionLabels } from "@/components/closet-cards";
+import { ItemCard } from "@/components/closet-cards";
 import { CATEGORIES, OCCASIONS, type ItemRecord, type Outfit } from "@/lib/domain";
 export function OutfitFields({ data, onChange, file, onFile, items, onError }: {
     data: Outfit;
@@ -63,11 +62,11 @@ export function OutfitFields({ data, onChange, file, onFile, items, onError }: {
       <div className="picker-title"><strong>{t("关联单品（可选）")}</strong><span>{t("已选 {count} / 30 件", { count: data.itemIds.length })}</span></div>
       <p className="field-hint">{t("可以只保存搭配照片，之后再来补选单品。")}</p>
       <Label htmlFor={`${id}-category`} className="sr-only">{t("筛选单品分类")}</Label><select id={`${id}-category`} className="outfit-category-filter" value={filter} onChange={event => setFilter(event.target.value)}>{Object.entries({ all: t("全部分类"), ...translatedOptions(CATEGORIES, t) }).map(([value, name]) => <option key={value} value={value}>{t(name)}</option>)}</select>
-      <div className="item-picker-grid">{available.map(item => <button type="button" key={item.id} className={`pick-item ${data.itemIds.includes(item.id) ? "picked" : ""}`} aria-pressed={data.itemIds.includes(item.id)} aria-label={t("选择单品 {value1}", { value1: item.data.name })} onClick={() => {
+      <div className="item-picker-scroll"><div className="item-grid item-picker-grid">{available.map(item => <ItemCard key={item.id} item={item} selection={{ selected: data.itemIds.includes(item.id), label: t("选择单品 {value1}", { value1: item.data.name }) }} onOpen={() => {
                 if (!data.itemIds.includes(item.id) && data.itemIds.length >= 30)
                     return;
                 onChange({ ...data, itemIds: data.itemIds.includes(item.id) ? data.itemIds.filter(value => value !== item.id) : [...data.itemIds, item.id] });
-            }}><div className="photo">{item.data.asset ? <img src={`/api/assets/${item.data.asset}`} alt={item.data.name} loading="lazy"/> : <div className="photo-placeholder"><Shirt strokeWidth={1}/></div>}</div><span className="pick-name">{item.data.name}</span><OccasionLabels values={item.data.occasions}/><ItemLabels item={item.data} showMeasurements={false}/><span className="pick-check">{data.itemIds.includes(item.id) && <Check size={13}/>}</span></button>)}</div>
+            }}/>)}</div></div>
       {!available.length && <p className="field-hint">{items.length ? t("这个分类里还没有单品。") : t("还没有衣橱单品，也可以直接保存照片搭配。")}</p>}
       {!!data.itemIds.length && <div className="selected-summary"><span>{t("已关联")}</span>{data.itemIds.map(value => <button type="button" key={value} onClick={() => onChange({ ...data, itemIds: data.itemIds.filter(itemId => itemId !== value) })}>{items.find(item => item.id === value)?.data.name}<X size={12}/></button>)}</div>}
     </div>

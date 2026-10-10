@@ -1,9 +1,8 @@
 "use client";
 import { useState } from "react";
-import { Check, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { ItemLabels } from "@/components/item-details";
-import { Photo, OutfitCollage, OccasionLabels } from "@/components/closet-cards";
+import { ItemCard, OutfitCard } from "@/components/closet-cards";
 import { CATEGORIES, OCCASIONS, type ClosetRecord, type ItemRecord, type Subset } from "@/lib/domain";
 import { rootRecords } from "@/lib/subsets";
 import { useI18n } from "@/lib/i18n/provider";
@@ -30,10 +29,12 @@ export function SubsetContentPicker({ records, data, inherited, onChange }: {
     {data.scope === "item" && data.root === "all" && <div className="category-tabs subset-picker-tabs" role="group" aria-label={t("单品分类")}>{Object.entries({ all: t("全部"), ...CATEGORIES }).map(([key, label]) => <button type="button" key={key} className={category === key ? "active" : ""} onClick={() => setCategory(key)}>{t(label)}</button>)}</div>}
     {data.scope === "item" && data.root !== "all" && <p className="field-hint">{t("当前分类：{name}", { name: t(CATEGORIES[data.root]) })}</p>}
     {data.scope === "outfit" && <div className="chip-row" role="group" aria-label={t("场合筛选")}>{Object.entries({ all: t("所有场合"), ...OCCASIONS }).map(([key, label]) => <button type="button" key={key} className={`chip ${occasion === key ? "selected" : ""}`} aria-pressed={occasion === key} onClick={() => setOccasion(key)}>{t(label)}</button>)}</div>}
-    <div className="subset-pick-grid">{visible.map(candidate => <button type="button" className={`item-card subset-pick-card ${data.memberIds.includes(candidate.id) ? "picked" : ""}`} key={candidate.id} aria-label={t("选择内容 {name}", { name: candidate.data.name })} aria-pressed={data.memberIds.includes(candidate.id)} onClick={() => toggle(candidate.id)}>
-      {candidate.kind === "item" ? <Photo asset={candidate.data.asset} name={candidate.data.name}/> : <OutfitCollage asset={candidate.data.asset} itemIds={candidate.data.itemIds} items={items}/>}
-      <div className="item-card-body"><div className="item-category">{candidate.kind === "item" ? t(CATEGORIES[candidate.data.category]) : candidate.data.asset ? t("搭配照片") : t("单品搭配")}</div><h3>{candidate.data.name}</h3><OccasionLabels values={candidate.data.occasions}/>{candidate.kind === "item" && <ItemLabels item={candidate.data} showMeasurements={false}/>}{inherited.has(candidate.id) && <small>{t("已包含在下级分组中")}</small>}{candidate.data.archived && <small>{t("已收起")}</small>}</div><span className="pick-check">{data.memberIds.includes(candidate.id) && <Check size={13}/>}</span>
-    </button>)}</div>
+    <div className="subset-pick-scroll"><div className={`${data.scope === "item" ? "item-grid" : "outfit-grid"} subset-pick-grid`}>{visible.map(candidate => {
+      const selection = { selected: data.memberIds.includes(candidate.id), label: t("选择内容 {name}", { name: candidate.data.name }), indicators: [inherited.has(candidate.id) ? t("已包含在下级分组中") : "", candidate.data.archived ? t("已收起") : ""].filter(Boolean) };
+      return candidate.kind === "item"
+        ? <ItemCard key={candidate.id} item={candidate} selection={selection} onOpen={() => toggle(candidate.id)}/>
+        : <OutfitCard key={candidate.id} outfit={candidate} items={items} selection={selection} onOpen={() => toggle(candidate.id)}/>;
+    })}</div></div>
     {!visible.length && <p className="field-hint">{t("当前筛选下没有可选内容，可切换分类或清空搜索。")}</p>}
     {!!data.memberIds.length && <div className="selected-summary"><span>{t("直接加入 {count} 条", { count: data.memberIds.length })}</span>{data.memberIds.map(id => <button type="button" key={id} aria-label={t("取消选择 {name}", { name: candidates.find(candidate => candidate.id === id)?.data.name || t("记录不存在") })} onClick={() => toggle(id)}>{candidates.find(candidate => candidate.id === id)?.data.name || t("记录不存在")}<X size={12}/></button>)}</div>}
   </div>;

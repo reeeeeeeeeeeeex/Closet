@@ -11,7 +11,7 @@ await build({ entryPoints: ['components/item-details.tsx','components/closet-car
 const root = process.cwd() + '/.test-runtime/item-details-build/';
 const { itemSchema, makeSnapshot } = require(root + 'lib/domain.cjs');
 const { ItemLabels, ItemDetailsFields } = require(root + 'components/item-details.cjs');
-const { ItemCard } = require(root + 'components/closet-cards.cjs');
+const { ItemCard, OutfitCard } = require(root + 'components/closet-cards.cjs');
 const { OutfitFields } = require(root + 'components/outfit-fields.cjs');
 const { PersonalSizesPanel } = require(root + 'components/personal-sizes.cjs');
 const { messageForLocale, catalogs, resolveLocale } = require(root + 'lib/i18n/core.cjs');
@@ -40,8 +40,20 @@ assert.match(render(ItemLabels, { item: snapshot.items[0].data }), /胸围 96 cm
 const cardRecord = { ...record, data: { ...shirt, occasions: ['work','casual'] } };
 const cardHtml = render(ItemCard, { item: cardRecord, onOpen: () => {} });
 assert.match(cardHtml,/通勤/); assert.match(cardHtml,/日常/); assert.match(cardHtml,/修身/); assert.doesNotMatch(cardHtml,/肩宽|胸围|衣长/);
+const selectedCard = render(ItemCard, { item: cardRecord, onOpen: () => {}, selection: { selected: true, label: '选择 Jacket' } });
+// Choosing a record changes only controls; its photo and body must match the list card.
+const itemContent = html => html.slice(html.indexOf('<div class="photo'), html.indexOf('<span class="card-edit"') >= 0 ? html.indexOf('<span class="card-edit"') : html.indexOf('<span class="pick-check"'));
+assert.equal(itemContent(selectedCard), itemContent(cardHtml));
+assert.match(selectedCard,/type="button"/); assert.match(selectedCard,/aria-pressed="true"/); assert.doesNotMatch(selectedCard,/card-edit/);
+const lookRecord = { ...record, kind: 'outfit', data: { name: 'Photo look', asset: 'a'.repeat(64), itemIds: [cardRecord.id], occasions: ['work'], notes: 'A useful note', archived: false } };
+const lookCard = render(OutfitCard,{outfit:lookRecord,items:[cardRecord],onOpen:()=>{},onCalendar:()=>{}});
+const selectedLook = render(OutfitCard,{outfit:lookRecord,items:[cardRecord],onOpen:()=>{},selection:{selected:false,label:'选择 Photo look'}});
+const outfitContent = html => html.slice(html.indexOf('<div class="outfit-visual"'),html.indexOf('<div class="outfit-footer"')).replace(/<\/button>$/,'');
+assert.equal(outfitContent(selectedLook),outfitContent(lookCard));
+assert.match(selectedLook,/A useful note/); assert.match(selectedLook,/aria-pressed="false"/); assert.doesNotMatch(selectedLook,/安排 Photo look/);
 const outfitFields = render(OutfitFields,{data:{name:'Look',asset:null,itemIds:[cardRecord.id],occasions:[],notes:'',archived:false},onChange:()=>{},file:null,onFile:()=>{},items:[cardRecord],onError:()=>{}});
 assert.match(outfitFields,/通勤/); assert.match(outfitFields,/日常/); assert.match(outfitFields,/修身/); assert.doesNotMatch(outfitFields,/肩宽|胸围|衣长/);
+assert.match(outfitFields,/item-card selectable-card picked/); assert.match(outfitFields,/item-card-body/); assert.doesNotMatch(outfitFields,/pick-name|pick-item/);
 catalogs.en = { '{count} 条记录': { one: '{count} record', other: '{count} records' }, '欧码 {size}': 'EU size {size}', '{label} {value} cm': '{value} cm — {label}' };
 assert.equal(messageForLocale('en','{count} 条记录',{ count: 1 }), '1 record');
 assert.equal(messageForLocale('en','{count} 条记录',{ count: 2 }), '2 records');
