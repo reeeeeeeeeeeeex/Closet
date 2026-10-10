@@ -2,6 +2,7 @@
 "use client";
 import { ArrowUpRight, CalendarDays, Check, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { itemColorStyle, itemColorText, isCommonColor } from "@/lib/colors";
 import { ItemLabels } from "@/components/item-details";
 import { CATEGORIES, OCCASIONS, type Item, type ItemRecord, type OutfitRecord } from "@/lib/domain";
 import { useI18n } from "@/lib/i18n/provider";
@@ -36,9 +37,13 @@ function SelectionMarker({ selection }: { selection: CardSelection }) {
 
 export function ItemCard({ item, onOpen, selection }: { item: ItemRecord; onOpen: () => void; selection?: CardSelection }) {
     const { t } = useI18n();
+    const style = itemColorStyle(item.data);
+    const first = style.values[0];
+    const name = first ? isCommonColor(first) ? t(first.name) : first.name : "";
+    const summary = !first ? "" : style.mode === "colorblock" ? t("拼色 · {count} 色", { count: style.values.length }) : style.mode === "primary" && style.values.length > 1 ? t("{name}＋{count} 辅色", { name, count: style.values.length - 1 }) : name;
     return <button type="button" className={`item-card ${selection ? "selectable-card" : ""} ${selection?.selected ? "picked" : ""}`} onClick={onOpen} aria-label={selection?.label} aria-pressed={selection?.selected}>
         <Photo asset={item.data.asset} name={item.data.name}/>
-        <div className="item-card-body"><div className="item-category">{t(CATEGORIES[item.data.category])}{item.data.color && ` / ${item.data.color}`}</div><h3>{item.data.name}</h3><OccasionLabels values={item.data.occasions}/><ItemLabels item={item.data} showMeasurements={false}/></div>
+        <div className="item-card-body"><div className="item-category" title={itemColorText(item.data)}>{t(CATEGORIES[item.data.category])}{summary && ` / ${summary}`}</div><h3>{item.data.name}</h3><OccasionLabels values={item.data.occasions}/><ItemLabels item={item.data} showMeasurements={false}/></div>
         {selection ? <SelectionMarker selection={selection}/> : <span className="card-edit"><ArrowUpRight size={18}/></span>}
     </button>;
 }

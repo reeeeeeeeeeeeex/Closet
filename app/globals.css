@@ -480,3 +480,31 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
   .personal-sizes-card [data-slot="input"] { min-height: 44px; }
   .import-preview > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 }
+
+/* Shared color entry, previews and scrollable suggestions. */
+.color-field {display:flex;flex-direction:column;gap:10px;min-width:0;font-size:14px}
+.color-field strong {font-weight:600}
+.color-modes {display:flex;gap:6px}
+.color-modes button {flex:1;min-height:44px;padding:8px 6px;border:1px solid #e1e6ed;border-radius:7px;font-size:13px}
+.color-modes button[aria-pressed=true] {background:#222934;border-color:#222934;color:white}
+.color-role {display:flex;align-items:flex-start;gap:10px;min-width:0}
+.color-role>span {flex:0 0 56px;padding-top:12px;color:#687384;font-size:13px}
+.color-selected,.color-options {display:flex;flex-wrap:wrap;gap:7px;min-width:0}
+.color-selected {max-height:150px;overflow-y:auto;overscroll-behavior-y:contain;flex:1;padding:2px}
+.color-chip {display:inline-flex;align-items:center;gap:7px;min-height:44px;max-width:100%;padding:6px 9px;border:1px solid #e1e6ed;border-radius:7px;background:#f9fafc;font-size:13px;overflow-wrap:anywhere}
+.color-chip.selected,.color-chip[aria-pressed=true] {border-color:#7086a0;background:#edf2f8}
+.color-chip>button {display:grid;place-items:center;min-width:32px;min-height:32px;margin:-3px -5px -3px 0;border-radius:4px}
+.color-swatch {display:inline-block;flex:0 0 19px;width:19px;height:19px;border-radius:50%;border:1px solid #22293426}
+.color-swatch.unfilled {background:linear-gradient(135deg,#fff 46%,#cad0d9 47%,#cad0d9 53%,#fff 54%)}
+.color-picker-panel {display:flex;flex-direction:column;gap:9px;padding:12px;border:1px solid #e1e6ed;border-radius:10px;background:#fff;min-width:0}
+.color-candidates {max-height:190px;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable;padding:3px}
+.color-candidates p {font-size:12px;color:#687384;margin:3px 0 7px}
+.color-candidates .color-options+p {margin-top:12px}
+.color-create {display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12px}
+.color-manual {display:flex;align-items:center;gap:8px;min-height:44px}
+.color-manual input {width:36px;height:32px;cursor:pointer;background:transparent}
+.color-use-new {justify-content:flex-start;white-space:normal;height:auto;min-height:44px;overflow-wrap:anywhere}
+.color-choice p {font-size:13px;color:#687384;margin-bottom:8px}
+.color-chip:focus-visible,.color-modes button:focus-visible,.color-candidates:focus-visible {outline:2px solid #7086a0;outline-offset:2px}
+.item-card .item-category {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:480px){.color-role {flex-direction:column;gap:5px}.color-role>span {flex-basis:auto;padding:0}.color-modes button {font-size:12px}.color-picker-panel {padding:9px}}

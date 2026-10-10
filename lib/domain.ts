@@ -2,6 +2,7 @@ import { z } from "zod";
 import { CATEGORY_MEASUREMENTS, garmentCategory, type Measurement } from "./item-details";
 import { DEFAULT_LOCALE, messageForLocale } from "./i18n/core";
 import { validateSubsets } from "./subsets";
+import { colorStyleSchema, libraryColorSchema, type LibraryColor } from "./colors";
 export const CATEGORIES = { top: "上装", bottom: "下装", dress: "连体 / 裙装", outerwear: "外套", shoes: "鞋履", bag: "包袋", accessory: "配饰" } as const;
 export const OCCASIONS = { work: "通勤", casual: "日常", party: "聚会", formal: "正式", vacation: "旅行", sport: "运动" } as const;
 export const SEASONS = { spring: "春", summer: "夏", autumn: "秋", winter: "冬" } as const;
@@ -30,7 +31,7 @@ export type PersonalSizes = z.infer<typeof personalSizesSchema>;
 export const itemSchema = z.object({
   name: title, category: z.enum(["top", "bottom", "dress", "outerwear", "shoes", "bag", "accessory"]),
   brand: z.string().trim().max(100, "品牌名称不能超过 100 个字符").optional(),
-  color: z.string().max(50), seasons: z.array(z.enum(["spring", "summer", "autumn", "winter"])).max(4),
+  color: z.string().max(50), colorStyle: colorStyleSchema.optional(), seasons: z.array(z.enum(["spring", "summer", "autumn", "winter"])).max(4),
   occasions, notes: note, asset: hashSchema.nullable(), photos: photosSchema, archived: z.boolean(),
   fit: z.enum(["tight", "fitted", "regular", "loose"]).nullable().default(null),
   shoeFit: z.enum(["trueToSize", "large", "small"]).nullable().default(null),
@@ -74,12 +75,13 @@ export type ClosetRecord = z.infer<typeof recordSchema>;
 export const assetSchema = z.object({ hash: hashSchema, name: z.string().max(255), mime: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]), size: z.number().int().positive().max(20 * 1024 * 1024) }).strict();
 export type Asset = z.infer<typeof assetSchema>;
 export const archiveSchema = z.object({
-  format: z.literal("new-closet"), schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7), z.literal(8)]), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
+  format: z.literal("new-closet"), schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7), z.literal(8), z.literal(9)]), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
+  colorLibrary: z.array(libraryColorSchema).default([]),
   records: z.array(recordSchema).max(2000), assets: z.array(assetSchema).max(2000),
 }).strict();
 export type ClosetArchive = z.infer<typeof archiveSchema>;
 export type Collection = { id: string; name: string; createdAt: string };
-export type ClosetState = { collections: Collection[]; collectionId: string; records: ClosetRecord[]; assets: Asset[] };
+export type ClosetState = { collections: Collection[]; collectionId: string; records: ClosetRecord[]; assets: Asset[]; colorLibrary?: LibraryColor[] };
 export function referencedAssets(records: ClosetRecord[]): Set<string> {
   const hashes = new Set<string>();
   for (const r of records) {
@@ -106,7 +108,7 @@ export function validateArchive(input: unknown): ClosetArchive {
   for (const hash of referencedAssets(a.records)) if (!media.has(hash)) throw new Error("备份缺少原图");
   validateSubsets(a.records);
   if (a.records.filter(record => record.kind === "personalSizes").length > 1) throw new Error("每个衣橱只能保存一份我的尺码");
-  return { ...a, schemaVersion: 8 };
+  return { ...a, schemaVersion: 9 };
 }
 export function makeSnapshot(outfit: Outfit, items: ItemRecord[]): CalendarEntry["snapshot"] {
   const map = new Map(items.map(i => [i.id, i]));

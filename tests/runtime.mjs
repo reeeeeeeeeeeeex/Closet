@@ -160,7 +160,7 @@ try {
   globalThis.fetch = (url, init = {}) => request(url, init);
   const backup = new File([await exportArchive(state, () => {})], 'wardrobe.zip');
   const manifest = await inspectArchive(backup, () => {});
-  assert.equal(manifest.schemaVersion,8); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
+  assert.equal(manifest.schemaVersion,9); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
   const restoredId = await importArchive(backup, manifest, () => {});
   const restored = await (await request('/api/closet?collection=' + restoredId)).json(); assert.deepEqual(restored.records, state.records); assert.equal(restored.collections.length, 2);
   assert.deepEqual((await (await request('/api/closet?collection=main')).json()).records, state.records);
@@ -223,7 +223,7 @@ try {
   const stored = persisted.prepare('SELECT storage_key FROM assets WHERE hash=?').get(asset.hash);
   assert.deepEqual(await readFile(path.join(directory, 'assets', stored.storage_key)), png); persisted.close();
   assert.equal((await request('/api/auth', { method: 'DELETE' })).status, 200);
-  console.log('PASS: production Node server; personal sizes singleton under concurrent creation, optional field clearing, invalid inputs, stale edits, per-collection isolation and item brands and multi-photo v8 ZIP recovery; nested category/item/outfit subsets, multiple membership, concurrent auto-add without lost members, stale edits blocked, invalid parent/scope/category and cyclic imports rejected; photo/calendar/subset transactions, original bytes, legacy records, restart persistence and complete ZIP recovery.');
+  console.log('PASS: production Node server; personal sizes singleton under concurrent creation, optional field clearing, invalid inputs, stale edits, per-collection isolation and item brands and multi-photo v9 ZIP recovery; nested category/item/outfit subsets, multiple membership, concurrent auto-add without lost members, stale edits blocked, invalid parent/scope/category and cyclic imports rejected; photo/calendar/subset transactions, original bytes, legacy records, restart persistence and complete ZIP recovery.');
 } catch (error) { console.error(logs); throw error; }
 finally {
   globalThis.fetch = originalFetch; await stop();

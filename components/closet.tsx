@@ -22,6 +22,8 @@ import { PersonalSizesPanel } from "@/components/personal-sizes";
 import { SubsetBrowser } from "@/components/subsets";
 import { subsetMemberIds } from "@/lib/subsets";
 import { ItemDetailsFields, ItemLabels } from "@/components/item-details";
+import { ColorField, ColorDetails } from "@/components/color-field";
+import { createColorDraft, draftColorStyle, colorStyleSchema, itemColorStyle, type ColorValue } from "@/lib/colors";
 import { BrandField } from "@/components/brand-field";
 import { canonicalBrand, itemBrands } from "@/lib/brands";
 import { CATEGORY_MEASUREMENTS, garmentCategory } from "@/lib/item-details";
@@ -234,7 +236,7 @@ export default function Home({ username }: { username: string }) {
         {view === "personalSizes" && <PersonalSizesPanel key={state.collectionId} record={state.records.find((record): record is PersonalSizesRecord => record.kind === "personalSizes")} collectionName={state.collections.find(collection => collection.id === state.collectionId)?.name || t("我的衣橱")} disabled={!!error || syncing} onSave={savePersonalSizes} onRefresh={() => refresh()}/> }
       </>}
     </main></SidebarInset><Toaster theme="light" position="top-center" richColors/>
-    {editor?.kind === "item" && <ItemEditor key={editor.record?.id || "new-item"} record={editor.record} initialCategory={editor.initialCategory} brands={itemBrands(items)} onClose={() => setEditor(null)} onSave={save}/>}
+    {editor?.kind === "item" && <ItemEditor key={editor.record?.id || "new-item"} record={editor.record} initialCategory={editor.initialCategory} brands={itemBrands(items)} colorLibrary={state?.colorLibrary || []} onClose={() => setEditor(null)} onSave={save}/>}
     {editor?.kind === "outfit" && <OutfitEditor key={editor.record?.id || "new-outfit"} record={editor.record} items={items} onClose={() => setEditor(null)} onSave={save}/>}
     {editor?.kind === "calendar" && <CalendarEditor key={editor.record?.id || "new-calendar"} record={editor.record} date={editor.date} outfitId={editor.outfitId} outfits={outfits} items={items} onClose={() => setEditor(null)} onSave={save} onDelete={removeCalendar}/>}
   </SidebarProvider>;
@@ -261,23 +263,29 @@ function EmptyState({ icon: Icon, title, text, action, onAction }: {
 function FormError({ message }: {
     message: string;
 }) { return message ? <div className="form-error" role="alert"><AlertCircle size={16}/><span>{message}</span></div> : null; }
-function ItemEditor({ record, initialCategory, brands, onClose, onSave }: {
+function ItemEditor({ record, initialCategory, brands, colorLibrary, onClose, onSave }: {
     record?: ItemRecord;
     initialCategory?: Item["category"];
     brands: string[];
+    colorLibrary: ColorValue[];
     onClose: () => void;
     onSave: Save;
 }) {
     const { t } = useI18n();
     const [data, setData] = useState<Item>(record?.data || { ...blankItem, category: initialCategory || "top" });
     const [photos, setPhotos] = useState(() => createPhotoDraft(record?.data || blankItem));
+    const [colors, setColors] = useState(() => createColorDraft(itemColorStyle(record?.data || blankItem)));
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const submit = async (archive = data.archived) => { setBusy(true); setError(""); try {
         if (!data.name.trim())
             throw new Error(t("请给单品起个名字"));
+        if (colors.needsChoice) throw new Error(t("请先选择主色或要保留的颜色"));
+        const parsedColors = colorStyleSchema.safeParse(draftColorStyle(colors));
+        if (!parsedColors.success) throw new Error(t(parsedColors.error.issues[0].message));
+        const colorStyle = parsedColors.data;
         const gallery = await savePhotoDraft(photos);
-        await onSave("item", { ...data, brand: canonicalBrand(data.brand || "", brands), archived: archive, ...gallery }, record);
+        await onSave("item", { ...data, colorStyle, color: colorStyle.values[0]?.name || "", brand: canonicalBrand(data.brand || "", brands), archived: archive, ...gallery }, record);
     }
     catch (e) {
         setError(errorMessage(e));
@@ -286,7 +294,7 @@ function ItemEditor({ record, initialCategory, brands, onClose, onSave }: {
         setBusy(false);
     } };
     return <Dialog open onOpenChange={(open: boolean) => { if (!open && !busy)
-        onClose(); }}><DialogContent className="closet-dialog editor-dialog item-dialog"><DialogHeader><DialogTitle>{record ? t("单品详情") : t("添加单品")}</DialogTitle><DialogDescription>{t("原图会完整保存。你可以随时补充或修改信息。")}</DialogDescription></DialogHeader><form onSubmit={e => { e.preventDefault(); void submit(); }}><fieldset disabled={busy}><div className="item-form-grid"><PhotoEditor draft={photos} onChange={setPhotos} kind="item" onError={setError}/><div className="form-fields"><div className="field"><Label htmlFor="item-name">{t("单品名称")}<span>*</span></Label><Input id="item-name" required maxLength={100} autoFocus value={data.name} placeholder={t("例如：短款牛仔外套")} onChange={e => setData({ ...data, name: e.target.value })}/></div><BrandField value={data.brand || ""} brands={brands} onChange={brand => setData({ ...data, brand })}/><div className="field-pair"><div className="field"><Label>{t("分类")}</Label><Picker label={t("单品分类")} value={data.category} onChange={value => { const category = value as Item["category"]; const allowed = CATEGORY_MEASUREMENTS[category] || []; setData({ ...data, category, fit: garmentCategory(category) ? data.fit : null, shoeFit: category === "shoes" ? data.shoeFit : null, shoeSize: category === "shoes" ? data.shoeSize : { eu: null, cn: null }, measurements: Object.fromEntries(Object.entries(data.measurements).filter(([key]) => allowed.some(value => value === key))) }); }} options={translatedOptions(CATEGORIES, t)}/></div><div className="field"><Label htmlFor="item-color">{t("颜色")}</Label><Input id="item-color" maxLength={50} value={data.color} placeholder={t("例如：深蓝")} onChange={e => setData({ ...data, color: e.target.value })}/></div></div><ItemDetailsFields item={data} onChange={setData}/><div className="field"><Label>{t("适合场合")}</Label><Chips options={OCCASIONS} value={data.occasions} onChange={occasions => setData({ ...data, occasions })}/></div><div className="field"><Label>{t("季节")}</Label><Chips options={SEASONS} value={data.seasons} onChange={seasons => setData({ ...data, seasons })}/></div><div className="field"><Label htmlFor="item-notes">{t("穿着备注")}</Label><Textarea id="item-notes" maxLength={3000} rows={3} value={data.notes} placeholder={t("版型、搭配想法，或舒适度\u2026")} onChange={e => setData({ ...data, notes: e.target.value })}/></div></div></div></fieldset><FormError message={error}/><DialogFooter className="editor-footer">{record && <Button type="button" variant="ghost" className="mr-auto" disabled={busy} onClick={() => void submit(!data.archived)}><Archive size={16}/>{data.archived ? t("放回衣橱") : t("收起单品")}</Button>}<Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy}>{busy ? <Loader2 size={16} className="animate-spin"/> : <Check size={16}/>}{busy ? t("保存中\u2026") : t("保存单品")}</Button></DialogFooter></form></DialogContent></Dialog>;
+        onClose(); }}><DialogContent className="closet-dialog editor-dialog item-dialog"><DialogHeader><DialogTitle>{record ? t("单品详情") : t("添加单品")}</DialogTitle><DialogDescription>{t("原图会完整保存。你可以随时补充或修改信息。")}</DialogDescription></DialogHeader><form onSubmit={e => { e.preventDefault(); void submit(); }}><fieldset disabled={busy}><div className="item-form-grid"><PhotoEditor draft={photos} onChange={setPhotos} kind="item" onError={setError}/><div className="form-fields"><div className="field"><Label htmlFor="item-name">{t("单品名称")}<span>*</span></Label><Input id="item-name" required maxLength={100} autoFocus value={data.name} placeholder={t("例如：短款牛仔外套")} onChange={e => setData({ ...data, name: e.target.value })}/></div><BrandField value={data.brand || ""} brands={brands} onChange={brand => setData({ ...data, brand })}/><div className="field-pair"><div className="field"><Label>{t("分类")}</Label><Picker label={t("单品分类")} value={data.category} onChange={value => { const category = value as Item["category"]; const allowed = CATEGORY_MEASUREMENTS[category] || []; setData({ ...data, category, fit: garmentCategory(category) ? data.fit : null, shoeFit: category === "shoes" ? data.shoeFit : null, shoeSize: category === "shoes" ? data.shoeSize : { eu: null, cn: null }, measurements: Object.fromEntries(Object.entries(data.measurements).filter(([key]) => allowed.some(value => value === key))) }); }} options={translatedOptions(CATEGORIES, t)}/></div></div><ColorField draft={colors} onChange={setColors} library={colorLibrary}/><ItemDetailsFields item={data} onChange={setData}/><div className="field"><Label>{t("适合场合")}</Label><Chips options={OCCASIONS} value={data.occasions} onChange={occasions => setData({ ...data, occasions })}/></div><div className="field"><Label>{t("季节")}</Label><Chips options={SEASONS} value={data.seasons} onChange={seasons => setData({ ...data, seasons })}/></div><div className="field"><Label htmlFor="item-notes">{t("穿着备注")}</Label><Textarea id="item-notes" maxLength={3000} rows={3} value={data.notes} placeholder={t("版型、搭配想法，或舒适度\u2026")} onChange={e => setData({ ...data, notes: e.target.value })}/></div></div></div></fieldset><FormError message={error}/><DialogFooter className="editor-footer">{record && <Button type="button" variant="ghost" className="mr-auto" disabled={busy} onClick={() => void submit(!data.archived)}><Archive size={16}/>{data.archived ? t("放回衣橱") : t("收起单品")}</Button>}<Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy}>{busy ? <Loader2 size={16} className="animate-spin"/> : <Check size={16}/>}{busy ? t("保存中\u2026") : t("保存单品")}</Button></DialogFooter></form></DialogContent></Dialog>;
 }
 function OutfitEditor({ record, items, onClose, onSave }: {
     record?: OutfitRecord;
@@ -436,7 +444,7 @@ function CalendarEditor({ record, date, outfitId, outfits, items, onClose, onSav
         <div className="field-pair"><div className="field"><Label htmlFor="wear-date">{t("日期")}</Label><Input id="wear-date" type="date" required value={data.date} onChange={event => setData({ ...data, date: event.target.value })}/></div><div className="field"><Label>{t("状态")}</Label><Picker label={t("穿搭状态")} value={data.status} options={{ planned: t("已计划"), worn: t("已穿着") }} onChange={value => setData({ ...data, status: value as "planned" | "worn" })}/></div></div>
         {record ? <>
           {record.data.snapshot.asset && <PhotoGallery data={record.data.snapshot} name={record.data.snapshot.name}/>}
-          {!!record.data.snapshot.items.length && <div className="snapshot-gallery-items">{record.data.snapshot.items.map(item => <div key={item.id}>{item.data.asset ? <PhotoGallery data={item.data} name={item.data.name}/> : <Photo asset={null} name={item.data.name} className="snapshot-item-placeholder"/>}<strong>{item.data.name}</strong><ItemLabels item={item.data}/></div>)}</div>}
+          {!!record.data.snapshot.items.length && <div className="snapshot-gallery-items">{record.data.snapshot.items.map(item => <div key={item.id}>{item.data.asset ? <PhotoGallery data={item.data} name={item.data.name}/> : <Photo asset={null} name={item.data.name} className="snapshot-item-placeholder"/>}<strong>{item.data.name}</strong><ColorDetails style={itemColorStyle(item.data)}/><ItemLabels item={item.data}/></div>)}</div>}
           <strong>{record.data.snapshot.name}</strong>
         </> : <>
           <div className="wear-mode" role="group" aria-label={t("添加穿搭方式")}><Button type="button" variant={mode === "photo" ? "default" : "outline"} aria-pressed={mode === "photo"} onClick={() => { setMode("photo"); setError(""); }}><Camera size={16}/>{t("照片新搭配")}</Button><Button type="button" variant={mode === "existing" ? "default" : "outline"} aria-pressed={mode === "existing"} onClick={() => { setMode("existing"); setError(""); }}>{t("选择已有搭配")}</Button></div>

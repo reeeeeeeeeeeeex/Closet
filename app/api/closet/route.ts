@@ -3,6 +3,8 @@ import { context, json, failure, getState, getRecords, getRecordsSync, insertRec
 import { itemSchema, outfitSchema, subsetSchema, personalSizesSchema, dateSchema, validateArchive, makeSnapshot, photoAssets, type ClosetRecord, type ItemRecord, type OutfitRecord, type Asset } from "@/lib/domain";
 import { validateSubsets } from "@/lib/subsets";
 import type { LocalDatabase } from "@/lib/local-storage";
+import { rememberColors } from "@/lib/color-library";
+import { itemColorStyle } from "@/lib/colors";
 
 function storeRecords(db: LocalDatabase, owner: string, collectionId: string, changes: ClosetRecord[], expectedVersion?: number, subsetId?: string) {
   return db.transaction(() => {
@@ -37,6 +39,7 @@ function storeRecords(db: LocalDatabase, owner: string, collectionId: string, ch
       if (!result.changes) throw new ApiError(409, "记录已在其他设备更改，请刷新");
     } else for (const change of changes) insertRecord(db, owner, collectionId, change).run();
     if (membership) db.prepare("UPDATE records SET data=?,version=version+1,updated_at=? WHERE owner=? AND collection_id=? AND id=?").bind(JSON.stringify(membership.data), membership.updatedAt, owner, collectionId, membership.id).run();
+    if (record.kind === "item") rememberColors(db, owner, itemColorStyle(record.data).values, record.updatedAt);
     return { ok: true, id: record.id, ...(record.kind === "personalSizes" ? { record } : {}) };
   });
 }
@@ -82,6 +85,7 @@ export async function POST(request: Request) {
     let data: ClosetRecord["data"];
     if (kind === "item") {
       const item = itemSchema.parse(body.data);
+      if (item.colorStyle) item.color = item.colorStyle.values[0]?.name || "";
       for (const hash of photoAssets(item)) if (!await db.prepare("SELECT hash FROM assets WHERE owner=? AND hash=?").bind(owner, hash).first()) throw new ApiError(400, "原图尚未上传完成");
       data = item;
     } else if (kind === "outfit") {
@@ -134,7 +138,14 @@ export async function PUT(request: Request) {
     const assets = (await db.prepare("SELECT hash,name,mime,size FROM assets WHERE owner=?").bind(owner).all<Asset>()).results; const map = new Map(assets.map(a => [a.hash, a]));
     for (const a of archive.assets) { const stored = map.get(a.hash); if (!stored || stored.size !== a.size || stored.mime !== a.mime) throw new ApiError(400, "备份图片缺失或未通过校验，请重新上传"); }
     const collectionId = crypto.randomUUID(); const now = new Date().toISOString();
-    await db.batch([ db.prepare("INSERT INTO collections (owner,id,name,created_at) VALUES (?,?,?,?)").bind(owner, collectionId, archive.collection.name.slice(0, 94) + " · 导入", now), ...archive.records.map(r => insertRecord(db, owner, collectionId, r)) ]);
+    db.transaction(() => {
+      db.prepare("INSERT INTO collections (owner,id,name,created_at) VALUES (?,?,?,?)").bind(owner, collectionId, archive.collection.name.slice(0, 94) + " · 导入", now).run();
+      for (const record of archive.records) {
+        insertRecord(db, owner, collectionId, record).run();
+        if (record.kind === "item") rememberColors(db, owner, itemColorStyle(record.data).values, record.updatedAt);
+      }
+      for (const color of archive.colorLibrary) rememberColors(db, owner, [color], color.usedAt);
+    });
     return json({ ok: true, collectionId });
   } catch (e) { return failure(e); }
 }

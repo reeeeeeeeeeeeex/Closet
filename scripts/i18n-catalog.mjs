@@ -18,7 +18,7 @@ function scanDirectory(directory) {
         if (argument && ts.isStringLiteral(argument)) keys.add(argument.text);
       }
       // Domain constants and validation messages also appear in translated UI.
-      if ((file === path.join('lib','domain.ts') || file === path.join('lib','item-details.ts') || file === path.join('lib','personal-sizes.ts') || file === path.join('lib','subsets.ts') || file.startsWith(path.join('app','api')) || file === path.join('lib','server.ts') || file === path.join('lib','local-auth.ts')) && ts.isStringLiteral(node) && /[\u3400-\u9fff]/.test(node.text)) keys.add(node.text);
+      if ((file === path.join('lib','colors.ts') || file === path.join('lib','domain.ts') || file === path.join('lib','item-details.ts') || file === path.join('lib','personal-sizes.ts') || file === path.join('lib','subsets.ts') || file.startsWith(path.join('app','api')) || file === path.join('lib','server.ts') || file === path.join('lib','local-auth.ts')) && ts.isStringLiteral(node) && /[\u3400-\u9fff]/.test(node.text)) keys.add(node.text);
       ts.forEachChild(node, visit);
     }
     visit(source);

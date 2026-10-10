@@ -1,4 +1,5 @@
 import { getLocalUser } from "./local-auth";
+import { getColorLibrary } from "./color-library";
 import { localStorage, type LocalDatabase } from "./local-storage";
 import { ZodError } from "zod";
 import { recordSchema, type ClosetRecord, type Asset, type ClosetState, referencedAssets } from "./domain";
@@ -45,7 +46,7 @@ export async function getState(db: LocalDatabase, owner: string, collectionId?: 
   if (collectionId && selected !== "main" && !collections.some(c => c.id === selected)) throw new ApiError(404, "衣橱不存在");
   const records = await getRecords(db, owner, selected); const hashes = referencedAssets(records);
   const assets = (await db.prepare("SELECT hash,name,mime,size FROM assets WHERE owner=?").bind(owner).all<Asset>()).results.filter(a => hashes.has(a.hash));
-  return { collections, collectionId: selected, records, assets };
+  return { collections, collectionId: selected, records, assets, colorLibrary: getColorLibrary(db, owner) };
 }
 export function insertRecord(db: LocalDatabase, owner: string, collectionId: string, r: ClosetRecord) {
   return db.prepare("INSERT INTO records (owner,collection_id,id,kind,data,version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)").bind(owner, collectionId, r.id, r.kind, JSON.stringify(r.data), r.version, r.createdAt, r.updatedAt);
