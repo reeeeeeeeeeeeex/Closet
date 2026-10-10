@@ -72,7 +72,7 @@ pnpm build
 pnpm test
 ```
 
-`pnpm test` 需要先完成生产构建。测试使用随机本地端口和隔离的 `.test-runtime/`，不会写入个人 `data/`。
+`pnpm test` 需要先完成生产构建。测试使用随机本地端口和隔离的 `.test-runtime/`，不会写入个人 `data/`。浏览器验收同样使用生产构建产物，结束后关闭临时测试服务及端口。
 
 - `tests/portability.mjs`：原图 ZIP 字节往返、快照独立性与损坏备份拒绝。
 - `tests/runtime.mjs`：真实生产 Node 服务的密码登录、授权、SQLite CRUD、冲突、事务回滚、重启持久化和实际 ZIP 导入导出。
