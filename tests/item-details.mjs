@@ -72,7 +72,7 @@ assert.equal(messageForLocale('en','未填写'), '未填写'); assert.equal(reso
 assert.equal(messageForLocale('en','constructor'), 'constructor'); assert.equal(messageForLocale('en','__proto__'), '__proto__');
 delete catalogs.en;
 const personalHtml = render(PersonalSizesPanel,{collectionName:'Main',disabled:false,onSave:async()=>{},onRefresh:async()=>undefined});
-for(const label of ['身高','肩宽','胸围','腰围','臀围','大腿围','臂长','内腿长','外腿长','脚长','欧码','中国码','保存我的尺码']) assert.match(personalHtml,new RegExp(label));
+for(const label of ['身高','肩宽','胸围','腰围','臀围','大腿围','膝围','臂长','内腿长','外腿长','脚长','欧码','中国码','保存我的尺码']) assert.match(personalHtml,new RegExp(label));
 assert.match(personalHtml,/从裆部沿腿内侧量到脚底/);
 assert.match(personalHtml,/从自然腰线沿腿外侧量到脚底/);
 const sourceCatalog = JSON.parse(await readFile('lib/i18n/messages/zh-CN.json','utf8'));

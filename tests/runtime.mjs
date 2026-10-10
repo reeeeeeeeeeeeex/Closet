@@ -135,7 +135,7 @@ try {
   const nestedPhoto = await post({ kind: 'calendar', subsetId: outfitSubsetId, data: { date: '2026-10-12', status: 'worn', notes: '', newOutfit: photoData } });
   assert.equal(nestedPhoto.status,200,await nestedPhoto.clone().text()); const nestedPhotoId = (await nestedPhoto.json()).outfitId;
   subsetState = await (await request('/api/closet')).json(); assert(subsetState.records.find(record => record.id === outfitSubsetId).data.memberIds.includes(nestedPhotoId));
-  const personalData = { measurements: { height: 168.5, shoulderWidth: 39, chest: 88, waist: 68, hips: 92, thigh: 51, armLength: 55, inseam: 77, outseam: 103, footLength: 24 }, shoeSize: { eu: 38.5, cn: 240 } };
+  const personalData = { measurements: { height: 168.5, shoulderWidth: 39, chest: 88, waist: 68, hips: 92, thigh: 51, knee: 36.5, armLength: 55, inseam: 77, outseam: 103, footLength: 24 }, shoeSize: { eu: 38.5, cn: 240 } };
   const competingProfiles = await Promise.all([personalData,{...personalData,measurements:{...personalData.measurements,waist:70}}].map(data=>post({kind:'personalSizes',data})));
   assert.deepEqual(competingProfiles.map(result=>result.status).sort(),[200,409]);
   const winningProfile = (await competingProfiles.find(result=>result.status===200).json()).record;
@@ -143,6 +143,7 @@ try {
   assert.equal(profiles.length,1); assert.equal(profiles[0].id,winningProfile.id);
   assert.equal((await post({kind:'personalSizes',id:winningProfile.id,version:winningProfile.version,data:{...personalData,shoeSize:{eu:38,cn:242}}})).status,400);
   assert.equal((await post({kind:'personalSizes',id:winningProfile.id,version:winningProfile.version,data:{...personalData,measurements:{waist:-1}}})).status,400);
+  assert.equal((await post({kind:'personalSizes',id:winningProfile.id,version:winningProfile.version,data:{...personalData,measurements:{knee:-1}}})).status,400);
   const cleared = await post({kind:'personalSizes',id:winningProfile.id,version:winningProfile.version,data:{}}); assert.equal(cleared.status,200);
   const emptyProfile = (await cleared.json()).record; assert.deepEqual(emptyProfile.data,{measurements:{},shoeSize:{eu:null,cn:null}});
   assert.equal((await post({kind:'personalSizes',id:winningProfile.id,version:winningProfile.version,data:personalData})).status,409);
@@ -159,7 +160,7 @@ try {
   globalThis.fetch = (url, init = {}) => request(url, init);
   const backup = new File([await exportArchive(state, () => {})], 'wardrobe.zip');
   const manifest = await inspectArchive(backup, () => {});
-  assert.equal(manifest.schemaVersion,7); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
+  assert.equal(manifest.schemaVersion,8); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
   const restoredId = await importArchive(backup, manifest, () => {});
   const restored = await (await request('/api/closet?collection=' + restoredId)).json(); assert.deepEqual(restored.records, state.records); assert.equal(restored.collections.length, 2);
   assert.deepEqual((await (await request('/api/closet?collection=main')).json()).records, state.records);
@@ -197,7 +198,7 @@ try {
   const stored = persisted.prepare('SELECT storage_key FROM assets WHERE hash=?').get(asset.hash);
   assert.deepEqual(await readFile(path.join(directory, 'assets', stored.storage_key)), png); persisted.close();
   assert.equal((await request('/api/auth', { method: 'DELETE' })).status, 200);
-  console.log('PASS: production Node server; personal sizes singleton under concurrent creation, optional field clearing, invalid inputs, stale edits, per-collection isolation and item brands and multi-photo v7 ZIP recovery; nested category/item/outfit subsets, multiple membership, concurrent auto-add without lost members, stale edits blocked, invalid parent/scope/category and cyclic imports rejected; photo/calendar/subset transactions, original bytes, legacy records, restart persistence and complete ZIP recovery.');
+  console.log('PASS: production Node server; personal sizes singleton under concurrent creation, optional field clearing, invalid inputs, stale edits, per-collection isolation and item brands and multi-photo v8 ZIP recovery; nested category/item/outfit subsets, multiple membership, concurrent auto-add without lost members, stale edits blocked, invalid parent/scope/category and cyclic imports rejected; photo/calendar/subset transactions, original bytes, legacy records, restart persistence and complete ZIP recovery.');
 } catch (error) { console.error(logs); throw error; }
 finally {
   globalThis.fetch = originalFetch; await stop();
