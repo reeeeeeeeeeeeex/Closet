@@ -339,9 +339,10 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 .outfit-draft-photo > img { width: 100%; height: 240px; object-fit: contain; border-radius: 10px; background: #eef1f5; }
 .outfit-photo-placeholder { height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; border: 1px dashed #c6cfdd; border-radius: 10px; color: #718097; font-size: 14px; text-align: center; }
 .photo-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.outfit-draft > .item-picker-area { grid-column: 1 / -1; }
+.outfit-draft > .item-picker-area { grid-column: 1 / -1; min-width: 0; }
 .outfit-draft .field-hint { margin: 8px 0 14px; font-size: 14px; }
-.outfit-category-filter { min-height: 40px; padding: 6px 12px; border: 1px solid var(--input); border-radius: 7px; background: white; font-size: 14px; }
+.outfit-picker-tabs { gap: 20px; }
+.outfit-picker-tabs button { flex-shrink: 0; }
 .outfit-cover-photo { height: 250px; }
 .outfit-cover-photo img { object-fit: contain; }
 .outfit-piece-strip { flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 8px; background: #eef1f5; }

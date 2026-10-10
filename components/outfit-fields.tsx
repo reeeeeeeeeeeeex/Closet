@@ -21,7 +21,8 @@ export function OutfitFields({ data, onChange, photos, onPhotos, items, onError 
     const { t } = useI18n();
     const id = useId();
     const [filter, setFilter] = useState("all");
-    const available = items.filter(item => (!item.data.archived || data.itemIds.includes(item.id)) && (filter === "all" || item.data.category === filter));
+    const selectable = items.filter(item => !item.data.archived || data.itemIds.includes(item.id));
+    const available = selectable.filter(item => filter === "all" || item.data.category === filter);
     return <div className="outfit-draft">
     <PhotoEditor draft={photos} onChange={onPhotos} kind="outfit" onError={onError}/>
     <div className="form-fields">
@@ -32,7 +33,7 @@ export function OutfitFields({ data, onChange, photos, onPhotos, items, onError 
     <div className="item-picker-area">
       <div className="picker-title"><strong>{t("关联单品（可选）")}</strong><span>{t("已选 {count} / 30 件", { count: data.itemIds.length })}</span></div>
       <p className="field-hint">{t("可以只保存搭配照片，之后再来补选单品。")}</p>
-      <Label htmlFor={`${id}-category`} className="sr-only">{t("筛选单品分类")}</Label><select id={`${id}-category`} className="outfit-category-filter" value={filter} onChange={event => setFilter(event.target.value)}>{Object.entries({ all: t("全部分类"), ...translatedOptions(CATEGORIES, t) }).map(([value, name]) => <option key={value} value={value}>{t(name)}</option>)}</select>
+      <div className="category-tabs outfit-picker-tabs" role="group" aria-label={t("筛选单品分类")}>{Object.entries({ all: t("全部"), ...translatedOptions(CATEGORIES, t) }).map(([value, name]) => <button type="button" key={value} className={filter === value ? "active" : ""} aria-pressed={filter === value} onClick={() => setFilter(value)}>{name}<span>{value === "all" ? selectable.length : selectable.filter(item => item.data.category === value).length}</span></button>)}</div>
       <div className="item-picker-scroll"><div className="item-grid item-picker-grid">{available.map(item => <ItemCard key={item.id} item={item} selection={{ selected: data.itemIds.includes(item.id), label: t("选择单品 {value1}", { value1: item.data.name }) }} onOpen={() => {
                 if (!data.itemIds.includes(item.id) && data.itemIds.length >= 30)
                     return;
