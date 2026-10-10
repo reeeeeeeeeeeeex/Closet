@@ -68,7 +68,7 @@ assert.match(personalHtml,/从自然腰线沿腿外侧量到脚底/);
 const sourceCatalog = JSON.parse(await readFile('lib/i18n/messages/zh-CN.json','utf8'));
 const template = JSON.parse(await readFile('lib/i18n/messages/locale.template.json','utf8'));
 assert.deepEqual(Object.keys(template).sort(), Object.keys(sourceCatalog).sort());
-for (const file of ['components/closet.tsx','components/closet-cards.tsx','components/outfit-fields.tsx','components/photo-gallery.tsx','components/item-details.tsx','components/personal-sizes.tsx','components/shoe-size-fields.tsx','components/subsets.tsx','components/subset-content-picker.tsx','app/login/login-form.tsx','lib/portable.ts']) {
+for (const file of ['components/closet.tsx','components/closet-cards.tsx','components/outfit-fields.tsx','components/photo-gallery.tsx','components/brand-field.tsx','components/item-details.tsx','components/personal-sizes.tsx','components/shoe-size-fields.tsx','components/subsets.tsx','components/subset-content-picker.tsx','app/login/login-form.tsx','lib/portable.ts']) {
   const source = ts.createSourceFile(file, await readFile(file,'utf8'), ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   function visit(node) {
     if (ts.isCallExpression(node) && ['t','tr'].includes(node.expression.getText(source)) && ts.isStringLiteral(node.arguments[0])) assert(Object.hasOwn(sourceCatalog,node.arguments[0].text), `${file}: missing catalog key ${node.arguments[0].text}`);

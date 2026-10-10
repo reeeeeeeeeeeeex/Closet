@@ -70,7 +70,7 @@ try {
   assert.equal((await post({ kind: 'outfit', data: { ...photoData, asset: null } })).status, 400);
   assert.equal((await post({ kind: 'calendar', data: { date: '2026-10-11', status: 'worn', notes: '', newOutfit: { ...photoData, asset: 'f'.repeat(64) } } })).status, 400);
   assert.equal((await (await request('/api/closet')).json()).records.length, 2);
-  const itemData = { name: 'Pink jacket', category: 'outerwear', color: 'pink', occasions: ['casual'], seasons: ['spring'], asset: asset.hash, photos:[asset.hash,secondAsset.hash], notes: 'Original', archived: false, fit: 'fitted', measurements: { shoulderWidth: 42.5, chest: 96, length: 68 } };
+  const itemData = { name: 'Pink jacket', brand: 'Runtime brand', category: 'outerwear', color: 'pink', occasions: ['casual'], seasons: ['spring'], asset: asset.hash, photos:[asset.hash,secondAsset.hash], notes: 'Original', archived: false, fit: 'fitted', measurements: { shoulderWidth: 42.5, chest: 96, length: 68 } };
   assert.equal((await post({kind:'item',data:{...itemData,photos:[asset.hash,'f'.repeat(64)]}})).status,400);
   assert.equal((await post({kind:'item',data:{...itemData,asset:'f'.repeat(64)}})).status,400);
   res = await post({ kind: 'item', data: itemData }); assert.equal(res.status, 200, await res.clone().text());
@@ -84,7 +84,7 @@ try {
   res = await post({ kind: 'outfit', data: outfitData }); assert.equal(res.status, 200, await res.clone().text());
   state = await (await request('/api/closet')).json(); const outfit = state.records.find(r => r.kind === 'outfit' && r.id !== photoOutfitId);
   res = await post({ kind: 'calendar', data: { date: '2026-10-09', status: 'worn', outfitId: outfit.id, notes: 'Original day' } }); assert.equal(res.status, 200, await res.clone().text());
-  assert.equal((await post({ kind: 'item', id: item.id, version: item.version, data: { ...itemData, name: 'Changed jacket',asset:secondAsset.hash,photos:[secondAsset.hash] } })).status, 200);
+  assert.equal((await post({ kind: 'item', id: item.id, version: item.version, data: { ...itemData, name: 'Changed jacket',brand:'Changed brand',asset:secondAsset.hash,photos:[secondAsset.hash] } })).status, 200);
   assert.equal((await post({ kind: 'item', id: item.id, version: item.version, data: { ...itemData, name: 'Stale overwrite' } })).status, 409);
   assert.equal((await post({ kind: 'outfit', id: outfit.id, version: outfit.version, data: { ...outfitData, name: 'Archived edit', archived: true } })).status, 200);
   state = await (await request('/api/closet')).json(); const entry = state.records.find(r => r.kind === 'calendar' && r.id !== photoCalendar.id);
@@ -93,10 +93,13 @@ try {
   assert.equal(entry.data.snapshot.name, 'First outfit'); assert.equal(entry.data.snapshot.items[0].data.name, 'Pink jacket');
   assert.equal(entry.data.snapshot.items[0].data.fit, 'fitted'); assert.equal(entry.data.snapshot.items[0].data.measurements.shoulderWidth, 42.5);
   assert.deepEqual(entry.data.snapshot.items[0].data.photos,[asset.hash,secondAsset.hash]);
-  assert.equal(entry.data.snapshot.items[0].data.asset,asset.hash);
-  assert.equal(state.records.find(record=>record.id===item.id).data.asset,secondAsset.hash);
+  assert.equal(entry.data.snapshot.items[0].data.asset,asset.hash); assert.equal(entry.data.snapshot.items[0].data.brand,'Runtime brand');
+  assert.equal(state.records.find(record=>record.id===item.id).data.asset,secondAsset.hash); assert.equal(state.records.find(record=>record.id===item.id).data.brand,'Changed brand');
   const savedShoes = state.records.find(r => r.kind === 'item' && r.data.category === 'shoes');
   assert.equal(savedShoes.data.shoeFit, 'small'); assert.deepEqual(savedShoes.data.shoeSize, { eu: 38.5, cn: 240 });
+  assert.equal((await post({kind:'item',id:savedShoes.id,version:savedShoes.version,data:{...savedShoes.data,brand:''}})).status,200);
+  assert.equal((await (await request('/api/closet')).json()).records.find(record=>record.id===savedShoes.id).data.brand,'');
+  assert.equal((await post({kind:'item',data:{...itemData,brand:'x'.repeat(101)}})).status,400);
   const createSubset = async data => { const result = await post({ kind: 'subset', data }); assert.equal(result.status, 200, await result.clone().text()); return (await result.json()).id; };
   const parentId = await createSubset({ name: 'Commuting', scope: 'item', root: 'all', parentId: null, memberIds: [item.id] });
   const childId = await createSubset({ name: 'Light', scope: 'item', root: 'all', parentId, memberIds: [item.id, savedShoes.id] });
@@ -148,7 +151,7 @@ try {
   globalThis.fetch = (url, init = {}) => request(url, init);
   const backup = new File([await exportArchive(state, () => {})], 'wardrobe.zip');
   const manifest = await inspectArchive(backup, () => {});
-  assert.equal(manifest.schemaVersion,6); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
+  assert.equal(manifest.schemaVersion,7); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
   const restoredId = await importArchive(backup, manifest, () => {});
   const restored = await (await request('/api/closet?collection=' + restoredId)).json(); assert.deepEqual(restored.records, state.records); assert.equal(restored.collections.length, 2);
   assert.deepEqual((await (await request('/api/closet?collection=main')).json()).records, state.records);
@@ -161,11 +164,11 @@ try {
   assert.equal(await local.prepare("SELECT id FROM collections WHERE owner='rollback'").first(), null);
   local.prepare("UPDATE records SET data=json_remove(data, '$.asset') WHERE id=?").bind(outfit.id).run();
   local.prepare("UPDATE records SET data=json_remove(data, '$.snapshot.asset', '$.snapshot.photos') WHERE id=?").bind(entry.id).run();
-  local.prepare("UPDATE records SET data=json_remove(data, '$.fit', '$.shoeFit', '$.shoeSize', '$.measurements') WHERE id=?").bind(item.id).run();
+  local.prepare("UPDATE records SET data=json_remove(data, '$.brand', '$.fit', '$.shoeFit', '$.shoeSize', '$.measurements') WHERE id=?").bind(item.id).run();
   const legacyRead = await (await request('/api/closet?collection=main')).json();
   assert.equal(legacyRead.records.find(r => r.id === outfit.id).data.asset, null);
   assert.equal(legacyRead.records.find(r => r.id === entry.id).data.snapshot.asset, null);
-  assert.equal(legacyRead.records.find(r => r.id === item.id).data.fit, null);
+  assert.equal(legacyRead.records.find(r => r.id === item.id).data.brand, undefined); assert.equal(legacyRead.records.find(r => r.id === item.id).data.fit, null);
   assert.deepEqual(legacyRead.records.find(r => r.id === item.id).data.measurements, {});
   const cyclic = structuredClone(manifest); cyclic.records.find(record => record.id === parentId).data.parentId = childId;
   assert.equal((await request('/api/closet', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cyclic) })).status,400);
@@ -186,7 +189,7 @@ try {
   const stored = persisted.prepare('SELECT storage_key FROM assets WHERE hash=?').get(asset.hash);
   assert.deepEqual(await readFile(path.join(directory, 'assets', stored.storage_key)), png); persisted.close();
   assert.equal((await request('/api/auth', { method: 'DELETE' })).status, 200);
-  console.log('PASS: production Node server; personal sizes singleton under concurrent creation, optional field clearing, invalid inputs, stale edits, per-collection isolation and multi-photo v6 ZIP recovery; nested category/item/outfit subsets, multiple membership, concurrent auto-add without lost members, stale edits blocked, invalid parent/scope/category and cyclic imports rejected; photo/calendar/subset transactions, original bytes, legacy records, restart persistence and complete ZIP recovery.');
+  console.log('PASS: production Node server; personal sizes singleton under concurrent creation, optional field clearing, invalid inputs, stale edits, per-collection isolation and item brands and multi-photo v7 ZIP recovery; nested category/item/outfit subsets, multiple membership, concurrent auto-add without lost members, stale edits blocked, invalid parent/scope/category and cyclic imports rejected; photo/calendar/subset transactions, original bytes, legacy records, restart persistence and complete ZIP recovery.');
 } catch (error) { console.error(logs); throw error; }
 finally {
   globalThis.fetch = originalFetch; await stop();
