@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ItemLabels } from "@/components/item-details";
+import { OccasionLabels } from "@/components/closet-cards";
 import { CATEGORIES, OCCASIONS, type ItemRecord, type Outfit } from "@/lib/domain";
 export function OutfitFields({ data, onChange, file, onFile, items, onError }: {
     data: Outfit;
@@ -66,7 +67,7 @@ export function OutfitFields({ data, onChange, file, onFile, items, onError }: {
                 if (!data.itemIds.includes(item.id) && data.itemIds.length >= 30)
                     return;
                 onChange({ ...data, itemIds: data.itemIds.includes(item.id) ? data.itemIds.filter(value => value !== item.id) : [...data.itemIds, item.id] });
-            }}><div className="photo">{item.data.asset ? <img src={`/api/assets/${item.data.asset}`} alt={item.data.name} loading="lazy"/> : <div className="photo-placeholder"><Shirt strokeWidth={1}/></div>}</div><span className="pick-name">{item.data.name}</span><ItemLabels item={item.data}/><span className="pick-check">{data.itemIds.includes(item.id) && <Check size={13}/>}</span></button>)}</div>
+            }}><div className="photo">{item.data.asset ? <img src={`/api/assets/${item.data.asset}`} alt={item.data.name} loading="lazy"/> : <div className="photo-placeholder"><Shirt strokeWidth={1}/></div>}</div><span className="pick-name">{item.data.name}</span><OccasionLabels values={item.data.occasions}/><ItemLabels item={item.data} showMeasurements={false}/><span className="pick-check">{data.itemIds.includes(item.id) && <Check size={13}/>}</span></button>)}</div>
       {!available.length && <p className="field-hint">{items.length ? t("这个分类里还没有单品。") : t("还没有衣橱单品，也可以直接保存照片搭配。")}</p>}
       {!!data.itemIds.length && <div className="selected-summary"><span>{t("已关联")}</span>{data.itemIds.map(value => <button type="button" key={value} onClick={() => onChange({ ...data, itemIds: data.itemIds.filter(itemId => itemId !== value) })}>{items.find(item => item.id === value)?.data.name}<X size={12}/></button>)}</div>}
     </div>

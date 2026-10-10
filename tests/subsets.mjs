@@ -55,11 +55,16 @@ assert.deepEqual(deep.sections[0].children[0].children[0].records.map(row=>row.i
 const photo = {...outfit,id:crypto.randomUUID(),data:{...outfit.data,name:'Photo look',asset:'a'.repeat(64),itemIds:[]}};
 const archivedItem = {...item,id:crypto.randomUUID(),data:{...item.data,name:'Archived selected',archived:true}};
 const hiddenItem = {...archivedItem,id:crypto.randomUUID(),data:{...archivedItem.data,name:'Archived hidden'}};
-const pickerRecords = [...records,photo,archivedItem,hiddenItem];
+const detailedItem = {...item,data:{...item.data,fit:'fitted',occasions:['work','casual'],measurements:{shoulderWidth:42.5,chest:96,length:68}}};
+const sizedShoes = {...shoes,data:{...shoes.data,shoeFit:'trueToSize',shoeSize:{eu:38.5,cn:240}}};
+const pickerRecords = [...records.map(record=>record.id===item.id?detailedItem:record.id===shoes.id?sizedShoes:record),photo,archivedItem,hiddenItem];
 const pickerHtml = renderToStaticMarkup(React.createElement(SubsetContentPicker,{records:pickerRecords,data:{...parent.data,memberIds:[archivedItem.id]},inherited:new Set([shoes.id]),onChange:()=>{}}));
 assert.match(pickerHtml,/subset-pick-grid/); assert.match(pickerHtml,/上装/); assert.match(pickerHtml,/鞋履/);
 assert.match(pickerHtml,/Archived selected/); assert.doesNotMatch(pickerHtml,/Archived hidden/);
 assert.match(pickerHtml,/已包含在下级分组中/); assert.match(pickerHtml,/aria-pressed="true"/);
+assert.match(pickerHtml,/通勤/); assert.match(pickerHtml,/日常/); assert.match(pickerHtml,/修身/);
+assert.match(pickerHtml,/合脚/); assert.match(pickerHtml,/欧码 38.5/); assert.match(pickerHtml,/中国码 240 mm/);
+assert.doesNotMatch(pickerHtml,/肩宽|胸围|衣长/);
 const looksHtml=renderToStaticMarkup(React.createElement(SubsetContentPicker,{records:pickerRecords,data:outfitSubset.data,inherited:new Set(),onChange:()=>{}}));
 assert.match(looksHtml,new RegExp('/api/assets/'+photo.data.asset)); assert.match(looksHtml,/outfit-collage/); assert.match(looksHtml,/所有场合/);
 const categoryHtml=renderToStaticMarkup(React.createElement(SubsetContentPicker,{records:pickerRecords,data:{...parent.data,root:'shoes',memberIds:[]},inherited:new Set(),onChange:()=>{}}));

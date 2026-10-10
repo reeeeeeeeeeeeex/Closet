@@ -30,8 +30,9 @@ export function ItemDetailsFields({ item, onChange }: {
                 }}/></div>)}</div></section>}
   </div>;
 }
-export function ItemLabels({ item }: {
+export function ItemLabels({ item, showMeasurements = true }: {
     item: Item;
+    showMeasurements?: boolean;
 }) {
     const { t, locale } = useI18n();
     const number = (value: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(value);
@@ -46,7 +47,7 @@ export function ItemLabels({ item }: {
         if (item.shoeSize.cn !== null)
             tags.push(t("中国码 {size} mm", { size: number(item.shoeSize.cn) }));
     }
-    for (const key of CATEGORY_MEASUREMENTS[item.category] || []) {
+    for (const key of showMeasurements ? CATEGORY_MEASUREMENTS[item.category] || [] : []) {
         const value = item.measurements[key];
         if (value !== undefined)
             tags.push(t("{label} {value} cm", { label: t(measurementName(item.category, key)), value: number(value) }));

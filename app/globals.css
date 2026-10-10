@@ -369,6 +369,7 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 .item-attribute-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .item-attribute-tags > span { font-size: 14px; line-height: 1.5; padding: 3px 7px; border-radius: 5px; background: #f0f3f7; color: #526179; }
 .pick-item .item-attribute-tags { padding: 0 7px 9px; }
+.pick-item > .occasion-labels { padding: 0 7px; }
 .snapshot-photos.large .item-attribute-tags > span { margin-top: 0; }
 @media (max-width: 420px) { .measurement-grid { gap: 10px; }.item-attribute-tags > span { font-size: 13px; } }
 
