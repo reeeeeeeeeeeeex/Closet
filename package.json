@@ -11,7 +11,7 @@
     "start": "node scripts/local-server.mjs start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node tests/portability.mjs && node tests/item-details.mjs && node tests/subsets.mjs && node tests/photos.mjs && node tests/brands.mjs && node tests/colors.mjs && node tests/runtime.mjs && node tests/accounts.mjs && node tests/colors-runtime.mjs",
+    "test": "node tests/portability.mjs && node tests/item-details.mjs && node tests/subsets.mjs && node tests/photos.mjs && node tests/brands.mjs && node tests/colors.mjs && node tests/color-sampling.mjs && node tests/runtime.mjs && node tests/accounts.mjs && node tests/colors-runtime.mjs",
     "db:generate": "drizzle-kit generate",
     "i18n:extract": "node scripts/i18n-catalog.mjs"
   },

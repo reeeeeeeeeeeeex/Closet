@@ -508,3 +508,15 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 .color-chip:focus-visible,.color-modes button:focus-visible,.color-candidates:focus-visible {outline:2px solid #7086a0;outline-offset:2px}
 .item-card .item-category {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:480px){.color-role {flex-direction:column;gap:5px}.color-role>span {flex-basis:auto;padding:0}.color-modes button {font-size:12px}.color-picker-panel {padding:9px}}
+
+.color-sampling-error {font-size:13px;color:#a33740;flex-basis:100%;overflow-wrap:anywhere}
+.color-photo-dialog {width:min(590px,calc(100vw - 24px))!important;max-width:590px!important}
+.color-confirm-dialog {width:min(420px,calc(100vw - 24px))!important}
+.sample-photo-tabs {display:flex;gap:7px;overflow-x:auto;padding-bottom:3px;overscroll-behavior-x:contain}
+.sample-photo {display:block;width:100%;height:min(330px,40dvh);object-fit:contain;background:#f0f2f5;cursor:crosshair;border-radius:7px;touch-action:pan-y}
+.sample-photo:focus-visible {outline:2px solid #7086a0;outline-offset:2px}
+.sample-result {display:flex;gap:16px;align-items:center;min-height:48px}
+.sample-result>.color-swatch {width:38px;height:38px;flex-basis:38px}
+.sample-loupe {position:relative;width:90px;height:90px;border:1px solid #dde2e9;border-radius:7px;overflow:hidden;flex-shrink:0}
+.sample-loupe canvas {width:90px;height:90px;image-rendering:pixelated}
+.sample-loupe>span {position:absolute;inset:0;display:grid;place-items:center;color:#fff;text-shadow:0 0 2px #000;font-size:20px}
