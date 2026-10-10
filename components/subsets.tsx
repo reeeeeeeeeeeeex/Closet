@@ -13,10 +13,11 @@ import { tr } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
 
 type SaveSubset = (data: Subset, record?: SubsetRecord) => Promise<string>;
-export function SubsetBrowser({ records, scope, root, activeId, disabled, onSelect, onSave, onDelete, visibleRecords, renderCards, onAdd }: {
+export function SubsetBrowser({ records, scope, root, activeId, disabled, onSelect, onSave, onDelete, visibleRecords, renderCards, onAdd, renderToolbar }: {
   records: ClosetRecord[]; scope: Subset["scope"]; root: Subset["root"]; activeId: string | null; disabled: boolean;
   onSelect: (id: string | null) => void; onSave: SaveSubset; visibleRecords: (ItemRecord | OutfitRecord)[];
   onDelete: (record: SubsetRecord) => Promise<void>;
+  renderToolbar?: (controls: ReactNode) => ReactNode;
   renderCards: (records: (ItemRecord | OutfitRecord)[]) => ReactNode; onAdd: (subsetId: string) => void;
 }) {
   const { t } = useI18n();
@@ -38,10 +39,10 @@ export function SubsetBrowser({ records, scope, root, activeId, disabled, onSele
       {open && <div id={contentId} className="subset-section-content">{section.children.map(renderSection)}{!!section.records.length && renderCards(section.records)}{!count && <p className="field-hint">{t("此分组在当前筛选下没有内容。")}</p>}</div>}
     </section>;
   }
+  const controls = <div className="subset-actions">{active && <><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDialog({ record: active, parentId: active.data.parentId })}><Pencil size={15}/>{t("编辑分组")}</Button><Button variant="ghost" size="sm" disabled={disabled} onClick={() => onAdd(active.id)}><Plus size={15}/>{scope === "item" ? t("添加单品") : t("新建搭配")}</Button></>}<Button variant="outline" size="sm" disabled={disabled} onClick={() => setDialog({ parentId: active?.id || null })}><FolderPlus size={16}/>{t("新建分组")}</Button></div>;
   return <section className="subset-browser" aria-label={t("分组管理")}>
-    <div className="subset-toolbar"><nav className="subset-path" aria-label={t("分组路径")}><button type="button" onClick={() => onSelect(null)}>{rootName}</button>{trail.map(record => <span key={record.id}><ChevronRight size={14} /><button type="button" aria-current={record.id === active?.id ? "page" : undefined} onClick={() => onSelect(record.id)}>{record.data.name}</button></span>)}</nav>
-      <div className="subset-actions">{active && <><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDialog({ record: active, parentId: active.data.parentId })}><Pencil size={15}/>{t("编辑分组")}</Button><Button variant="ghost" size="sm" disabled={disabled} onClick={() => onAdd(active.id)}><Plus size={15}/>{scope === "item" ? t("添加单品") : t("新建搭配")}</Button></>}<Button variant="outline" size="sm" disabled={disabled} onClick={() => setDialog({ parentId: active?.id || null })}><FolderPlus size={16}/>{t("新建分组")}</Button></div>
-    </div>
+    {renderToolbar ? renderToolbar(controls) : <div className="subset-toolbar">{controls}</div>}
+    {active && <nav className="subset-path" aria-label={t("分组路径")}><button type="button" onClick={() => onSelect(null)}>{rootName}</button>{trail.map(record => <span key={record.id}><ChevronRight size={14} /><button type="button" aria-current={record.id === active?.id ? "page" : undefined} onClick={() => onSelect(record.id)}>{record.data.name}</button></span>)}</nav>}
     {sections.map(renderSection)}
     {!!ungrouped.length && <section className="subset-ungrouped">{!!sections.length && <h2>{t("未分组")}</h2>}{renderCards(ungrouped)}</section>}
     {dialog && <SubsetEditor key={dialog.record?.id || dialog.parentId || "root"} record={dialog.record} preset={{ scope, root, parentId: dialog.parentId }} records={records} onClose={() => setDialog(null)} onSave={async (data, record) => { await onSave(data, record); setDialog(null); }} onDelete={async record => { await onDelete(record); setDialog(null); }} />}

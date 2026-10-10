@@ -126,7 +126,9 @@ button:focus-visible, a:focus-visible { outline: 2px solid #667eac; outline-offs
 
 .topbar { height: 56px; border-bottom: 1px solid #e7eaf0; padding: 0 32px; display: flex; justify-content: space-between; align-items: center; background: #ffffffa8; }
 
-.topbar-right { display: flex; align-items: center; gap: 15px; }
+.topbar-menu { display: none; }
+.topbar-right { display: flex; align-items: center; gap: 12px; margin-left: auto; flex-shrink: 0; }
+.topbar.has-wardrobe-stats { gap: 20px; }
 .sync-label { display: flex; align-items: center; gap: 7px; color: #788374; font-size: 12px; }
 .sync-error { color: #aa6344; }
 .account-dot { width: 30px; height: 30px; margin-left: 3px; font-size: 12px; }
@@ -146,7 +148,8 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 .search-box > svg { position: absolute; left: 13px; color: #929ba7; }
 .search-box input { padding-left: 39px; padding-right: 27px; height: 39px; min-height: 39px; background: #fff; font-size: 12px; border-color: #e5e8ef; border-radius: 7px; box-shadow: none; }
 .search-box > button { position: absolute; right: 10px; }
-.filter-controls { display: flex; align-items: center; gap: 13px; }
+.filter-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.filter-controls > .subset-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .filter-controls [data-slot="select-trigger"] { min-height: 37px; height: 37px; width: 117px; background: transparent; font-size: 12px; border: 1px solid #e1e5ed; box-shadow: none; }
 .archive-filter { display: flex; gap: 6px; align-items: center; font-size: 12px; color: #8b929d; padding: 9px; border-radius: 6px; }
 .archive-filter.on { background: #e8ebf1; color: #3c4c65; }
@@ -345,15 +348,16 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 @media (max-width: 420px) { .measurement-grid { gap: 10px; }.item-attribute-tags > span { font-size: 13px; } }
 
 .subset-browser { margin: 0 0 12px; }
-.subset-section { margin: 18px 0 28px; min-width: 0; }
-.subset-section-heading { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; }
+.subset-section { margin: 8px 0 12px; min-width: 0; }
+.subset-section-heading { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; }
 .subset-toggle { padding: 5px; color: #738096; }
 .subset-title { font-size: 18px; font-weight: 600; text-align: left; overflow-wrap: anywhere; }
 .subset-count { font-size: 13px; color: #77869a; }
 .subset-section-heading > .subset-actions { margin-left: auto; flex-wrap: wrap; }
 .subset-section-content > .subset-section { border-left: 2px solid var(--border); padding-left: 16px; }
-.subset-ungrouped { margin-top: 28px; }
-.subset-ungrouped > h2 { font-size: 17px; font-weight: 600; margin-bottom: 16px; }
+.subset-ungrouped { margin-top: 12px; }
+.subset-ungrouped > h2 { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+.subset-browser > .subset-path { margin-bottom: 12px; }
 @media (max-width: 767px) { .subset-section-heading > .subset-actions { width: 100%; margin-left: 0; gap: 4px; }.subset-section-heading .subset-actions button { padding: 0 8px; font-size: 12px; }.subset-section-content > .subset-section { padding-left: 8px; }.subset-title { font-size: 16px; } }
 .subset-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
 .subset-path { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; }
@@ -405,13 +409,13 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 /* Compact controls shared by the signed-in wardrobe pages. */
 .closet-sidebar .brand-header { padding: 20px; }
 .closet-sidebar .profile-footer { padding: 16px 20px; }
-.stats-strip { display: flex; align-items: center; gap: 16px; min-height: 72px; padding: 12px 20px; margin-bottom: 12px; border: 1px solid #e4e8ed; border-radius: 10px; background: #fff; }
-.stats-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); flex: 1; max-width: 420px; min-width: 0; }
-.stat { padding: 0 20px; min-width: 0; border-right: 1px solid #eceef3; }
+.stats-strip { display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0; }
+.stats-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); flex: 1; max-width: 330px; min-width: 0; }
+.stat { padding: 0 16px; min-width: 0; border-right: 1px solid #eceef3; }
 .stat:first-child { padding-left: 0; }
 .stat:last-child { border-right: 0; }
-.stat > span { color: #78818e; font-size: 12px; }
-.stat > div { font-size: 24px; font-weight: 500; line-height: 1; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.stat > span { color: #78818e; font-size: 12px; white-space: nowrap; }
+.stat > div { font-size: 20px; font-weight: 500; line-height: 1; margin-top: 3px; font-variant-numeric: tabular-nums; }
 .stat small { margin-left: 6px; font-size: 12px; font-weight: 400; color: #78818e; }
 .stats-strip > .main-action { margin-left: auto; }
 .outfit-toolbar { background: #fff; border: 1px solid #e4e8ed; border-radius: 10px; padding: 12px 16px; }
@@ -419,10 +423,21 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 .calendar-heading { flex-wrap: wrap; gap: 12px; }
 .calendar-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 .calendar-navigation { display: flex; align-items: center; gap: 4px; }
+@media (min-width: 768px) and (max-width: 1023px) {
+  .topbar.has-wardrobe-stats { height: auto; flex-wrap: wrap; row-gap: 0; }
+  .has-wardrobe-stats .topbar-right { min-height: 48px; }
+  .has-wardrobe-stats .stats-strip { flex: 0 0 100%; order: 3; padding: 0 0 8px; }
+}
 @media (max-width: 767px) {
-  .stats-strip { flex-wrap: wrap; gap: 12px; padding: 12px 16px; }
-  .stats-summary { flex: 0 0 100%; max-width: none; }
-  .stat { padding: 0 12px; }
+  .topbar-menu { display: flex; }
+  .topbar.has-wardrobe-stats { height: auto; min-height: 48px; flex-wrap: wrap; column-gap: 8px; row-gap: 0; }
+  .has-wardrobe-stats .topbar-right { min-height: 48px; }
+  .stats-strip { order: 3; flex: 0 0 100%; gap: 8px; padding: 2px 0 8px; }
+  .stats-summary { max-width: none; }
+  .stat { padding: 0 6px; }
+  .stat > div { font-size: 18px; }
+  .stat small { margin-left: 4px; }
+  .stats-strip > .main-action { padding: 0 10px; }
   .topbar [data-slot="button"], .workspace [data-slot="button"], .filter-controls [data-slot="select-trigger"], .archive-filter, .category-tabs > button { min-height: 44px; }
   .search-box input { height: 44px; }
   .outfit-toolbar { padding: 12px; }
