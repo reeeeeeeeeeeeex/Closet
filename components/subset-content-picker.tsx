@@ -1,4 +1,5 @@
 "use client";
+import { itemColorText } from "@/lib/colors";
 import { useState } from "react";
 import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,7 @@ export function SubsetContentPicker({ records, data, inherited, onChange }: {
     && (!selectedOnly || data.memberIds.includes(candidate.id))
     && (candidate.kind !== "item" || category === "all" || candidate.data.category === category)
     && (occasion === "all" || candidate.data.occasions.some(value => value === occasion))
-    && [candidate.data.name, candidate.data.notes, candidate.kind === "item" ? candidate.data.color : "", candidate.kind === "item" ? candidate.data.brand : ""].join(" ").toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+    && [candidate.data.name, candidate.data.notes, candidate.kind === "item" ? itemColorText(candidate.data) : "", candidate.kind === "item" ? candidate.data.brand : ""].join(" ").toLocaleLowerCase().includes(search.toLocaleLowerCase()));
   function toggle(id: string) { onChange(data.memberIds.includes(id) ? data.memberIds.filter(value => value !== id) : [...data.memberIds, id]); }
   return <div className="subset-picker">
     <div className="picker-title"><strong>{t("选择内容（可选）")}</strong><button type="button" className={`chip ${selectedOnly ? "selected" : ""}`} aria-pressed={selectedOnly} onClick={() => { setSelectedOnly(!selectedOnly); if (!selectedOnly) { setCategory("all"); setOccasion("all"); setSearch(""); } }}>{t("查看已选 {count} 条", { count: data.memberIds.length })}</button></div>

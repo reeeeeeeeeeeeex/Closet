@@ -22,6 +22,9 @@ import { PersonalSizesPanel } from "@/components/personal-sizes";
 import { SubsetBrowser } from "@/components/subsets";
 import { subsetMemberIds } from "@/lib/subsets";
 import { ItemDetailsFields, ItemLabels } from "@/components/item-details";
+import { ColorFilter } from "@/components/color-filter";
+import { filterItems, wardrobeColors } from "@/lib/item-filter";
+import { colorKey } from "@/lib/colors";
 import { ColorSamplingTools } from "@/components/color-sampling";
 import { ColorField, ColorDetails } from "@/components/color-field";
 import { createColorDraft, draftColorStyle, colorStyleSchema, itemColorStyle, type ColorValue } from "@/lib/colors";
@@ -112,6 +115,7 @@ export default function Home({ username }: { username: string }) {
     const [synced, setSynced] = useState("");
     const [editor, setEditor] = useState<Editor | null>(null);
     const [search, setSearch] = useState("");
+    const [colorFilter, setColorFilter] = useState<string[]>([]);
     const [category, setCategory] = useState("all");
     const [selectedSubsetId, setSelectedSubsetId] = useState<string | null>(null);
     const [occasion, setOccasion] = useState("all");
@@ -123,7 +127,7 @@ export default function Home({ username }: { username: string }) {
     const refresh = useCallback(async (collectionId?: string, silent = false) => {
         const id = ++refreshId.current;
         if (collectionId) {
-            if (selectedCollection.current !== collectionId) setSelectedSubsetId(null);
+            if (selectedCollection.current !== collectionId) { setSelectedSubsetId(null); setColorFilter([]); }
             selectedCollection.current = collectionId;
         }
         if (!silent)
@@ -134,6 +138,8 @@ export default function Home({ username }: { username: string }) {
                 return;
             selectedCollection.current = next.collectionId;
             setState(next);
+            const availableColors = new Set(wardrobeColors(next.records.filter((record): record is ItemRecord => record.kind === "item")).map(colorKey));
+            setColorFilter(previous => previous.filter(key => availableColors.has(key)));
             setError("");
             setAuthRequired(false);
             setSynced(new Date().toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }));
@@ -182,9 +188,9 @@ export default function Home({ username }: { username: string }) {
     const subsetRoot = view === "wardrobe" ? category as Subset["root"] : "all";
     const activeSubset = state?.records.find((record): record is SubsetRecord => record.kind === "subset" && record.id === selectedSubsetId && record.data.scope === scope && record.data.root === subsetRoot);
     const subsetMembers = activeSubset ? subsetMemberIds(state!.records, activeSubset.id) : null;
-    const filteredItems = items.filter(i => (!subsetMembers || subsetMembers.has(i.id)) && i.data.archived === archived && (category === "all" || i.data.category === category) && (occasion === "all" || i.data.occasions.includes(occasion as Item["occasions"][number])) && [i.data.name, i.data.brand, i.data.color, i.data.notes].join(" ").toLowerCase().includes(search.toLowerCase()));
+    const filteredItems = filterItems(items, { category, occasion, archived, search, colors: colorFilter, members: subsetMembers });
     const filteredOutfits = outfits.filter(o => (!subsetMembers || subsetMembers.has(o.id)) && o.data.archived === archived && (occasion === "all" || o.data.occasions.includes(occasion as Item["occasions"][number])) && [o.data.name, o.data.notes].join(" ").toLowerCase().includes(search.toLowerCase()));
-    const goView = (v: View) => { setView(v); setSearch(""); setCategory("all"); setSelectedSubsetId(null); setOccasion("all"); setArchived(false); };
+    const goView = (v: View) => { setView(v); setSearch(""); setColorFilter([]); setCategory("all"); setSelectedSubsetId(null); setOccasion("all"); setArchived(false); };
     useEffect(() => {
         const mc = (document as Document & {
             modelContext?: {
@@ -228,8 +234,8 @@ export default function Home({ username }: { username: string }) {
       {error && <div className="error-banner" role="alert"><AlertCircle size={19}/><div><strong>{t("暂时无法同步衣橱")}</strong><p>{error}</p>{authRequired && <a href="/login">{t("登录后继续")}</a>}</div><Button variant="outline" onClick={() => void refresh()}>{t("重试")}</Button></div>}
       {loading ? <div className="loading-grid">{[1, 2, 3, 4].map(n => <Skeleton key={n} className="h-72 rounded-2xl"/>)}</div> : state && <>
         {view === "wardrobe" && <><div className="wardrobe-toolbar"><div className="category-tabs" role="group" aria-label={t("单品分类")}>{Object.entries({ all: t("全部"), ...translatedOptions(CATEGORIES, t) }).map(([key, label]) => <button key={key} onClick={() => { setCategory(key); setSelectedSubsetId(null); }} className={category === key ? "active" : ""}>{label}<span>{key === "all" ? items.filter(i => i.data.archived === archived).length : items.filter(i => i.data.category === key && i.data.archived === archived).length}</span></button>)}</div></div></>}
-        {(view === "wardrobe" || view === "outfits") && <><SubsetBrowser renderToolbar={controls => <div className={view === "outfits" ? "filter-row outfit-toolbar" : "filter-row"}><div className="search-box"><Search size={17}/><Input value={search} onChange={e => setSearch(e.target.value)} placeholder={view === "wardrobe" ? t("找一件单品、品牌、颜色或备注\u2026") : t("寻找我的搭配\u2026")} aria-label={t("搜索")}/>{search && <button aria-label={t("清空搜索")} onClick={() => setSearch("")}><X size={14}/></button>}</div><div className="filter-controls"><Picker label={t("场合筛选")} value={occasion} onChange={setOccasion} options={{ all: t("所有场合"), ...translatedOptions(OCCASIONS, t) }}/><button className={`archive-filter ${archived ? "on" : ""}`} aria-pressed={archived} onClick={() => setArchived(!archived)} title={t("查看已收起的单品或搭配")}><Archive size={16}/><span>{t("已收起")}</span></button>{view === "outfits" && <Button className="main-action" disabled={!!error} onClick={() => setEditor({ kind: "outfit" })}><Plus size={18}/>{t("新建搭配")}</Button>}{controls}</div></div>} key={state.collectionId + ":" + view + ":" + subsetRoot + ":" + (activeSubset?.id || "root")} records={state.records} scope={scope} root={subsetRoot} activeId={activeSubset?.id || null} disabled={!!error || syncing} onSelect={setSelectedSubsetId} onSave={saveSubset} onDelete={removeSubset} visibleRecords={view === "wardrobe" ? filteredItems : filteredOutfits} onAdd={subsetId => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"], subsetId } : { kind: "outfit", subsetId })} renderCards={records => view === "wardrobe" ? <div className="item-grid">{records.map(record => record.kind === "item" && <ItemCard key={record.id} item={record} onOpen={() => setEditor({ kind: "item", record })}/>)}</div> : <div className="outfit-grid">{records.map(record => record.kind === "outfit" && <OutfitCard key={record.id} outfit={record} items={items} onOpen={() => setEditor({ kind: "outfit", record })} onCalendar={() => setEditor({ kind: "calendar", outfitId: record.id, date: localDate() })}/>)}</div>} />
-        {view === "wardrobe" && !filteredItems.length && (items.length === 0 && !search && category === "all" && occasion === "all" && !archived ? <Welcome onAdd={() => setEditor({ kind: "item" })} onImport={() => goView("backup")}/> : <EmptyState icon={Search} title={t("这里还没有单品")} text={t("试试其他分类，或清空筛选条件。")} action={t("清空筛选")} onAction={() => { setSearch(""); setOccasion("all"); setArchived(false); }}/>) }
+        {(view === "wardrobe" || view === "outfits") && <><SubsetBrowser renderToolbar={controls => <div className={view === "outfits" ? "filter-row outfit-toolbar" : "filter-row"}><div className="search-box"><Search size={17}/><Input value={search} onChange={e => setSearch(e.target.value)} placeholder={view === "wardrobe" ? t("找一件单品、品牌、颜色或备注\u2026") : t("寻找我的搭配\u2026")} aria-label={t("搜索")}/>{search && <button aria-label={t("清空搜索")} onClick={() => setSearch("")}><X size={14}/></button>}</div><div className="filter-controls">{view === "wardrobe" && <ColorFilter colors={wardrobeColors(items)} selected={colorFilter} onChange={setColorFilter}/>}<Picker label={t("场合筛选")} value={occasion} onChange={setOccasion} options={{ all: t("所有场合"), ...translatedOptions(OCCASIONS, t) }}/><button className={`archive-filter ${archived ? "on" : ""}`} aria-pressed={archived} onClick={() => setArchived(!archived)} title={t("查看已收起的单品或搭配")}><Archive size={16}/><span>{t("已收起")}</span></button>{view === "outfits" && <Button className="main-action" disabled={!!error} onClick={() => setEditor({ kind: "outfit" })}><Plus size={18}/>{t("新建搭配")}</Button>}{controls}</div></div>} key={state.collectionId + ":" + view + ":" + subsetRoot + ":" + (activeSubset?.id || "root")} records={state.records} scope={scope} root={subsetRoot} activeId={activeSubset?.id || null} disabled={!!error || syncing} onSelect={setSelectedSubsetId} onSave={saveSubset} onDelete={removeSubset} visibleRecords={view === "wardrobe" ? filteredItems : filteredOutfits} onAdd={subsetId => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"], subsetId } : { kind: "outfit", subsetId })} renderCards={records => view === "wardrobe" ? <div className="item-grid">{records.map(record => record.kind === "item" && <ItemCard key={record.id} item={record} onOpen={() => setEditor({ kind: "item", record })}/>)}</div> : <div className="outfit-grid">{records.map(record => record.kind === "outfit" && <OutfitCard key={record.id} outfit={record} items={items} onOpen={() => setEditor({ kind: "outfit", record })} onCalendar={() => setEditor({ kind: "calendar", outfitId: record.id, date: localDate() })}/>)}</div>} />
+        {view === "wardrobe" && !filteredItems.length && (items.length === 0 && !search && !colorFilter.length && category === "all" && occasion === "all" && !archived ? <Welcome onAdd={() => setEditor({ kind: "item" })} onImport={() => goView("backup")}/> : <EmptyState icon={Search} title={t("这里还没有单品")} text={t("试试其他分类，或清空筛选条件。")} action={t("清空筛选")} onAction={() => { setSearch(""); setColorFilter([]); setOccasion("all"); setArchived(false); }}/>) }
         {view === "outfits" && !filteredOutfits.length && <EmptyState icon={Layers3} title={t("没有找到这个搭配")} text={t("拍照、导入搭配照片，或从单品组合一套穿搭。")} action={t("新建搭配")} onAction={() => setEditor({ kind: "outfit" })}/>}</>}
         {view === "calendar" && <CalendarPanel entries={calendar} disabled={!!error} onAdd={date => setEditor({ kind: "calendar", date })} onEdit={record => setEditor({ kind: "calendar", record })}/>}
         {view === "backup" && <BackupPanel state={state} onImported={async (id) => { await refresh(id); goView("wardrobe"); }}/>}

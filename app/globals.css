@@ -520,3 +520,9 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 .sample-loupe {position:relative;width:90px;height:90px;border:1px solid #dde2e9;border-radius:7px;overflow:hidden;flex-shrink:0}
 .sample-loupe canvas {width:90px;height:90px;image-rendering:pixelated}
 .sample-loupe>span {position:absolute;inset:0;display:grid;place-items:center;color:#fff;text-shadow:0 0 2px #000;font-size:20px}
+
+.color-filter-trigger {min-height:44px;gap:6px}
+.color-filter-trigger>span {background:#e8edf4;min-width:20px;border-radius:4px;padding:0 4px;color:#34445e}
+.color-filter-panel {width:min(340px,calc(100vw - 24px));display:flex;flex-direction:column;gap:10px;border-radius:10px;padding:12px}
+.color-filter-footer {display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:#687384}
+.color-filter-footer button {min-height:44px}

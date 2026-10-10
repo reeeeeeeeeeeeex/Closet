@@ -33,6 +33,7 @@ export function uniqueColors(values: ColorValue[]): ColorValue[] {
 export type ColorDraft = { mode: ColorStyle["mode"]; all: ColorValue[]; primaryKey: string | null; needsChoice: boolean };
 export const createColorDraft = (style: ColorStyle): ColorDraft => ({ mode: style.mode, all: [...style.values], primaryKey: style.values[0] ? colorKey(style.values[0]) : null, needsChoice: false });
 export function changeColorMode(draft: ColorDraft, mode: ColorStyle["mode"]): ColorDraft {
+  if (mode === draft.mode) return draft;
   return { ...draft, mode, needsChoice: mode !== "colorblock" && draft.all.length > 1 && mode !== draft.mode };
 }
 export function draftColorStyle(draft: ColorDraft): ColorStyle {

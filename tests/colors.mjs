@@ -25,7 +25,7 @@ assert.throws(()=>colorStyleSchema.parse({mode:'primary',values:[blue,blue]}),/�
 for(const mode of ['solid','primary','colorblock'])assert.deepEqual(colorStyleSchema.parse({mode,values:[]}).values,[]);
 assert.deepEqual(itemColorStyle({color:'蓝,白 / 手写颜色'}).values,[{name:'蓝,白 / 手写颜色',hex:null}]);
 assert.equal(itemSchema.parse(base).colorStyle,undefined);
-let draft=changeColorMode(createColorDraft(style),'solid');assert.equal(draft.needsChoice,true);
+let draft=changeColorMode(createColorDraft(style),'solid');assert.equal(draft.needsChoice,true);assert.equal(changeColorMode(draft,draft.mode).needsChoice,true);
 draft={...draft,primaryKey:colorKey(pink),needsChoice:false};assert.deepEqual(draftColorStyle(draft).values,[pink]);
 draft=changeColorMode(draft,'colorblock');assert.deepEqual(draftColorStyle(draft).values,style.values);
 draft=changeColorMode(draft,'primary');assert.equal(draft.needsChoice,true);

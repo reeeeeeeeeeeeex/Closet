@@ -74,4 +74,4 @@ assert.throws(() => validateArchive({ ...manifest, records: [outfit] }), /不存
 assert.throws(() => validateArchive({ ...manifest, records: [...manifest.records, item] }), /重复/);
 assert.throws(()=>validateArchive({...manifest,records:[...manifest.records,{...personal,id:crypto.randomUUID()}]}),/一份我的尺码/);
 await rm('.test-build', { recursive: true, force: true });
-console.log('PASS: exact item/outfit original bytes + all records round trip; immutable photo-only snapshots; legacy v1-v7 backup upgrades and brands/galleries/personal sizes v9 round trip; leap-year month jumps; corrupt/missing media, future version, duplicate IDs and broken references rejected.');
+console.log('PASS: exact item/outfit original bytes + all records round trip; immutable photo-only snapshots; legacy v1-v8 backup upgrades and brands/galleries/personal sizes v9 round trip; leap-year month jumps; corrupt/missing media, future version, duplicate IDs and broken references rejected.');
