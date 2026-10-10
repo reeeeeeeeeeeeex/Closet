@@ -62,7 +62,7 @@ export function SubsetEditor({ record, preset, records, onClose, onSave }: {
     try { if (!data.name.trim()) throw new Error(t("请填写分组名称")); await onSave(data, record); }
     catch (error) { setError(error instanceof Error ? tr(error.message) : t("保存分组失败，请重试")); setBusy(false); }
   }
-  return <Dialog open onOpenChange={(open: boolean) => { if (!open && !busy) onClose(); }}><DialogContent className="editor-dialog subset-dialog"><DialogHeader><DialogTitle>{record ? t("编辑分组") : t("新建分组")}</DialogTitle><DialogDescription>{t("可以先创建空分组，再添加内容。下级分组的内容会自动汇总到上级分组。")}</DialogDescription></DialogHeader>
+  return <Dialog open onOpenChange={(open: boolean) => { if (!open && !busy) onClose(); }}><DialogContent className="closet-dialog editor-dialog subset-dialog"><DialogHeader><DialogTitle>{record ? t("编辑分组") : t("新建分组")}</DialogTitle><DialogDescription>{t("可以先创建空分组，再添加内容。下级分组的内容会自动汇总到上级分组。")}</DialogDescription></DialogHeader>
     <form onSubmit={event => void submit(event)}><fieldset disabled={busy}><div className="form-fields"><div className="field"><Label htmlFor="subset-name">{t("分组名称")}</Label><Input id="subset-name" autoFocus required maxLength={100} value={data.name} onChange={event => setData({ ...data, name: event.target.value })} placeholder={t("例如：春季通勤、运动鞋、旅行穿搭")} /></div>
       <SubsetContentPicker records={records} data={data} inherited={inherited} onChange={memberIds => setData({ ...data, memberIds })}/>
     </div></fieldset>{error && <p className="form-error" role="alert">{error}</p>}<DialogFooter className="editor-footer"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy}>{busy ? t("保存中…") : t("保存分组")}</Button></DialogFooter></form>
