@@ -1,4 +1,8 @@
 import { sqliteTable, text, integer, primaryKey, foreignKey } from "drizzle-orm/sqlite-core";
+export const accounts = sqliteTable("accounts", {
+  id: text("id").primaryKey(), username: text("username").notNull(), usernameKey: text("username_key").notNull().unique(),
+  salt: text("salt").notNull(), passwordHash: text("password_hash").notNull(), secret: text("secret").notNull(),
+});
 export const collections = sqliteTable("collections", {
   owner: text("owner").notNull(), id: text("id").notNull(), name: text("name").notNull(), createdAt: text("created_at").notNull(),
 }, t => [primaryKey({ columns: [t.owner, t.id] })]);

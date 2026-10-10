@@ -71,7 +71,8 @@ function Picker({ value, onChange, options, label }: {
 }) {
     return <Select value={value} onValueChange={onChange}><SelectTrigger className="w-full" aria-label={label}><SelectValue placeholder={label}/></SelectTrigger><SelectContent>{Object.entries(options).map(([key, name]) => <SelectItem key={key} value={key}>{name}</SelectItem>)}</SelectContent></Select>;
 }
-function Navigation({ view, onView, state }: {
+function Navigation({ view, onView, state, username }: {
+    username: string;
     view: View;
     onView: (v: View) => void;
     state: ClosetState | null;
@@ -94,9 +95,9 @@ function Navigation({ view, onView, state }: {
     <SidebarContent className="px-5"><div className="nav-caption">{t("我的空间")}</div><SidebarMenu>{entries.map(e => <SidebarMenuItem key={e.id}><SidebarMenuButton isActive={view === e.id} onClick={() => go(e.id)} className="nav-button"><e.icon size={19} strokeWidth={1.7}/><span>{e.name}</span>{e.count !== undefined && <span className="nav-count">{e.count}</span>}</SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>
     <div className="nav-caption mt-8">{t("更多可能")}</div><SidebarMenu>{[{ id: "assistant" as View, name: t("AI 穿搭灵感"), icon: Sparkles }, { id: "backup" as View, name: t("数据与备份"), icon: Database }].map(e => <SidebarMenuItem key={e.id}><SidebarMenuButton isActive={view === e.id} onClick={() => go(e.id)} className="nav-button"><e.icon size={19} strokeWidth={1.7}/><span>{e.name}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>
     </SidebarContent>
-    <SidebarFooter className="profile-footer"><div className="profile-mark">{t("N")}</div><div><strong>{t("私人衣橱")}</strong><span><LockKeyhole size={11}/>{t("仅自己可见")}</span></div></SidebarFooter></Sidebar>;
+    <SidebarFooter className="profile-footer"><div className="profile-mark">{username.slice(0, 1)}</div><div><strong title={username}>{username}</strong><span><LockKeyhole size={11}/>{t("仅自己可见")}</span></div></SidebarFooter></Sidebar>;
 }
-export default function Home() {
+export default function Home({ username }: { username: string }) {
     const { t, locale } = useI18n();
     const router = useRouter();
     const [state, setState] = useState<ClosetState | null>(null);
@@ -204,7 +205,7 @@ export default function Home() {
         await refresh(); return result.record;
     };
     const titles = { personalSizes: t("我的尺码"), wardrobe: t("我的衣橱"), outfits: t("我的搭配"), calendar: t("穿搭日历"), backup: t("数据与备份"), assistant: t("AI 穿搭灵感") };
-    return <SidebarProvider style={{ "--sidebar-width": "248px" } as React.CSSProperties}><Navigation view={view} onView={goView} state={state}/><SidebarInset className="main-inset"><header className="topbar"><div className="flex items-center gap-3"><SidebarTrigger className="md:hidden"/></div><div className="topbar-right"><span className={`sync-label ${error ? "sync-error" : ""}`}><Cloud size={15}/> {error ? t("连接待恢复") : loading ? t("正在连接") : t("已同步 {value1}", { value1: synced })}</span><Button variant="ghost" size="icon" aria-label={t("刷新衣橱")} onClick={() => void refresh()} disabled={syncing}><RefreshCw size={16} className={syncing ? "animate-spin" : ""}/></Button><Button variant="ghost" onClick={async () => { try {
+    return <SidebarProvider style={{ "--sidebar-width": "248px" } as React.CSSProperties}><Navigation view={view} onView={goView} state={state} username={username}/><SidebarInset className="main-inset"><header className="topbar"><div className="flex items-center gap-3"><SidebarTrigger className="md:hidden"/></div><div className="topbar-right"><span className={`sync-label ${error ? "sync-error" : ""}`}><Cloud size={15}/> {error ? t("连接待恢复") : loading ? t("正在连接") : t("已同步 {value1}", { value1: synced })}</span><Button variant="ghost" size="icon" aria-label={t("刷新衣橱")} onClick={() => void refresh()} disabled={syncing}><RefreshCw size={16} className={syncing ? "animate-spin" : ""}/></Button><Button variant="ghost" onClick={async () => { try {
         await api("/api/auth", { method: "DELETE" });
         router.replace("/login");
         router.refresh();
@@ -503,7 +504,7 @@ function BackupPanel({ state, onImported }: {
     return <div className="backup-area"><div className="backup-grid">
       <section className="backup-card"><h2>{t("完整导出")}</h2><p>{t("每张原图保持原始文件内容。解压后，照片与清单都可以直接打开。")}</p><div className="backup-stats"><span>{t("{count} 条记录", { count: state.records.length })}</span><span>{t("{count} 张原图", { count: state.assets.length })}</span><span>{formatSize(state.assets.reduce((n, a) => n + a.size, 0))}</span></div><Button onClick={() => void exportAll()} disabled={busy}><Download size={16}/>{t("下载完整备份")}</Button>{lastExport && <small className="last-export">{t("已于 {time} 生成下载", { time: lastExport })}</small>}</section>
       <section className="backup-card"><h2>{t("导入与恢复")}</h2><p>{t("先核对原图和记录，再建立一个新的衣橱。原有衣橱和资料完整保留。")}</p><div className="import-drop"><PackageOpen size={20} strokeWidth={1.5}/><span>{t("选择 New Closet 的 .zip 备份包")}</span><small>{t("首版支持 2 GB / 2000 条记录以内的备份")}</small></div><input ref={fileInput} type="file" accept=".zip,application/zip" className="sr-only" aria-label={t("选择备份文件")} onChange={e => { const f = e.target.files?.[0]; if (f) void inspect(f); }}/><Button variant="outline" onClick={() => fileInput.current?.click()} disabled={busy}><Upload size={16}/>{t("选择备份并检查")}</Button></section>
-    </div>{busy && <div className="progress-banner" role="status"><Loader2 size={19} className="animate-spin"/><span>{progress || t("正在处理\u2026")} <small>{t("请保持此页面打开")}</small></span></div>}<FormError message={error}/><details className="usage-notes"><summary>{t("使用说明")}</summary><p>{t("在同一网络中打开本机服务地址，使用同一衣橱密码即可访问。联网时自动刷新；离线编辑和原生 App 暂未提供。")}</p></details>
+    </div>{busy && <div className="progress-banner" role="status"><Loader2 size={19} className="animate-spin"/><span>{progress || t("正在处理\u2026")} <small>{t("请保持此页面打开")}</small></span></div>}<FormError message={error}/><details className="usage-notes"><summary>{t("使用说明")}</summary><p>{t("在同一网络中打开本机服务地址，使用自己的账号和密码登录。联网时自动刷新；离线编辑和原生 App 暂未提供。")}</p></details>
     <Dialog open={!!manifest} onOpenChange={(open: boolean) => { if (!open && !busy) {
         setManifest(null);
         setFile(null);

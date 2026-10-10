@@ -34,13 +34,13 @@ async function start() {
 const request = (url, options = {}, authenticated = true) => originalFetch(base + url, { ...options, headers: { ...(authenticated ? { Cookie: cookie } : {}), ...options.headers }, redirect: 'manual' });
 const post = data => request('/api/closet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'save', collectionId: 'main', ...data }) });
 const password = 'runtime-test-' + crypto.randomUUID();
-const login = password => request('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify({ password }) }, false);
+const login = (password, action = 'login') => request('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify({ username: 'runtime', password, action }) }, false);
 try {
   await start();
   assert.equal((await request('/api/closet', {}, false)).status, 401);
   assert.equal((await request('/api/closet', { headers: { 'oai-authenticated-user-id': 'forged', 'oai-authenticated-user-email': 'forged@example.invalid' } }, false)).status, 401);
   assert.equal((await request('/', {}, false)).headers.get('location'), '/login');
-  let res = await login(password); assert.equal(res.status, 200, await res.clone().text());
+  let res = await login(password, 'register'); assert.equal(res.status, 200, await res.clone().text());
   assert.match(res.headers.get('set-cookie'), /HttpOnly/i); cookie = res.headers.get('set-cookie').split(';')[0];
   assert.equal((await login('wrong-password')).status, 401);
   assert.equal((await request('/api/closet', { headers: { Cookie: 'closet_session=forged' } })).status, 401);

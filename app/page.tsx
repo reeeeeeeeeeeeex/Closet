@@ -3,6 +3,7 @@ import { getLocalUser } from "@/lib/local-auth";
 import Closet from "@/components/closet";
 export const dynamic = "force-dynamic";
 export default async function HomePage() {
-  if (!await getLocalUser()) redirect("/login");
-  return <Closet />;
+  const user = await getLocalUser();
+  if (!user?.username) redirect("/login");
+  return <Closet username={user.username} />;
 }

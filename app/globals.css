@@ -288,6 +288,11 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 .login-card h1 { font-size: 28px; font-weight: 600; margin: 16px 0 8px; }
 .login-card p { font-size: 16px; color: var(--muted-foreground); margin-bottom: 24px; }
 .login-card form { display: grid; gap: 20px; }
+.login-modes { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.login-fields { display: grid; gap: 16px; min-width: 0; }
+.login-modes button, .login-card form button { min-height: 44px; }
+.profile-footer > div:last-child { min-width: 0; }
+.profile-footer strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .login-card [role=alert] { color: var(--destructive); margin: 0; }
 
 .calendar-month-title { font-size: 24px; font-weight: 500; height: auto; padding: 6px 8px; gap: 9px; }
