@@ -31,6 +31,16 @@ assert.doesNotMatch(render(ItemDetailsFields, { item: shoe, onChange: () => {} }
 assert.throws(() => itemSchema.parse({ ...shoe, shoeSize: { eu: 38, cn: 242 } }));
 assert.throws(() => itemSchema.parse({ ...base, measurements: { chest: -1 } }));
 assert.throws(() => itemSchema.parse({ ...base, category: 'bottom', measurements: { shoulderWidth: 42 } }));
+const trousers = itemSchema.parse({ ...base, category: 'bottom', measurements: { knee: 42.5 } });
+assert.match(render(ItemDetailsFields,{item:trousers,onChange:()=>{}}),/膝围/);
+assert.match(render(ItemLabels,{item:trousers}),/膝围 42.5 cm/);
+assert.doesNotMatch(render(ItemLabels,{item:trousers,showMeasurements:false}),/膝围/);
+assert.equal(itemSchema.parse({...trousers,measurements:{}}).measurements.knee,undefined);
+assert.throws(()=>itemSchema.parse({...trousers,measurements:{knee:0}}));
+assert.throws(()=>itemSchema.parse({...base,measurements:{knee:42.5}}),/此分类/);
+const trousersRecord={id:crypto.randomUUID(),kind:'item',data:trousers};
+const kneeSnapshot=makeSnapshot({name:'Trousers look',asset:null,itemIds:[trousersRecord.id],occasions:[],notes:'',archived:false},[trousersRecord]);
+trousers.measurements.knee=44; assert.equal(kneeSnapshot.items[0].data.measurements.knee,42.5);
 assert.throws(() => itemSchema.parse({ ...base, shoeFit: 'small' }));
 assert.equal(itemSchema.parse(base).fit, null);
 const record = { id: crypto.randomUUID(), kind: 'item', data: shirt, version: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };

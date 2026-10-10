@@ -100,6 +100,14 @@ try {
   assert.equal((await post({kind:'item',id:savedShoes.id,version:savedShoes.version,data:{...savedShoes.data,brand:''}})).status,200);
   assert.equal((await (await request('/api/closet')).json()).records.find(record=>record.id===savedShoes.id).data.brand,'');
   assert.equal((await post({kind:'item',data:{...itemData,brand:'x'.repeat(101)}})).status,400);
+  const trousersData={...itemData,name:'Trousers',category:'bottom',measurements:{knee:42.5}};
+  const trousersResponse=await post({kind:'item',data:trousersData}); assert.equal(trousersResponse.status,200); const trousersId=(await trousersResponse.json()).id;
+  assert.equal((await (await request('/api/closet')).json()).records.find(record=>record.id===trousersId).data.measurements.knee,42.5);
+  assert.equal((await post({kind:'item',id:trousersId,version:1,data:{...trousersData,measurements:{}}})).status,200);
+  assert.equal((await (await request('/api/closet')).json()).records.find(record=>record.id===trousersId).data.measurements.knee,undefined);
+  assert.equal((await post({kind:'item',id:trousersId,version:2,data:trousersData})).status,200);
+  assert.equal((await post({kind:'item',data:{...trousersData,measurements:{knee:-1}}})).status,400);
+  assert.equal((await post({kind:'item',data:{...itemData,measurements:{knee:42.5}}})).status,400);
   const createSubset = async data => { const result = await post({ kind: 'subset', data }); assert.equal(result.status, 200, await result.clone().text()); return (await result.json()).id; };
   const parentId = await createSubset({ name: 'Commuting', scope: 'item', root: 'all', parentId: null, memberIds: [item.id] });
   const childId = await createSubset({ name: 'Light', scope: 'item', root: 'all', parentId, memberIds: [item.id, savedShoes.id] });

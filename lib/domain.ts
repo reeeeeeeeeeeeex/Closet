@@ -20,7 +20,7 @@ const title = z.string().trim().min(1, "请填写名称").max(100);
 const note = z.string().max(3000);
 const occasions = z.array(z.enum(["work", "casual", "party", "formal", "vacation", "sport"])).max(6);
 const centimeters = z.number().finite().positive("尺寸必须大于 0").max(500, "尺寸不能超过 500 cm").optional();
-const measurementsSchema = z.object({ shoulderWidth: centimeters, chest: centimeters, waist: centimeters, hips: centimeters, thigh: centimeters, legOpening: centimeters, length: centimeters, sleeveLength: centimeters, rise: centimeters, hem: centimeters }).strict();
+const measurementsSchema = z.object({ shoulderWidth: centimeters, chest: centimeters, waist: centimeters, hips: centimeters, thigh: centimeters, knee: centimeters, legOpening: centimeters, length: centimeters, sleeveLength: centimeters, rise: centimeters, hem: centimeters }).strict();
 export const shoeSizeSchema = z.object({ eu: z.number().finite().min(10, "欧码需在 10 到 60 之间").max(60, "欧码需在 10 到 60 之间").nullable().default(null), cn: z.number().int().min(100, "中国码需在 100 到 350 mm 之间").max(350, "中国码需在 100 到 350 mm 之间").multipleOf(5, "中国码以 5 mm 为间隔").nullable().default(null) }).strict().default({ eu: null, cn: null });
 export const personalSizesSchema = z.object({
   measurements: z.object({ height: centimeters, shoulderWidth: centimeters, chest: centimeters, waist: centimeters, hips: centimeters, thigh: centimeters, armLength: centimeters, inseam: centimeters, outseam: centimeters, footLength: centimeters }).strict().default({}),

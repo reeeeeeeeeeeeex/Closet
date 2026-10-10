@@ -32,6 +32,7 @@ assert.throws(() => outfitSchema.parse({ ...photoOnly.data, itemIds: [], asset: 
 const state = { collections: [{ id: 'main', name: 'Round trip', createdAt: item.createdAt }], collectionId: 'main', records: [item, outfit, entry, photoOnly, photoEntry], assets: [{ hash, name: '原始照片.png', mime: 'image/png', size: png.length }, { hash: photoHash, name: '穿搭原图.png', mime: 'image/png', size: outfitPhoto.length }] };
 const personal = {...metadata(),kind:'personalSizes',data:personalSizesSchema.parse({measurements:{height:168,waist:68,inseam:77,outseam:103},shoeSize:{eu:38.5,cn:240}})};
 state.records.push(personal);
+state.records.push({...metadata(),kind:'item',data:itemSchema.parse({...item.data,name:'Trousers',category:'bottom',measurements:{waist:72,knee:42.5}})});
 assert.throws(()=>personalSizesSchema.parse({measurements:{waist:0}}));
 assert.throws(()=>personalSizesSchema.parse({measurements:{height:Infinity}}));
 assert.throws(()=>personalSizesSchema.parse({measurements:{length:90}}));
