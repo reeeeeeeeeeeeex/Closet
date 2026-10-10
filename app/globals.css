@@ -404,6 +404,20 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 .subset-picker-tabs { gap: 20px; }
 @media (max-width: 767px) { .subset-grid { grid-template-columns: 1fr; }.subset-actions { margin-left: auto; } }
 .personal-sizes-panel { max-width: 1000px; }
+.photo-editor, .photo-gallery { min-width: 0; }
+.photo-gallery-preview { height: 290px; background: #eef0f4; border-radius: 10px; overflow: hidden; }
+.photo-gallery-preview > img { width: 100%; height: 100%; object-fit: contain; }
+.photo-gallery-empty { display: flex; height: 100%; align-items: center; justify-content: center; flex-direction: column; gap: 12px; padding: 16px; color: #8b97aa; text-align: center; }
+.photo-thumbnails { display: flex; gap: 8px; overflow-x: auto; padding: 4px; margin-top: 12px; }
+.photo-thumbnails > button { flex: 0 0 66px; position: relative; height: 78px; overflow: hidden; border: 1px solid #dde3eb; border-radius: 6px; background: #eef0f4; }
+.photo-thumbnails > button.active { outline: 2px solid #576c8a; outline-offset: -2px; }
+.photo-thumbnails img { width: 100%; height: 100%; object-fit: contain; }
+.photo-thumbnails span { position: absolute; bottom: 3px; left: 3px; font-size: 11px; padding: 2px 5px; background: #ffffffed; border-radius: 3px; color: #526179; }
+.photo-current-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 8px; }
+.photo-current-actions > button, .photo-current-actions > a { font-size: 12px; }
+.snapshot-photos .photo-gallery { width: 100%; }
+.snapshot-photos .photo-gallery-preview { height: 180px; }
+@media (max-width: 767px) { .photo-gallery-preview { height: 230px; }.photo-current-actions > button { padding: 0 8px; } }
 .personal-sizes-context { margin-bottom: 8px; font-size: 15px; font-weight: 600; }
 .personal-sizes-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 24px; min-width: 0; }
 .personal-sizes-card { border: 1px solid var(--border); border-radius: 11px; padding: 24px; background: white; min-width: 0; }

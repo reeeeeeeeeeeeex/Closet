@@ -4,7 +4,7 @@ import { tr, translatedOptions } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Shirt, Layers3, CalendarDays, Database, Sparkles, Plus, Search, ArrowUpRight, ArrowRight, RefreshCw, Download, Upload, Check, X, ImagePlus, Archive, ChevronLeft, ChevronRight, ChevronDown, Cloud, LockKeyhole, Copy, Loader2, Camera, AlertCircle, CheckCircle2, PackageOpen, Ruler, } from "lucide-react";
+import { Shirt, Layers3, CalendarDays, Database, Sparkles, Plus, Search, ArrowUpRight, ArrowRight, RefreshCw, Download, Upload, Check, X, Archive, ChevronLeft, ChevronRight, ChevronDown, Cloud, LockKeyhole, Copy, Loader2, Camera, AlertCircle, CheckCircle2, PackageOpen, Ruler, } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +23,8 @@ import { SubsetBrowser } from "@/components/subsets";
 import { subsetMemberIds } from "@/lib/subsets";
 import { ItemDetailsFields, ItemLabels } from "@/components/item-details";
 import { CATEGORY_MEASUREMENTS, garmentCategory } from "@/lib/item-details";
+import { PhotoEditor } from "@/components/photo-gallery";
+import { createPhotoDraft, savePhotoDraft } from "@/lib/photo-draft";
 import { OutfitFields } from "@/components/outfit-fields";
 import { dayInMonth } from "@/lib/calendar";
 import { ApiClientError, api, uploadAsset, exportArchive, inspectArchive, importArchive, downloadBlob } from "@/lib/portable";
@@ -261,20 +263,14 @@ function ItemEditor({ record, initialCategory, onClose, onSave }: {
 }) {
     const { t } = useI18n();
     const [data, setData] = useState<Item>(record?.data || { ...blankItem, category: initialCategory || "top" });
-    const [file, setFile] = useState<File | null>(null);
-    const [preview, setPreview] = useState("");
+    const [photos, setPhotos] = useState(() => createPhotoDraft(record?.data || blankItem));
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
-    // Synchronize the selected File with its browser-owned object URL.
-    useEffect(() => { if (!file)
-        return; const url = URL.createObjectURL(file);
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setPreview(url); return () => URL.revokeObjectURL(url); }, [file]);
     const submit = async (archive = data.archived) => { setBusy(true); setError(""); try {
         if (!data.name.trim())
             throw new Error(t("请给单品起个名字"));
-        const asset = file ? (await uploadAsset(file)).hash : data.asset;
-        await onSave("item", { ...data, archived: archive, asset }, record);
+        const gallery = await savePhotoDraft(photos);
+        await onSave("item", { ...data, archived: archive, ...gallery }, record);
     }
     catch (e) {
         setError(errorMessage(e));
@@ -283,13 +279,7 @@ function ItemEditor({ record, initialCategory, onClose, onSave }: {
         setBusy(false);
     } };
     return <Dialog open onOpenChange={(open: boolean) => { if (!open && !busy)
-        onClose(); }}><DialogContent className="editor-dialog item-dialog"><DialogHeader><DialogTitle>{record ? t("单品详情") : t("添加单品")}</DialogTitle><DialogDescription>{t("原图会完整保存。你可以随时补充或修改信息。")}</DialogDescription></DialogHeader><form onSubmit={e => { e.preventDefault(); void submit(); }}><div className="item-form-grid"><div><label className="upload-zone" htmlFor="item-photo">{preview || data.asset ? <img src={preview || `/api/assets/${data.asset}`} alt={t("单品照片预览")}/> : <div><ImagePlus size={36} strokeWidth={1.2}/><strong>{t("放进一张照片")}</strong><span>{t("点击选择照片或拍照")}</span></div>}<span className="upload-hover"><Camera size={16}/> {preview || data.asset ? t("更换原图") : t("选择照片")}</span></label><input id="item-photo" className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" onChange={e => { const f = e.target.files?.[0]; if (f && f.size > 20 * 1024 * 1024) {
-        setError(t("单张图片最多 20 MB"));
-        return;
-    } if (f) {
-        setFile(f);
-        setError("");
-    } }}/><p className="field-hint">{t("JPG / PNG / WebP / GIF / AVIF")}<br />{t("单张最多 20 MB，不压缩原图")}</p>{data.asset && <a className="text-link text-sm" href={`/api/assets/${data.asset}`} download>{t("下载原图")}<Download size={14}/></a>}</div><div className="form-fields"><div className="field"><Label htmlFor="item-name">{t("单品名称")}<span>*</span></Label><Input id="item-name" required maxLength={100} autoFocus value={data.name} placeholder={t("例如：短款牛仔外套")} onChange={e => setData({ ...data, name: e.target.value })}/></div><div className="field-pair"><div className="field"><Label>{t("分类")}</Label><Picker label={t("单品分类")} value={data.category} onChange={value => { const category = value as Item["category"]; const allowed = CATEGORY_MEASUREMENTS[category] || []; setData({ ...data, category, fit: garmentCategory(category) ? data.fit : null, shoeFit: category === "shoes" ? data.shoeFit : null, shoeSize: category === "shoes" ? data.shoeSize : { eu: null, cn: null }, measurements: Object.fromEntries(Object.entries(data.measurements).filter(([key]) => allowed.some(value => value === key))) }); }} options={translatedOptions(CATEGORIES, t)}/></div><div className="field"><Label htmlFor="item-color">{t("颜色")}</Label><Input id="item-color" maxLength={50} value={data.color} placeholder={t("例如：深蓝")} onChange={e => setData({ ...data, color: e.target.value })}/></div></div><ItemDetailsFields item={data} onChange={setData}/><div className="field"><Label>{t("适合场合")}</Label><Chips options={OCCASIONS} value={data.occasions} onChange={occasions => setData({ ...data, occasions })}/></div><div className="field"><Label>{t("季节")}</Label><Chips options={SEASONS} value={data.seasons} onChange={seasons => setData({ ...data, seasons })}/></div><div className="field"><Label htmlFor="item-notes">{t("穿着备注")}</Label><Textarea id="item-notes" maxLength={3000} rows={3} value={data.notes} placeholder={t("版型、搭配想法，或舒适度\u2026")} onChange={e => setData({ ...data, notes: e.target.value })}/></div></div></div><FormError message={error}/><DialogFooter className="editor-footer">{record && <Button type="button" variant="ghost" className="mr-auto" disabled={busy} onClick={() => void submit(!data.archived)}><Archive size={16}/>{data.archived ? t("放回衣橱") : t("收起单品")}</Button>}<Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy}>{busy ? <Loader2 size={16} className="animate-spin"/> : <Check size={16}/>}{busy ? t("保存中\u2026") : t("保存单品")}</Button></DialogFooter></form></DialogContent></Dialog>;
+        onClose(); }}><DialogContent className="editor-dialog item-dialog"><DialogHeader><DialogTitle>{record ? t("单品详情") : t("添加单品")}</DialogTitle><DialogDescription>{t("原图会完整保存。你可以随时补充或修改信息。")}</DialogDescription></DialogHeader><form onSubmit={e => { e.preventDefault(); void submit(); }}><fieldset disabled={busy}><div className="item-form-grid"><PhotoEditor draft={photos} onChange={setPhotos} kind="item" onError={setError}/><div className="form-fields"><div className="field"><Label htmlFor="item-name">{t("单品名称")}<span>*</span></Label><Input id="item-name" required maxLength={100} autoFocus value={data.name} placeholder={t("例如：短款牛仔外套")} onChange={e => setData({ ...data, name: e.target.value })}/></div><div className="field-pair"><div className="field"><Label>{t("分类")}</Label><Picker label={t("单品分类")} value={data.category} onChange={value => { const category = value as Item["category"]; const allowed = CATEGORY_MEASUREMENTS[category] || []; setData({ ...data, category, fit: garmentCategory(category) ? data.fit : null, shoeFit: category === "shoes" ? data.shoeFit : null, shoeSize: category === "shoes" ? data.shoeSize : { eu: null, cn: null }, measurements: Object.fromEntries(Object.entries(data.measurements).filter(([key]) => allowed.some(value => value === key))) }); }} options={translatedOptions(CATEGORIES, t)}/></div><div className="field"><Label htmlFor="item-color">{t("颜色")}</Label><Input id="item-color" maxLength={50} value={data.color} placeholder={t("例如：深蓝")} onChange={e => setData({ ...data, color: e.target.value })}/></div></div><ItemDetailsFields item={data} onChange={setData}/><div className="field"><Label>{t("适合场合")}</Label><Chips options={OCCASIONS} value={data.occasions} onChange={occasions => setData({ ...data, occasions })}/></div><div className="field"><Label>{t("季节")}</Label><Chips options={SEASONS} value={data.seasons} onChange={seasons => setData({ ...data, seasons })}/></div><div className="field"><Label htmlFor="item-notes">{t("穿着备注")}</Label><Textarea id="item-notes" maxLength={3000} rows={3} value={data.notes} placeholder={t("版型、搭配想法，或舒适度\u2026")} onChange={e => setData({ ...data, notes: e.target.value })}/></div></div></div></fieldset><FormError message={error}/><DialogFooter className="editor-footer">{record && <Button type="button" variant="ghost" className="mr-auto" disabled={busy} onClick={() => void submit(!data.archived)}><Archive size={16}/>{data.archived ? t("放回衣橱") : t("收起单品")}</Button>}<Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy}>{busy ? <Loader2 size={16} className="animate-spin"/> : <Check size={16}/>}{busy ? t("保存中\u2026") : t("保存单品")}</Button></DialogFooter></form></DialogContent></Dialog>;
 }
 function OutfitEditor({ record, items, onClose, onSave }: {
     record?: OutfitRecord;

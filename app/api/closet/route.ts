@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { context, json, failure, getState, getRecords, getRecordsSync, insertRecord, sameOrigin, limitedJson, ApiError } from "@/lib/server";
-import { itemSchema, outfitSchema, subsetSchema, personalSizesSchema, dateSchema, validateArchive, makeSnapshot, type ClosetRecord, type ItemRecord, type OutfitRecord, type Asset } from "@/lib/domain";
+import { itemSchema, outfitSchema, subsetSchema, personalSizesSchema, dateSchema, validateArchive, makeSnapshot, photoAssets, type ClosetRecord, type ItemRecord, type OutfitRecord, type Asset } from "@/lib/domain";
 import { validateSubsets } from "@/lib/subsets";
 import type { LocalDatabase } from "@/lib/local-storage";
 
@@ -62,11 +62,11 @@ export async function POST(request: Request) {
     let data: ClosetRecord["data"];
     if (kind === "item") {
       const item = itemSchema.parse(body.data);
-      if (item.asset && !await db.prepare("SELECT hash FROM assets WHERE owner=? AND hash=?").bind(owner, item.asset).first()) throw new ApiError(400, "原图尚未上传完成");
+      for (const hash of photoAssets(item)) if (!await db.prepare("SELECT hash FROM assets WHERE owner=? AND hash=?").bind(owner, hash).first()) throw new ApiError(400, "原图尚未上传完成");
       data = item;
     } else if (kind === "outfit") {
       data = outfitSchema.parse(body.data);
-      if (data.asset && !await db.prepare("SELECT hash FROM assets WHERE owner=? AND hash=?").bind(owner, data.asset).first()) throw new ApiError(400, "搭配原图尚未上传完成");
+      for (const hash of photoAssets(data)) if (!await db.prepare("SELECT hash FROM assets WHERE owner=? AND hash=?").bind(owner, hash).first()) throw new ApiError(400, "搭配原图尚未上传完成");
       if (new Set(data.itemIds).size !== data.itemIds.length) throw new ApiError(400, "搭配不能重复添加同一单品");
       if (data.itemIds.some(id => !records.some(r => r.id === id && r.kind === "item"))) throw new ApiError(400, "搭配中的单品不存在");
     } else if (kind === "subset") {
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
         if (existing) throw new ApiError(400, "历史搭配快照不可替换，请新建记录");
         const outfitData = input.newOutfit;
         if (!outfitData.asset) throw new ApiError(400, "请添加搭配照片");
-        if (!await db.prepare("SELECT hash FROM assets WHERE owner=? AND hash=?").bind(owner, outfitData.asset).first()) throw new ApiError(400, "搭配原图尚未上传完成");
+        for (const hash of photoAssets(outfitData)) if (!await db.prepare("SELECT hash FROM assets WHERE owner=? AND hash=?").bind(owner, hash).first()) throw new ApiError(400, "搭配原图尚未上传完成");
         if (outfitData.itemIds.some(id => !records.some(r => r.id === id && r.kind === "item"))) throw new ApiError(400, "搭配中的单品不存在");
         if (records.length > 1998) throw new ApiError(400, "添加照片穿搭需要两条记录，此衣橱容量不足");
         const now = new Date().toISOString();

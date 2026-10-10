@@ -26,7 +26,7 @@ export async function uploadAsset(file: File): Promise<Asset> {
 }
 export const hashBytes = async (bytes: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as BufferSource))).map(b => b.toString(16).padStart(2, "0")).join("");
 const imagePath = (a: Asset) => `assets/${a.hash}.${a.mime.split("/")[1]}`;
-export const manifestFromState = (state: ClosetState): ClosetArchive => validateArchive({ format: "new-closet", schemaVersion: 5, exportedAt: new Date().toISOString(), collection: { name: state.collections.find(c => c.id === state.collectionId)?.name || tr("我的衣橱") }, records: state.records, assets: state.assets });
+export const manifestFromState = (state: ClosetState): ClosetArchive => validateArchive({ format: "new-closet", schemaVersion: 6, exportedAt: new Date().toISOString(), collection: { name: state.collections.find(c => c.id === state.collectionId)?.name || tr("我的衣橱") }, records: state.records, assets: state.assets });
 export async function exportArchive(state: ClosetState, progress: (message: string) => void): Promise<Blob> {
     const manifest = manifestFromState(state);
     const blobs: Blob[] = [];
@@ -38,7 +38,7 @@ export async function exportArchive(state: ClosetState, progress: (message: stri
     const add = (name: string, bytes: Uint8Array) => { const f = new ZipPassThrough(name); zip.add(f); f.push(bytes, true); if (zipError)
         throw zipError; };
     add("manifest.json", strToU8(JSON.stringify(manifest, null, 2)));
-    add("README.txt", strToU8("New Closet backup v5\nmanifest.json contains all records, nested groups and memberships, clothing fits/measurements, personal body measurements, shoe sizes, outfit photos, relationships, snapshots and original filenames.\nassets/ contains exact original bytes, named by SHA-256.\nImages and JSON can be opened independently of this app.\n"));
+    add("README.txt", strToU8("New Closet backup v6\nmanifest.json contains all records, nested groups and memberships, clothing fits/measurements, personal body measurements, shoe sizes, item/outfit photo galleries and covers, relationships, snapshots and original filenames.\nassets/ contains exact original bytes, named by SHA-256.\nImages and JSON can be opened independently of this app.\n"));
     for (const [index, asset] of manifest.assets.entries()) {
         progress(tr("正在打包原图 {value1} / {value2}", { value1: index + 1, value2: manifest.assets.length }));
         const response = await fetch(`/api/assets/${asset.hash}`, { cache: "no-store" });

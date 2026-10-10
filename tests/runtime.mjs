@@ -52,7 +52,10 @@ try {
   res = await request('/api/assets', { method: 'POST', body: form }); assert.equal(res.status, 200, await res.clone().text()); const asset = await res.json();
   res = await request('/api/assets/' + asset.hash); assert.deepEqual(Buffer.from(await res.arrayBuffer()), png); assert.match(res.headers.get('cache-control'), /private/);
   assert.equal((await request('/api/assets/' + asset.hash, {}, false)).status, 401);
-  const photoData = { name: 'Photo without items', itemIds: [], asset: asset.hash, occasions: [], notes: '', archived: false };
+  const secondBytes = Buffer.concat([png, Buffer.from('second original photo')]);
+  const secondForm = new FormData(); secondForm.append('file',new File([secondBytes],'第二张.png',{type:'image/png'}));
+  const secondUpload = await request('/api/assets',{method:'POST',body:secondForm}); assert.equal(secondUpload.status,200); const secondAsset = await secondUpload.json();
+  const photoData = { name: 'Photo without items', itemIds: [], asset: asset.hash, photos:[asset.hash,secondAsset.hash], occasions: [], notes: '', archived: false };
   res = await post({ kind: 'calendar', data: { date: '2026-10-10', status: 'worn', notes: 'Direct photo', newOutfit: photoData } });
   assert.equal(res.status, 200, await res.clone().text()); const photoOutfitId = (await res.json()).outfitId;
   const photoState = await (await request('/api/closet')).json();
@@ -61,10 +64,15 @@ try {
   const photoCalendar = photoState.records.find(r => r.kind === 'calendar');
   assert.deepEqual(photoOutfit.data.itemIds, []); assert.equal(photoCalendar.data.snapshot.asset, asset.hash);
   assert.deepEqual(photoCalendar.data.snapshot.items, []);
+  assert.deepEqual(photoCalendar.data.snapshot.photos,photoData.photos);
+  assert.equal((await post({kind:'outfit',data:{...photoData,photos:[asset.hash,'f'.repeat(64)]}})).status,400);
+  assert.equal((await post({kind:'calendar',data:{date:'2026-10-11',status:'worn',notes:'',newOutfit:{...photoData,photos:[asset.hash,'f'.repeat(64)]}}})).status,400);
   assert.equal((await post({ kind: 'outfit', data: { ...photoData, asset: null } })).status, 400);
   assert.equal((await post({ kind: 'calendar', data: { date: '2026-10-11', status: 'worn', notes: '', newOutfit: { ...photoData, asset: 'f'.repeat(64) } } })).status, 400);
   assert.equal((await (await request('/api/closet')).json()).records.length, 2);
-  const itemData = { name: 'Pink jacket', category: 'outerwear', color: 'pink', occasions: ['casual'], seasons: ['spring'], asset: asset.hash, notes: 'Original', archived: false, fit: 'fitted', measurements: { shoulderWidth: 42.5, chest: 96, length: 68 } };
+  const itemData = { name: 'Pink jacket', category: 'outerwear', color: 'pink', occasions: ['casual'], seasons: ['spring'], asset: asset.hash, photos:[asset.hash,secondAsset.hash], notes: 'Original', archived: false, fit: 'fitted', measurements: { shoulderWidth: 42.5, chest: 96, length: 68 } };
+  assert.equal((await post({kind:'item',data:{...itemData,photos:[asset.hash,'f'.repeat(64)]}})).status,400);
+  assert.equal((await post({kind:'item',data:{...itemData,asset:'f'.repeat(64)}})).status,400);
   res = await post({ kind: 'item', data: itemData }); assert.equal(res.status, 200, await res.clone().text());
   let state = await (await request('/api/closet')).json(); const item = state.records.find(r => r.kind === 'item');
   const shoes = { ...itemData, name: 'Daily shoes', category: 'shoes', fit: null, measurements: {}, shoeFit: 'small', shoeSize: { eu: 38.5, cn: 240 } };
@@ -76,7 +84,7 @@ try {
   res = await post({ kind: 'outfit', data: outfitData }); assert.equal(res.status, 200, await res.clone().text());
   state = await (await request('/api/closet')).json(); const outfit = state.records.find(r => r.kind === 'outfit' && r.id !== photoOutfitId);
   res = await post({ kind: 'calendar', data: { date: '2026-10-09', status: 'worn', outfitId: outfit.id, notes: 'Original day' } }); assert.equal(res.status, 200, await res.clone().text());
-  assert.equal((await post({ kind: 'item', id: item.id, version: item.version, data: { ...itemData, name: 'Changed jacket' } })).status, 200);
+  assert.equal((await post({ kind: 'item', id: item.id, version: item.version, data: { ...itemData, name: 'Changed jacket',asset:secondAsset.hash,photos:[secondAsset.hash] } })).status, 200);
   assert.equal((await post({ kind: 'item', id: item.id, version: item.version, data: { ...itemData, name: 'Stale overwrite' } })).status, 409);
   assert.equal((await post({ kind: 'outfit', id: outfit.id, version: outfit.version, data: { ...outfitData, name: 'Archived edit', archived: true } })).status, 200);
   state = await (await request('/api/closet')).json(); const entry = state.records.find(r => r.kind === 'calendar' && r.id !== photoCalendar.id);
@@ -84,6 +92,9 @@ try {
   assert.equal(photoHistory.data.snapshot.items.length, 0); assert.equal(photoHistory.data.snapshot.asset, asset.hash);
   assert.equal(entry.data.snapshot.name, 'First outfit'); assert.equal(entry.data.snapshot.items[0].data.name, 'Pink jacket');
   assert.equal(entry.data.snapshot.items[0].data.fit, 'fitted'); assert.equal(entry.data.snapshot.items[0].data.measurements.shoulderWidth, 42.5);
+  assert.deepEqual(entry.data.snapshot.items[0].data.photos,[asset.hash,secondAsset.hash]);
+  assert.equal(entry.data.snapshot.items[0].data.asset,asset.hash);
+  assert.equal(state.records.find(record=>record.id===item.id).data.asset,secondAsset.hash);
   const savedShoes = state.records.find(r => r.kind === 'item' && r.data.category === 'shoes');
   assert.equal(savedShoes.data.shoeFit, 'small'); assert.deepEqual(savedShoes.data.shoeSize, { eu: 38.5, cn: 240 });
   const createSubset = async data => { const result = await post({ kind: 'subset', data }); assert.equal(result.status, 200, await result.clone().text()); return (await result.json()).id; };
@@ -131,12 +142,13 @@ try {
   await stop(); await start();
   assert.deepEqual((await (await request('/api/closet')).json()).records, state.records);
   assert.deepEqual(Buffer.from(await (await request('/api/assets/' + asset.hash)).arrayBuffer()), png);
+  assert.deepEqual(Buffer.from(await (await request('/api/assets/' + secondAsset.hash)).arrayBuffer()),secondBytes);
   await build({ entryPoints: ['lib/portable.ts', 'lib/local-storage.ts'], outdir: directory, bundle: true, platform: 'node', format: 'esm', logLevel: 'error' });
   const { exportArchive, inspectArchive, importArchive } = await import(pathToFileURL(path.join(directory, 'portable.js')));
   globalThis.fetch = (url, init = {}) => request(url, init);
   const backup = new File([await exportArchive(state, () => {})], 'wardrobe.zip');
   const manifest = await inspectArchive(backup, () => {});
-  assert.equal(manifest.schemaVersion,5); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
+  assert.equal(manifest.schemaVersion,6); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
   const restoredId = await importArchive(backup, manifest, () => {});
   const restored = await (await request('/api/closet?collection=' + restoredId)).json(); assert.deepEqual(restored.records, state.records); assert.equal(restored.collections.length, 2);
   assert.deepEqual((await (await request('/api/closet?collection=main')).json()).records, state.records);
@@ -148,7 +160,7 @@ try {
   await assert.rejects(local.batch([local.prepare("INSERT INTO collections VALUES ('rollback','test','name','now')"), local.prepare("INSERT INTO collections VALUES ('rollback','test','duplicate','now')")]));
   assert.equal(await local.prepare("SELECT id FROM collections WHERE owner='rollback'").first(), null);
   local.prepare("UPDATE records SET data=json_remove(data, '$.asset') WHERE id=?").bind(outfit.id).run();
-  local.prepare("UPDATE records SET data=json_remove(data, '$.snapshot.asset') WHERE id=?").bind(entry.id).run();
+  local.prepare("UPDATE records SET data=json_remove(data, '$.snapshot.asset', '$.snapshot.photos') WHERE id=?").bind(entry.id).run();
   local.prepare("UPDATE records SET data=json_remove(data, '$.fit', '$.shoeFit', '$.shoeSize', '$.measurements') WHERE id=?").bind(item.id).run();
   const legacyRead = await (await request('/api/closet?collection=main')).json();
   assert.equal(legacyRead.records.find(r => r.id === outfit.id).data.asset, null);
@@ -171,10 +183,10 @@ try {
   assert.equal((await (await request('/api/closet?collection=' + restoredId)).json()).records.some(r => r.id === entry.id), true);
   assert.match(await (await request('/')).text(), /我的衣橱/);
   const persisted = new DatabaseSync(path.join(directory, 'closet.sqlite'), { readOnly: true });
-  const stored = persisted.prepare('SELECT storage_key FROM assets').get();
+  const stored = persisted.prepare('SELECT storage_key FROM assets WHERE hash=?').get(asset.hash);
   assert.deepEqual(await readFile(path.join(directory, 'assets', stored.storage_key)), png); persisted.close();
   assert.equal((await request('/api/auth', { method: 'DELETE' })).status, 200);
-  console.log('PASS: production Node server; personal sizes singleton under concurrent creation, optional field clearing, invalid inputs, stale edits, per-collection isolation and v5 ZIP recovery; nested category/item/outfit subsets, multiple membership, concurrent auto-add without lost members, stale edits blocked, invalid parent/scope/category and cyclic imports rejected; photo/calendar/subset transactions, original bytes, legacy records, restart persistence and complete ZIP recovery.');
+  console.log('PASS: production Node server; personal sizes singleton under concurrent creation, optional field clearing, invalid inputs, stale edits, per-collection isolation and multi-photo v6 ZIP recovery; nested category/item/outfit subsets, multiple membership, concurrent auto-add without lost members, stale edits blocked, invalid parent/scope/category and cyclic imports rejected; photo/calendar/subset transactions, original bytes, legacy records, restart persistence and complete ZIP recovery.');
 } catch (error) { console.error(logs); throw error; }
 finally {
   globalThis.fetch = originalFetch; await stop();
