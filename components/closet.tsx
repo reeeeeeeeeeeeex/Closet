@@ -2,9 +2,8 @@
 "use client";
 import { tr, translatedOptions } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Shirt, Layers3, CalendarDays, Database, Sparkles, Plus, Search, ArrowRight, RefreshCw, Download, Upload, Check, X, Archive, ChevronLeft, ChevronRight, ChevronDown, Cloud, LockKeyhole, Copy, Loader2, Camera, AlertCircle, PackageOpen, Ruler, } from "lucide-react";
+import { Shirt, Layers3, CalendarDays, Database, Sparkles, Plus, Search, ArrowRight, RefreshCw, Download, Upload, Check, X, Archive, ChevronLeft, ChevronRight, ChevronDown, LockKeyhole, Copy, Loader2, Camera, AlertCircle, PackageOpen, Ruler, } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +17,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { CATEGORIES, OCCASIONS, SEASONS, wardrobePrompt, type Item, type ItemRecord, type Outfit, type OutfitRecord, type CalendarRecord, type ClosetState, type ClosetRecord, type ClosetArchive, type Subset, type SubsetRecord, type PersonalSizesRecord, type PersonalSizes } from "@/lib/domain";
 import { Photo, OutfitCollage, ItemCard, OutfitCard } from "@/components/closet-cards";
+import { ClosetHeader } from "@/components/closet-header";
 import { PersonalSizesPanel } from "@/components/personal-sizes";
 import { SubsetBrowser } from "@/components/subsets";
 import { subsetMemberIds } from "@/lib/subsets";
@@ -105,7 +105,6 @@ function Navigation({ view, onView, state, username }: {
 }
 export default function Home({ username }: { username: string }) {
     const { t, locale } = useI18n();
-    const router = useRouter();
     const [state, setState] = useState<ClosetState | null>(null);
     const [view, setView] = useState<View>("wardrobe");
     const [loading, setLoading] = useState(true);
@@ -218,16 +217,9 @@ export default function Home({ username }: { username: string }) {
         const result = await api<{ record: PersonalSizesRecord }>("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "save", collectionId: state?.collectionId || "main", kind: "personalSizes", data, id: record?.id, version: record?.version }) });
         await refresh(); return result.record;
     };
-    const wardrobeStats = state && view === "wardrobe" ? <div className="stats-strip"><div className="stats-summary"><Stat label={t("衣橱单品")} count={activeItems.length} suffix={t("件")}/><Stat label={t("收藏搭配")} count={activeOutfits.length} suffix={t("套")}/><Stat label={t("已穿记录")} count={calendar.filter(c => c.data.status === "worn").length} suffix={t("次")}/></div><Button className="main-action" disabled={!!error} onClick={() => setEditor({ kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"] })}><Plus size={18}/>{t("添加单品")}</Button></div> : null;
+    const wardrobeStats = state && view === "wardrobe" ? { items: activeItems.length, outfits: activeOutfits.length, worn: calendar.filter(c => c.data.status === "worn").length } : undefined;
     const titles = { personalSizes: t("我的尺码"), wardrobe: t("我的衣橱"), outfits: t("我的搭配"), calendar: t("穿搭日历"), backup: t("数据与备份"), assistant: t("AI 穿搭灵感") };
-    return <SidebarProvider style={{ "--sidebar-width": "248px" } as React.CSSProperties}><Navigation view={view} onView={goView} state={state} username={username}/><SidebarInset className="main-inset"><header className={`topbar ${view === "wardrobe" ? "has-wardrobe-stats" : ""}`}><div className="topbar-menu"><SidebarTrigger className="md:hidden"/></div>{wardrobeStats}<div className="topbar-right"><span className={`sync-label ${error ? "sync-error" : ""}`}><Cloud size={15}/> {error ? t("连接待恢复") : loading ? t("正在连接") : t("已同步 {value1}", { value1: synced })}</span><Button variant="ghost" size="icon" aria-label={t("刷新衣橱")} onClick={() => void refresh()} disabled={syncing}><RefreshCw size={16} className={syncing ? "animate-spin" : ""}/></Button><Button variant="ghost" onClick={async () => { try {
-        await api("/api/auth", { method: "DELETE" });
-        router.replace("/login");
-        router.refresh();
-    }
-    catch (e) {
-        toast.error(errorMessage(e));
-    } }}>{t("退出")}</Button></div></header>
+    return <SidebarProvider style={{ "--sidebar-width": "248px" } as React.CSSProperties}><Navigation view={view} onView={goView} state={state} username={username}/><SidebarInset className="main-inset"><ClosetHeader menu={<SidebarTrigger className="md:hidden"/>} stats={wardrobeStats} error={!!error} loading={loading} syncing={syncing} synced={synced} onRefresh={() => void refresh()} onAdd={() => setEditor({ kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"] })}/>
     <main className="workspace">
       {state && state.collections.length > 1 && <div className="collection-switch"><span>{t("当前衣橱")}</span><Picker label={t("切换衣橱")} value={state.collectionId} options={Object.fromEntries(state.collections.map(c => [c.id, c.name]))} onChange={v => void refresh(v)}/></div>}
       <h1 className="sr-only">{titles[view]}</h1>
@@ -248,11 +240,6 @@ export default function Home({ username }: { username: string }) {
     {editor?.kind === "calendar" && <CalendarEditor key={editor.record?.id || "new-calendar"} record={editor.record} date={editor.date} outfitId={editor.outfitId} outfits={outfits} items={items} onClose={() => setEditor(null)} onSave={save} onDelete={removeCalendar}/>}
   </SidebarProvider>;
 }
-function Stat({ label, count, suffix }: {
-    label: string;
-    count: number;
-    suffix: string;
-}) { return <div className="stat"><span>{label}</span><div>{count.toString().padStart(2, "0")}<small>{suffix}</small></div></div>; }
 function Welcome({ onAdd, onImport }: {
     onAdd: () => void;
     onImport: () => void;

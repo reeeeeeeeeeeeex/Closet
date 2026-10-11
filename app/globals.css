@@ -409,35 +409,23 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 /* Compact controls shared by the signed-in wardrobe pages. */
 .closet-sidebar .brand-header { padding: 20px; }
 .closet-sidebar .profile-footer { padding: 16px 20px; }
-.stats-strip { display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0; }
-.stats-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); flex: 1; max-width: 330px; min-width: 0; }
-.stat { padding: 0 16px; min-width: 0; border-right: 1px solid #eceef3; }
-.stat:first-child { padding-left: 0; }
-.stat:last-child { border-right: 0; }
-.stat > span { color: #78818e; font-size: 12px; white-space: nowrap; }
-.stat > div { font-size: 20px; font-weight: 500; line-height: 1; margin-top: 3px; font-variant-numeric: tabular-nums; }
-.stat small { margin-left: 6px; font-size: 12px; font-weight: 400; color: #78818e; }
-.stats-strip > .main-action { margin-left: auto; }
+.stats-summary {display:flex;align-items:center;gap:12px;min-width:0;white-space:nowrap;font-size:13px;color:#78818e}
+.stats-summary strong {font-size:14px;font-weight:600;color:#222934;font-variant-numeric:tabular-nums}
+.stats-summary i {font-style:normal;color:#bdc4ce}
+.topbar.has-wardrobe-stats {gap:12px}
+.topbar-right .main-action {height:44px;min-height:44px;padding:0 14px;font-size:14px}
 .outfit-toolbar { background: #fff; border: 1px solid #e4e8ed; border-radius: 10px; padding: 12px 16px; }
 .outfit-toolbar .filter-controls { flex-wrap: wrap; margin-left: auto; }
 .calendar-heading { flex-wrap: wrap; gap: 12px; }
 .calendar-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 .calendar-navigation { display: flex; align-items: center; gap: 4px; }
-@media (min-width: 768px) and (max-width: 1023px) {
-  .topbar.has-wardrobe-stats { height: auto; flex-wrap: wrap; row-gap: 0; }
-  .has-wardrobe-stats .topbar-right { min-height: 48px; }
-  .has-wardrobe-stats .stats-strip { flex: 0 0 100%; order: 3; padding: 0 0 8px; }
-}
 @media (max-width: 767px) {
   .topbar-menu { display: flex; }
-  .topbar.has-wardrobe-stats { height: auto; min-height: 48px; flex-wrap: wrap; column-gap: 8px; row-gap: 0; }
-  .has-wardrobe-stats .topbar-right { min-height: 48px; }
-  .stats-strip { order: 3; flex: 0 0 100%; gap: 8px; padding: 2px 0 8px; }
-  .stats-summary { max-width: none; }
-  .stat { padding: 0 6px; }
-  .stat > div { font-size: 18px; }
-  .stat small { margin-left: 4px; }
-  .stats-strip > .main-action { padding: 0 10px; }
+  .topbar.has-wardrobe-stats {height:72px;flex-wrap:wrap;column-gap:8px;row-gap:0}
+  .has-wardrobe-stats .topbar-menu,.has-wardrobe-stats .topbar-right {height:48px}
+  .stats-summary {order:3;flex:0 0 100%;height:24px;gap:10px;font-size:12px}
+  .stats-summary strong {font-size:13px}
+  .topbar-right .main-action {padding:0 10px}
   .topbar [data-slot="button"], .workspace [data-slot="button"], .filter-controls [data-slot="select-trigger"], .archive-filter, .category-tabs > button { min-height: 44px; }
   .search-box input { height: 44px; }
   .outfit-toolbar { padding: 12px; }
