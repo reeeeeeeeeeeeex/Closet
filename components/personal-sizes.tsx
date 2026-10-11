@@ -1,5 +1,5 @@
 "use client";
-import { useId, useState } from "react";
+import { useId, useState, useEffect } from "react";
 import { ZodError } from "zod";
 import { Check, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,9 @@ import { PERSONAL_MEASUREMENTS, type PersonalMeasurement } from "@/lib/personal-
 import { tr } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
 
-export function PersonalSizesPanel({ record, collectionName, disabled, onSave, onRefresh }: {
+export function PersonalSizesPanel({ record, collectionName, disabled, onSave, onRefresh, onDraftChange, onBusyChange }: {
+  onDraftChange?: (dirty: boolean) => void;
+  onBusyChange?: (busy: boolean) => void;
   record?: PersonalSizesRecord; collectionName: string; disabled: boolean;
   onSave: (data: PersonalSizes, base?: PersonalSizesRecord) => Promise<PersonalSizesRecord>; onRefresh: () => Promise<ClosetState | undefined>;
 }) {
@@ -20,6 +22,8 @@ export function PersonalSizesPanel({ record, collectionName, disabled, onSave, o
   const [base, setBase] = useState(record);
   const [data, setData] = useState<PersonalSizes>(() => structuredClone(record?.data || personalSizesSchema.parse({})));
   const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [saved, setSaved] = useState(false);
+  useEffect(() => { onDraftChange?.(JSON.stringify(data) !== JSON.stringify(base?.data || personalSizesSchema.parse({}))); }, [data, base, onDraftChange]);
+  useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
   const changedElsewhere = record?.version !== base?.version || record?.id !== base?.id;
   function change(next: PersonalSizes) { setData(next); setSaved(false); }
   function fields(keys: PersonalMeasurement[]) {

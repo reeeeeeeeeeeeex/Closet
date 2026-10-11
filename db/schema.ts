@@ -5,7 +5,7 @@ export const colorLibrary = sqliteTable("color_library", {
 export const colorLibrarySeeded = sqliteTable("color_library_seeded", { owner: text("owner").primaryKey() });
 export const accounts = sqliteTable("accounts", {
   id: text("id").primaryKey(), username: text("username").notNull(), usernameKey: text("username_key").notNull().unique(),
-  salt: text("salt").notNull(), passwordHash: text("password_hash").notNull(), secret: text("secret").notNull(),
+  secret: text("secret").notNull(),
 });
 export const collections = sqliteTable("collections", {
   owner: text("owner").notNull(), id: text("id").notNull(), name: text("name").notNull(), createdAt: text("created_at").notNull(),

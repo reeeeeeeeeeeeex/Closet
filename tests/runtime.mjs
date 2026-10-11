@@ -15,7 +15,7 @@ const reserve = createServer(); reserve.listen(0, '127.0.0.1'); await once(reser
 const port = reserve.address().port; await new Promise(resolve => reserve.close(resolve));
 const base = `http://127.0.0.1:${port}`;
 const originalFetch = globalThis.fetch;
-let server; let logs = ''; let cookie = '';
+let server; let logs = ''; let cookie = ''; let profileId = '';
 async function stop() {
   if (!server || server.exitCode !== null) return;
   const exit = once(server, 'exit'); server.kill(); await exit;
@@ -26,32 +26,28 @@ async function start() {
   server.stdout.on('data', data => { logs += data; }); server.stderr.on('data', data => { logs += data; });
   for (let i = 0; i < 100; i++) {
     if (server.exitCode !== null) throw new Error(logs);
-    try { if ((await originalFetch(base + '/login')).status === 200) return; } catch {}
+    try { if ((await originalFetch(base + '/')).status === 200) return; } catch {}
     await new Promise(resolve => setTimeout(resolve, 200));
   }
   throw new Error('Server startup timed out: ' + logs);
 }
-const request = (url, options = {}, authenticated = true) => originalFetch(base + url, { ...options, headers: { ...(authenticated ? { Cookie: cookie } : {}), ...options.headers }, redirect: 'manual' });
+const request = (url, options = {}, authenticated = true) => originalFetch(base + url, { ...options, headers: { ...(authenticated ? { Cookie: cookie, "X-Closet-Profile": profileId } : {}), ...options.headers }, redirect: 'manual' });
 const post = data => request('/api/closet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'save', collectionId: 'main', ...data }) });
-const password = 'runtime-test-' + crypto.randomUUID();
-const login = (password, action = 'login') => request('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify({ username: 'runtime', password, action }) }, false);
 try {
   await start();
-  assert.equal((await request('/api/closet', {}, false)).status, 401);
-  assert.equal((await request('/api/closet', { headers: { 'oai-authenticated-user-id': 'forged', 'oai-authenticated-user-email': 'forged@example.invalid' } }, false)).status, 401);
-  assert.equal((await request('/', {}, false)).headers.get('location'), '/login');
-  let res = await login(password, 'register'); assert.equal(res.status, 200, await res.clone().text());
-  assert.match(res.headers.get('set-cookie'), /HttpOnly/i); cookie = res.headers.get('set-cookie').split(';')[0];
-  assert.equal((await login('wrong-password')).status, 401);
-  assert.equal((await request('/api/closet', { headers: { Cookie: 'closet_session=forged' } })).status, 401);
-  assert.equal((await request('/api/auth', { method: 'POST', headers: { Origin: 'https://other.invalid', 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) })).status, 403);
+  assert.equal((await request('/', {}, false)).status,200);
+  assert.equal((await request('/login', {}, false)).headers.get('location'),'/');
+  let res = await request('/api/profiles',{},false); assert.equal(res.status,200);
+  const profileState = await res.json(); profileId = profileState.current.id;
+  assert.match(res.headers.get('set-cookie'),/HttpOnly/i); cookie=res.headers.get('set-cookie').split(';')[0];
+  assert.equal((await request('/api/auth',{method:'POST',body:'{}'})).status,410);
   assert.equal((await request('/api/closet', { method: 'POST', headers: { Origin: 'https://other.invalid', 'Content-Type': 'application/json' }, body: '{}' })).status, 403);
   assert.deepEqual((await (await request('/api/closet')).json()).records, []);
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jrWQAAAAASUVORK5CYII=', 'base64');
   const form = new FormData(); form.append('file', new File([png], '原图.png', { type: 'image/png' }));
   res = await request('/api/assets', { method: 'POST', body: form }); assert.equal(res.status, 200, await res.clone().text()); const asset = await res.json();
   res = await request('/api/assets/' + asset.hash); assert.deepEqual(Buffer.from(await res.arrayBuffer()), png); assert.match(res.headers.get('cache-control'), /private/);
-  assert.equal((await request('/api/assets/' + asset.hash, {}, false)).status, 401);
+  assert.deepEqual(Buffer.from(await (await request('/api/assets/' + asset.hash, {}, false)).arrayBuffer()),png);
   const secondBytes = Buffer.concat([png, Buffer.from('second original photo')]);
   const secondForm = new FormData(); secondForm.append('file',new File([secondBytes],'第二张.png',{type:'image/png'}));
   const secondUpload = await request('/api/assets',{method:'POST',body:secondForm}); assert.equal(secondUpload.status,200); const secondAsset = await secondUpload.json();
@@ -222,7 +218,7 @@ try {
   const persisted = new DatabaseSync(path.join(directory, 'closet.sqlite'), { readOnly: true });
   const stored = persisted.prepare('SELECT storage_key FROM assets WHERE hash=?').get(asset.hash);
   assert.deepEqual(await readFile(path.join(directory, 'assets', stored.storage_key)), png); persisted.close();
-  assert.equal((await request('/api/auth', { method: 'DELETE' })).status, 200);
+  assert.equal((await request('/api/auth', { method: 'DELETE' })).status, 410);
   console.log('PASS: production Node server; personal sizes singleton under concurrent creation, optional field clearing, invalid inputs, stale edits, per-collection isolation and item brands and multi-photo v9 ZIP recovery; nested category/item/outfit subsets, multiple membership, concurrent auto-add without lost members, stale edits blocked, invalid parent/scope/category and cyclic imports rejected; photo/calendar/subset transactions, original bytes, legacy records, restart persistence and complete ZIP recovery.');
 } catch (error) { console.error(logs); throw error; }
 finally {

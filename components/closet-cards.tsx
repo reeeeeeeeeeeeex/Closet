@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- Display authenticated original images. */
 "use client";
+import { assetUrl } from "@/lib/profile-client";
 import { ArrowUpRight, CalendarDays, Check, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { itemColorStyle, itemColorText, isCommonColor } from "@/lib/colors";
@@ -13,7 +14,7 @@ export function Photo({ asset, name, className = "" }: {
     className?: string;
 }) {
     const { t } = useI18n();
-    return <div className={`photo ${className}`}>{asset ? <img src={`/api/assets/${asset}`} alt={name} loading="lazy" onError={e => { e.currentTarget.style.opacity = ".2"; }}/> : <div className="photo-placeholder"><Shirt strokeWidth={1}/><span>{t("未添加照片")}</span></div>}</div>;
+    return <div className={`photo ${className}`}>{asset ? <img src={assetUrl(asset)} alt={name} loading="lazy" onError={e => { e.currentTarget.style.opacity = ".2"; }}/> : <div className="photo-placeholder"><Shirt strokeWidth={1}/><span>{t("未添加照片")}</span></div>}</div>;
 }
 export function OccasionLabels({ values }: {
     values: Item["occasions"];

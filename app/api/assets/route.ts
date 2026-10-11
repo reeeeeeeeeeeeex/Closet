@@ -1,7 +1,7 @@
 import { context, json, failure, sameOrigin, digest, ApiError } from "@/lib/server";
 export async function POST(request: Request) {
   try {
-    sameOrigin(request); const { owner, db, bucket } = await context();
+    sameOrigin(request); const { owner, db, bucket } = await context(request);
     if (Number(request.headers.get("content-length") || 0) > 21 * 1024 * 1024) throw new ApiError(413, "单张图片最多 20 MB");
     const file = await request.formData(); const upload = file.get("file");
     if (!(upload instanceof File) || !upload.size) throw new ApiError(400, "请选择图片");

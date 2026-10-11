@@ -1,9 +1,4 @@
-import { redirect } from "next/navigation";
-import { getLocalUser } from "@/lib/local-auth";
+import { selectedProfile, publicProfile } from "@/lib/profiles";
 import Closet from "@/components/closet";
 export const dynamic = "force-dynamic";
-export default async function HomePage() {
-  const user = await getLocalUser();
-  if (!user?.username) redirect("/login");
-  return <Closet username={user.username} />;
-}
+export default async function HomePage() { const profile = publicProfile(await selectedProfile()); return <Closet key={profile.id} profile={profile}/>; }

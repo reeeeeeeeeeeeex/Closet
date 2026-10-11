@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- Preserve authenticated originals and local file previews. */
 "use client";
+import { assetUrl } from "@/lib/profile-client";
 import { useEffect, useRef, useState } from "react";
 import { Camera, Download, ImagePlus, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,7 @@ export function PhotoEditor({ draft, onChange, kind, onError }: { draft: PhotoDr
     return () => Object.values(next).forEach(url => URL.revokeObjectURL(url));
   }, [draft.photos]);
   const active = draft.photos.find(photo => photo.key === activeKey) || draft.photos.find(photo => photo.key === draft.cover) || draft.photos[0];
-  const source = (photo: PhotoDraft["photos"][number]) => photo.asset ? `/api/assets/${photo.asset}` : urls[photo.key];
+  const source = (photo: PhotoDraft["photos"][number]) => photo.asset ? assetUrl(photo.asset) : urls[photo.key];
   function choose(input: HTMLInputElement) {
     const files = Array.from(input.files || []); input.value = "";
     if (!files.length) return;
@@ -34,7 +35,7 @@ export function PhotoEditor({ draft, onChange, kind, onError }: { draft: PhotoDr
     <input ref={library} type="file" multiple className="sr-only" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" aria-label={kind === "item" ? t("添加单品照片") : t("添加搭配照片")} onChange={event => choose(event.currentTarget)}/>
     <input ref={camera} type="file" capture="environment" className="sr-only" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" aria-label={kind === "item" ? t("拍摄单品照片") : t("拍摄搭配照片")} onChange={event => choose(event.currentTarget)}/>
     <div className="photo-thumbnails">{draft.photos.map((photo, index) => <button type="button" key={photo.key} className={active?.key === photo.key ? "active" : ""} aria-label={t("查看照片 {number}", { number: index + 1 })} aria-pressed={active?.key === photo.key} onClick={() => setActiveKey(photo.key)}>{source(photo) && <img src={source(photo)} alt={t("照片 {number}", { number: index + 1 })}/>}<span>{photo.key === draft.cover ? t("封面") : index + 1}</span></button>)}</div>
-    {active && <div className="photo-current-actions"><Button type="button" variant="outline" disabled={active.key === draft.cover} onClick={() => onChange({ ...draft, cover: active.key })}>{active.key === draft.cover ? t("当前封面") : t("设为封面")}</Button><Button type="button" variant="ghost" onClick={() => { onChange(removeDraftPhoto(draft, active.key)); onError(""); }}><X size={15}/>{t("移除当前照片")}</Button>{active.asset && <a className="text-link" href={`/api/assets/${active.asset}`} download><Download size={14}/>{t("下载原图")}</a>}</div>}
+    {active && <div className="photo-current-actions"><Button type="button" variant="outline" disabled={active.key === draft.cover} onClick={() => onChange({ ...draft, cover: active.key })}>{active.key === draft.cover ? t("当前封面") : t("设为封面")}</Button><Button type="button" variant="ghost" onClick={() => { onChange(removeDraftPhoto(draft, active.key)); onError(""); }}><X size={15}/>{t("移除当前照片")}</Button>{active.asset && <a className="text-link" href={assetUrl(active.asset)} download><Download size={14}/>{t("下载原图")}</a>}</div>}
     <p className="field-hint">{t("{count} / 20 张照片 · 单张最多 20 MB，不压缩原图", { count: draft.photos.length })}<br/>{kind === "item" ? t("封面用于列表和搭配中的单品拼图。移除封面后，第一张照片自动成为封面。") : t("搭配封面用于我的搭配和穿搭日历。移除封面后，第一张照片自动成为封面。")}</p>
   </div>;
 }
@@ -45,5 +46,5 @@ export function PhotoGallery({ data, name }: { data: PhotoData; name: string }) 
   const photos = photoAssets(data);
   const selected = active && photos.includes(active) ? active : data.asset || photos[0];
   if (!selected) return null;
-  return <div className="photo-gallery"><div className="photo-gallery-preview"><img src={`/api/assets/${selected}`} alt={name}/></div>{photos.length > 1 && <div className="photo-thumbnails">{photos.map((hash, index) => <button type="button" key={hash} className={selected === hash ? "active" : ""} aria-label={t("查看 {name} 的照片 {number}", { name, number: index + 1 })} aria-pressed={selected === hash} onClick={() => setActive(hash)}><img src={`/api/assets/${hash}`} alt={t("照片 {number}", { number: index + 1 })}/><span>{hash === data.asset ? t("封面") : index + 1}</span></button>)}</div>}</div>;
+  return <div className="photo-gallery"><div className="photo-gallery-preview"><img src={assetUrl(selected)} alt={name}/></div>{photos.length > 1 && <div className="photo-thumbnails">{photos.map((hash, index) => <button type="button" key={hash} className={selected === hash ? "active" : ""} aria-label={t("查看 {name} 的照片 {number}", { name, number: index + 1 })} aria-pressed={selected === hash} onClick={() => setActive(hash)}><img src={assetUrl(hash)} alt={t("照片 {number}", { number: index + 1 })}/><span>{hash === data.asset ? t("封面") : index + 1}</span></button>)}</div>}</div>;
 }

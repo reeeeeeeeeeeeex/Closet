@@ -1,3 +1,4 @@
+import type { Profile } from "./profile-types";
 import { z } from "zod";
 import { CATEGORY_MEASUREMENTS, garmentCategory, type Measurement } from "./item-details";
 import { DEFAULT_LOCALE, messageForLocale } from "./i18n/core";
@@ -81,7 +82,7 @@ export const archiveSchema = z.object({
 }).strict();
 export type ClosetArchive = z.infer<typeof archiveSchema>;
 export type Collection = { id: string; name: string; createdAt: string };
-export type ClosetState = { collections: Collection[]; collectionId: string; records: ClosetRecord[]; assets: Asset[]; colorLibrary?: LibraryColor[] };
+export type ClosetState = { profile?: Profile; collections: Collection[]; collectionId: string; records: ClosetRecord[]; assets: Asset[]; colorLibrary?: LibraryColor[] };
 export function referencedAssets(records: ClosetRecord[]): Set<string> {
   const hashes = new Set<string>();
   for (const r of records) {

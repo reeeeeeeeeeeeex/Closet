@@ -1,18 +1,19 @@
-import { getLocalUser } from "./local-auth";
+import { selectedProfile, publicProfile, listStoredProfiles } from "./profiles";
 import { getColorLibrary } from "./color-library";
 import { localStorage, type LocalDatabase } from "./local-storage";
 import { ZodError } from "zod";
 import { recordSchema, type ClosetRecord, type Asset, type ClosetState, referencedAssets } from "./domain";
-export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
-export async function context() {
-  const user = await getLocalUser();
-  if (!user) throw new ApiError(401, "请先登录后再访问衣橱");
+export class ApiError extends Error { constructor(public status: number, message: string, public code?: string) { super(message); } }
+export async function context(request: Request) {
+  const profile = await selectedProfile();
+  const expected = [request.headers.get("X-Closet-Profile"), new URL(request.url).searchParams.get("profile")].filter(Boolean);
+  if (expected.some(id => id !== profile.id) || (!expected.length && !["GET", "HEAD"].includes(request.method))) throw new ApiError(409, "账号已在其他标签页切换，草稿仍保留。请重新载入当前账号。", "PROFILE_CHANGED");
   const { db, bucket } = localStorage();
-  return { owner: user.userId, db, bucket };
+  return { owner: profile.id, db, bucket };
 }
 export const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 export function failure(error: unknown) {
-  if (error instanceof ApiError) return json({ error: error.message }, error.status);
+  if (error instanceof ApiError) return json({ error: error.message, ...(error.code ? { code: error.code } : {}) }, error.status);
   if (error instanceof ZodError) return json({ error: error.issues[0]?.message || "内容格式不正确" }, 400);
   console.error("Closet operation failed", error instanceof Error ? error.message : "Unknown error");
   return json({ error: "操作未完成，请稍后重试。原有数据没有被覆盖。" }, 500);
@@ -46,7 +47,7 @@ export async function getState(db: LocalDatabase, owner: string, collectionId?: 
   if (collectionId && selected !== "main" && !collections.some(c => c.id === selected)) throw new ApiError(404, "衣橱不存在");
   const records = await getRecords(db, owner, selected); const hashes = referencedAssets(records);
   const assets = (await db.prepare("SELECT hash,name,mime,size FROM assets WHERE owner=?").bind(owner).all<Asset>()).results.filter(a => hashes.has(a.hash));
-  return { collections, collectionId: selected, records, assets, colorLibrary: getColorLibrary(db, owner) };
+  return { profile: publicProfile(listStoredProfiles().find(profile => profile.id === owner)!), collections, collectionId: selected, records, assets, colorLibrary: getColorLibrary(db, owner) };
 }
 export function insertRecord(db: LocalDatabase, owner: string, collectionId: string, r: ClosetRecord) {
   return db.prepare("INSERT INTO records (owner,collection_id,id,kind,data,version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)").bind(owner, collectionId, r.id, r.kind, JSON.stringify(r.data), r.version, r.createdAt, r.updatedAt);

@@ -44,13 +44,13 @@ function storeRecords(db: LocalDatabase, owner: string, collectionId: string, ch
   });
 }
 export async function GET(request: Request) {
-  try { const { db, owner } = await context(); return json(await getState(db, owner, new URL(request.url).searchParams.get("collection") || undefined)); }
+  try { const { db, owner } = await context(request); return json(await getState(db, owner, new URL(request.url).searchParams.get("collection") || undefined)); }
   catch (e) { return failure(e); }
 }
 const mutationSchema = z.object({ op: z.enum(["save", "deleteCalendar", "deleteSubset"]), collectionId: z.string().min(1).max(100), id: z.string().uuid().optional(), version: z.number().int().positive().optional(), subsetId: z.string().uuid().optional(), kind: z.enum(["item", "outfit", "calendar", "subset", "personalSizes"]), data: z.unknown() });
 export async function POST(request: Request) {
   try {
-    sameOrigin(request); const { db, owner } = await context(); const body = mutationSchema.parse(await limitedJson(request, 128 * 1024));
+    sameOrigin(request); const { db, owner } = await context(request); const body = mutationSchema.parse(await limitedJson(request, 128 * 1024));
     const { collectionId, kind } = body;
     if (collectionId === "main") await db.prepare("INSERT OR IGNORE INTO collections (owner,id,name,created_at) VALUES (?,?,?,?)").bind(owner, "main", "我的衣橱", new Date().toISOString()).run();
     else if (!await db.prepare("SELECT id FROM collections WHERE owner=? AND id=?").bind(owner, collectionId).first()) throw new ApiError(404, "衣橱不存在");
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
 }
 export async function PUT(request: Request) {
   try {
-    sameOrigin(request); const { db, owner } = await context();
+    sameOrigin(request); const { db, owner } = await context(request);
     let archive; try { archive = validateArchive(await limitedJson(request)); } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError(400, e instanceof Error ? e.message : "备份无效"); }
     const assets = (await db.prepare("SELECT hash,name,mime,size FROM assets WHERE owner=?").bind(owner).all<Asset>()).results; const map = new Map(assets.map(a => [a.hash, a]));
     for (const a of archive.assets) { const stored = map.get(a.hash); if (!stored || stored.size !== a.size || stored.mime !== a.mime) throw new ApiError(400, "备份图片缺失或未通过校验，请重新上传"); }

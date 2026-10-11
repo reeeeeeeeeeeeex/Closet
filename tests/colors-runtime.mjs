@@ -8,13 +8,13 @@ import path from 'node:path';
 const directory=await mkdtemp(path.resolve('.test-runtime/color-instance-'));
 const reserve=createServer();reserve.listen(0,'127.0.0.1');await once(reserve,'listening');const port=reserve.address().port;await new Promise(resolve=>reserve.close(resolve));
 const base=`http://127.0.0.1:${port}`;let server,logs='';
-async function start(){server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port',String(port)],{env:{...process.env,CLOSET_HOST:'127.0.0.1',CLOSET_DATA_DIR:directory,NEXT_TELEMETRY_DISABLED:'1'},stdio:['ignore','pipe','pipe']});server.stdout.on('data',d=>logs+=d);server.stderr.on('data',d=>logs+=d);for(let i=0;i<100;i++){if(server.exitCode!==null)throw Error(logs);try{if((await fetch(base+'/login')).status===200)return;}catch{}await new Promise(resolve=>setTimeout(resolve,100));}throw Error(logs);}
+async function start(){server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port',String(port)],{env:{...process.env,CLOSET_HOST:'127.0.0.1',CLOSET_DATA_DIR:directory,NEXT_TELEMETRY_DISABLED:'1'},stdio:['ignore','pipe','pipe']});server.stdout.on('data',d=>logs+=d);server.stderr.on('data',d=>logs+=d);for(let i=0;i<100;i++){if(server.exitCode!==null)throw Error(logs);try{if((await fetch(base+'/')).status===200)return;}catch{}await new Promise(resolve=>setTimeout(resolve,100));}throw Error(logs);}
 async function stop(){if(server?.exitCode===null){const done=once(server,'exit');server.kill();await done;}}
-const req=(cookie,method,body,query='')=>fetch(base+'/api/closet'+query,{method,headers:{Cookie:cookie,Origin:base,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+const req=(cookie,method,body,query='')=>fetch(base+'/api/closet'+query,{method,headers:{Cookie:cookie,'X-Closet-Profile':cookie.split('=')[1]?.split('.')[0] || '',Origin:base,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
 const get=async(cookie,id)=>{const response=await req(cookie,'GET',undefined,id?'?collection='+id:'');assert.equal(response.status,200);return response.json();};
 const data={name:'Colors',category:'top',color:'',seasons:[],occasions:[],notes:'',asset:null,archived:false};
 const blue={name:'海蓝',hex:'#123456'},cream={name:'浅奶油',hex:'#fffedc'},purple={name:'烟灰紫',hex:'#9988aa'};
-async function account(username){const r=await fetch(base+'/api/auth',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({action:'register',username,password:'1'})});assert.equal(r.status,200);return r.headers.get('set-cookie').split(';')[0];}
+async function account(username){const r=await fetch(base+'/api/profiles',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({action:'create',name:username})});assert.equal(r.status,200);return r.headers.get('set-cookie').split(';')[0];}
 const save=(cookie,details)=>req(cookie,'POST',{op:'save',kind:'item',collectionId:'main',data,...details});
 const archive=(records=[],colorLibrary=[])=>({format:'new-closet',schemaVersion:9,exportedAt:new Date().toISOString(),collection:{name:'Imported'},records,assets:[],colorLibrary});
 try {

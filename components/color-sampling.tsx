@@ -1,4 +1,5 @@
 "use client";
+import { assetUrl } from "@/lib/profile-client";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Pipette } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -58,7 +59,7 @@ function PhotoSamplingCanvas({ photo, onClose, onConfirm }: { photo: DraftPhoto;
   const [sample, setSample] = useState<{ x: number; y: number; hex: string } | null>(null);
   useEffect(() => {
     let cancelled = false;
-    const url = photo.file ? URL.createObjectURL(photo.file) : `/api/assets/${photo.asset}`;
+    const url = photo.file ? URL.createObjectURL(photo.file) : photo.asset ? assetUrl(photo.asset) : "";
     const image = new Image();
     image.onload = () => {
       if (cancelled || !canvas.current) return;

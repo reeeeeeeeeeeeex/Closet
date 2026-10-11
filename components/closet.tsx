@@ -1,9 +1,12 @@
 /* eslint-disable @next/next/no-img-element -- Authenticated originals and temporary blob previews bypass the image proxy. */
 "use client";
+import { assetUrl, setProfileContext, subscribeOperations, getOperationCount, subscribeProfileChanges } from "@/lib/profile-client";
+import type { Profile, ProfileState } from "@/lib/profile-types";
+import { ProfileMenu } from "@/components/profile-menu";
 import { tr, translatedOptions } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Shirt, Layers3, CalendarDays, Database, Sparkles, Plus, Search, ArrowRight, RefreshCw, Download, Upload, Check, X, Archive, ChevronLeft, ChevronRight, ChevronDown, LockKeyhole, Copy, Loader2, Camera, AlertCircle, PackageOpen, Ruler, } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Shirt, Layers3, CalendarDays, Database, Sparkles, Plus, Search, ArrowRight, Download, Upload, Check, X, Archive, ChevronLeft, ChevronRight, ChevronDown, LockKeyhole, Copy, Loader2, Camera, AlertCircle, PackageOpen, Ruler, } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -77,8 +80,8 @@ function Picker({ value, onChange, options, label }: {
 }) {
     return <Select value={value} onValueChange={onChange}><SelectTrigger className="w-full" aria-label={label}><SelectValue placeholder={label}/></SelectTrigger><SelectContent>{Object.entries(options).map(([key, name]) => <SelectItem key={key} value={key}>{name}</SelectItem>)}</SelectContent></Select>;
 }
-function Navigation({ view, onView, state, username }: {
-    username: string;
+function Navigation({ view, onView, state, profileMenu }: {
+    profileMenu: React.ReactNode;
     view: View;
     onView: (v: View) => void;
     state: ClosetState | null;
@@ -101,15 +104,20 @@ function Navigation({ view, onView, state, username }: {
     <SidebarContent className="px-5"><div className="nav-caption">{t("我的空间")}</div><SidebarMenu>{entries.map(e => <SidebarMenuItem key={e.id}><SidebarMenuButton isActive={view === e.id} onClick={() => go(e.id)} className="nav-button"><e.icon size={19} strokeWidth={1.7}/><span>{e.name}</span>{e.count !== undefined && <span className="nav-count">{e.count}</span>}</SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>
     <div className="nav-caption mt-8">{t("更多可能")}</div><SidebarMenu>{[{ id: "assistant" as View, name: t("AI 穿搭灵感"), icon: Sparkles }, { id: "backup" as View, name: t("数据与备份"), icon: Database }].map(e => <SidebarMenuItem key={e.id}><SidebarMenuButton isActive={view === e.id} onClick={() => go(e.id)} className="nav-button"><e.icon size={19} strokeWidth={1.7}/><span>{e.name}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>
     </SidebarContent>
-    <SidebarFooter className="profile-footer"><div className="profile-mark">{username.slice(0, 1)}</div><div><strong title={username}>{username}</strong><span><LockKeyhole size={11}/>{t("仅自己可见")}</span></div></SidebarFooter></Sidebar>;
+    <SidebarFooter className="profile-footer">{profileMenu}</SidebarFooter></Sidebar>;
 }
-export default function Home({ username }: { username: string }) {
+export default function Home({ profile }: { profile: Profile }) {
     const { t, locale } = useI18n();
+    const [currentProfile, setCurrentProfile] = useState(profile);
+    const [draftDirty, setDraftDirty] = useState(false);
+    const [panelBusy, setPanelBusy] = useState(false);
+    const operations = useSyncExternalStore(subscribeOperations, getOperationCount, () => 0);
     const [state, setState] = useState<ClosetState | null>(null);
     const [view, setView] = useState<View>("wardrobe");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [authRequired, setAuthRequired] = useState(false);
+    const [profileChanged, setProfileChanged] = useState(false);
+    const [reloadConfirm, setReloadConfirm] = useState(false);
     const [syncing, setSyncing] = useState(false);
     const [synced, setSynced] = useState("");
     const [editor, setEditor] = useState<Editor | null>(null);
@@ -140,13 +148,14 @@ export default function Home({ username }: { username: string }) {
             const availableColors = new Set(wardrobeColors(next.records.filter((record): record is ItemRecord => record.kind === "item")).map(colorKey));
             setColorFilter(previous => previous.filter(key => availableColors.has(key)));
             setError("");
-            setAuthRequired(false);
+            setProfileChanged(false);
+            if (next.profile) setCurrentProfile(next.profile);
             setSynced(new Date().toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }));
             return next;
         }
         catch (e) {
             if (id === refreshId.current) {
-                setError(errorMessage(e)); setAuthRequired(e instanceof ApiClientError && e.status === 401);
+                setError(errorMessage(e)); setProfileChanged(e instanceof ApiClientError && e.code === "PROFILE_CHANGED");
             }
         }
         finally {
@@ -157,7 +166,14 @@ export default function Home({ username }: { username: string }) {
         }
     }, [locale]);
     // Start the initial request asynchronously; refresh also serves event handlers.
-    useEffect(() => { void Promise.resolve().then(() => refresh()); }, [refresh]);
+    useEffect(() => {
+        setProfileContext(profile.id);
+        void api<ProfileState>("/api/profiles").then(next => {
+            if (next.current.id !== profile.id) { setProfileChanged(true); setLoading(false); setError(t("账号已在其他标签页切换，草稿仍保留。请重新载入当前账号。")); return; }
+            setCurrentProfile(next.current); return refresh();
+        }).catch(error => { setError(errorMessage(error)); setLoading(false); });
+    }, [profile.id, refresh, t]);
+    useEffect(() => subscribeProfileChanges(() => { setProfileChanged(true); setError(t("账号已在其他标签页切换，草稿仍保留。请重新载入当前账号。")); }), [t]);
     useEffect(() => { if (editor)
         return; const onFocus = () => { if (document.visibilityState === "visible")
         void refresh(undefined, true); }; window.addEventListener("focus", onFocus); const interval = setInterval(onFocus, 45000); return () => { window.removeEventListener("focus", onFocus); clearInterval(interval); }; }, [editor, refresh]);
@@ -189,7 +205,7 @@ export default function Home({ username }: { username: string }) {
     const subsetMembers = activeSubset ? subsetMemberIds(state!.records, activeSubset.id) : null;
     const filteredItems = filterItems(items, { category, occasion, archived, search, colors: colorFilter, members: subsetMembers });
     const filteredOutfits = outfits.filter(o => (!subsetMembers || subsetMembers.has(o.id)) && o.data.archived === archived && (occasion === "all" || o.data.occasions.includes(occasion as Item["occasions"][number])) && [o.data.name, o.data.notes].join(" ").toLowerCase().includes(search.toLowerCase()));
-    const goView = (v: View) => { setView(v); setSearch(""); setColorFilter([]); setCategory("all"); setSelectedSubsetId(null); setOccasion("all"); setArchived(false); };
+    const goView = (v: View) => { setView(v); setDraftDirty(false); setSearch(""); setColorFilter([]); setCategory("all"); setSelectedSubsetId(null); setOccasion("all"); setArchived(false); };
     useEffect(() => {
         const mc = (document as Document & {
             modelContext?: {
@@ -219,22 +235,23 @@ export default function Home({ username }: { username: string }) {
     };
     const wardrobeStats = state && view === "wardrobe" ? { items: activeItems.length, outfits: activeOutfits.length, worn: calendar.filter(c => c.data.status === "worn").length } : undefined;
     const titles = { personalSizes: t("我的尺码"), wardrobe: t("我的衣橱"), outfits: t("我的搭配"), calendar: t("穿搭日历"), backup: t("数据与备份"), assistant: t("AI 穿搭灵感") };
-    return <SidebarProvider style={{ "--sidebar-width": "248px" } as React.CSSProperties}><Navigation view={view} onView={goView} state={state} username={username}/><SidebarInset className="main-inset"><ClosetHeader menu={<SidebarTrigger className="md:hidden"/>} stats={wardrobeStats} error={!!error} loading={loading} syncing={syncing} synced={synced} onRefresh={() => void refresh()} onAdd={() => setEditor({ kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"] })}/>
+    return <SidebarProvider style={{ "--sidebar-width": "248px" } as React.CSSProperties}><Navigation view={view} onView={goView} state={state} profileMenu={<ProfileMenu current={currentProfile} disabled={operations > 0 || panelBusy || loading} hasDraft={!!editor || draftDirty} onSelected={next => { setProfileContext(next.id); window.location.reload(); }} onRenamed={next => { if (next.id === currentProfile.id) setCurrentProfile(next); }}/> }/><SidebarInset className="main-inset"><ClosetHeader menu={<SidebarTrigger className="md:hidden"/>} stats={wardrobeStats} error={!!error} loading={loading} syncing={syncing} synced={synced} onRefresh={() => void refresh()} onAdd={() => setEditor({ kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"] })}/>
     <main className="workspace">
       {state && state.collections.length > 1 && <div className="collection-switch"><span>{t("当前衣橱")}</span><Picker label={t("切换衣橱")} value={state.collectionId} options={Object.fromEntries(state.collections.map(c => [c.id, c.name]))} onChange={v => void refresh(v)}/></div>}
       <h1 className="sr-only">{titles[view]}</h1>
-      {error && <div className="error-banner" role="alert"><AlertCircle size={19}/><div><strong>{t("暂时无法同步衣橱")}</strong><p>{error}</p>{authRequired && <a href="/login">{t("登录后继续")}</a>}</div><Button variant="outline" onClick={() => void refresh()}>{t("重试")}</Button></div>}
+      {error && <div className="error-banner" role="alert"><AlertCircle size={19}/><div><strong>{t("暂时无法同步衣橱")}</strong><p>{error}</p>{profileChanged && <Button variant="outline" onClick={() => { if (draftDirty || editor) { setReloadConfirm(true); } else window.location.reload(); }}>{t("载入当前账号")}</Button>}</div><Button variant="outline" onClick={() => void refresh()}>{t("重试")}</Button></div>}
       {loading ? <div className="loading-grid">{[1, 2, 3, 4].map(n => <Skeleton key={n} className="h-72 rounded-2xl"/>)}</div> : state && <>
         {view === "wardrobe" && <><div className="wardrobe-toolbar"><div className="category-tabs" role="group" aria-label={t("单品分类")}>{Object.entries({ all: t("全部"), ...translatedOptions(CATEGORIES, t) }).map(([key, label]) => <button key={key} onClick={() => { setCategory(key); setSelectedSubsetId(null); }} className={category === key ? "active" : ""}>{label}<span>{key === "all" ? items.filter(i => i.data.archived === archived).length : items.filter(i => i.data.category === key && i.data.archived === archived).length}</span></button>)}</div></div></>}
         {(view === "wardrobe" || view === "outfits") && <><SubsetBrowser renderToolbar={controls => <div className={view === "outfits" ? "filter-row outfit-toolbar" : "filter-row"}><div className="search-box"><Search size={17}/><Input value={search} onChange={e => setSearch(e.target.value)} placeholder={view === "wardrobe" ? t("找一件单品、品牌、颜色或备注\u2026") : t("寻找我的搭配\u2026")} aria-label={t("搜索")}/>{search && <button aria-label={t("清空搜索")} onClick={() => setSearch("")}><X size={14}/></button>}</div><div className="filter-controls">{view === "wardrobe" && <ColorFilter colors={wardrobeColors(items)} selected={colorFilter} onChange={setColorFilter}/>}<Picker label={t("场合筛选")} value={occasion} onChange={setOccasion} options={{ all: t("所有场合"), ...translatedOptions(OCCASIONS, t) }}/><button className={`archive-filter ${archived ? "on" : ""}`} aria-pressed={archived} onClick={() => setArchived(!archived)} title={t("查看已收起的单品或搭配")}><Archive size={16}/><span>{t("已收起")}</span></button>{view === "outfits" && <Button className="main-action" disabled={!!error} onClick={() => setEditor({ kind: "outfit" })}><Plus size={18}/>{t("新建搭配")}</Button>}{controls}</div></div>} key={state.collectionId + ":" + view + ":" + subsetRoot + ":" + (activeSubset?.id || "root")} records={state.records} scope={scope} root={subsetRoot} activeId={activeSubset?.id || null} disabled={!!error || syncing} onSelect={setSelectedSubsetId} onSave={saveSubset} onDelete={removeSubset} visibleRecords={view === "wardrobe" ? filteredItems : filteredOutfits} onAdd={subsetId => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"], subsetId } : { kind: "outfit", subsetId })} renderCards={records => view === "wardrobe" ? <div className="item-grid">{records.map(record => record.kind === "item" && <ItemCard key={record.id} item={record} onOpen={() => setEditor({ kind: "item", record })}/>)}</div> : <div className="outfit-grid">{records.map(record => record.kind === "outfit" && <OutfitCard key={record.id} outfit={record} items={items} onOpen={() => setEditor({ kind: "outfit", record })} onCalendar={() => setEditor({ kind: "calendar", outfitId: record.id, date: localDate() })}/>)}</div>} />
         {view === "wardrobe" && !filteredItems.length && (items.length === 0 && !search && !colorFilter.length && category === "all" && occasion === "all" && !archived ? <Welcome onAdd={() => setEditor({ kind: "item" })} onImport={() => goView("backup")}/> : <EmptyState icon={Search} title={t("这里还没有单品")} text={t("试试其他分类，或清空筛选条件。")} action={t("清空筛选")} onAction={() => { setSearch(""); setColorFilter([]); setOccasion("all"); setArchived(false); }}/>) }
         {view === "outfits" && !filteredOutfits.length && <EmptyState icon={Layers3} title={t("没有找到这个搭配")} text={t("拍照、导入搭配照片，或从单品组合一套穿搭。")} action={t("新建搭配")} onAction={() => setEditor({ kind: "outfit" })}/>}</>}
         {view === "calendar" && <CalendarPanel entries={calendar} disabled={!!error} onAdd={date => setEditor({ kind: "calendar", date })} onEdit={record => setEditor({ kind: "calendar", record })}/>}
-        {view === "backup" && <BackupPanel state={state} onImported={async (id) => { await refresh(id); goView("wardrobe"); }}/>}
-        {view === "assistant" && <AssistantPanel state={state}/>}
-        {view === "personalSizes" && <PersonalSizesPanel key={state.collectionId} record={state.records.find((record): record is PersonalSizesRecord => record.kind === "personalSizes")} collectionName={state.collections.find(collection => collection.id === state.collectionId)?.name || t("我的衣橱")} disabled={!!error || syncing} onSave={savePersonalSizes} onRefresh={() => refresh()}/> }
+        {view === "backup" && <BackupPanel state={state} onBusyChange={setPanelBusy} onImported={async (id) => { await refresh(id); goView("wardrobe"); }}/>}
+        {view === "assistant" && <AssistantPanel state={state} onDraftChange={setDraftDirty}/>}
+        {view === "personalSizes" && <PersonalSizesPanel key={state.collectionId} record={state.records.find((record): record is PersonalSizesRecord => record.kind === "personalSizes")} collectionName={state.collections.find(collection => collection.id === state.collectionId)?.name || t("我的衣橱")} disabled={!!error || syncing} onSave={savePersonalSizes} onDraftChange={setDraftDirty} onBusyChange={setPanelBusy} onRefresh={() => refresh()}/> }
       </>}
     </main></SidebarInset><Toaster theme="light" position="top-center" richColors/>
+    <AlertDialog open={reloadConfirm} onOpenChange={setReloadConfirm}><AlertDialogContent className="closet-dialog"><AlertDialogHeader><AlertDialogTitle>{t("载入当前账号前放弃草稿？")}</AlertDialogTitle><AlertDialogDescription>{t("当前页面有未保存的内容。重新载入后会放弃这些草稿，已保存的资料保留。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("保留草稿")}</AlertDialogCancel><AlertDialogAction onClick={() => window.location.reload()}>{t("放弃草稿并载入")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     {editor?.kind === "item" && <ItemEditor key={editor.record?.id || "new-item"} record={editor.record} initialCategory={editor.initialCategory} brands={itemBrands(items)} colorLibrary={state?.colorLibrary || []} onClose={() => setEditor(null)} onSave={save}/>}
     {editor?.kind === "outfit" && <OutfitEditor key={editor.record?.id || "new-outfit"} record={editor.record} items={items} onClose={() => setEditor(null)} onSave={save}/>}
     {editor?.kind === "calendar" && <CalendarEditor key={editor.record?.id || "new-calendar"} record={editor.record} date={editor.date} outfitId={editor.outfitId} outfits={outfits} items={items} onClose={() => setEditor(null)} onSave={save} onDelete={removeCalendar}/>}
@@ -368,7 +385,7 @@ function CalendarPanel({ entries, disabled, onAdd, onEdit }: {
             const preview = dayEntries[0]?.data.snapshot.asset || dayEntries[0]?.data.snapshot.items[0]?.data.asset;
             return <button key={key} className={`calendar-day ${date.getMonth() !== month.getMonth() ? "outside" : ""} ${key === today ? "today" : ""} ${key === selected ? "selected" : ""}`} onClick={() => { setSelected(key); if (date.getMonth() !== month.getMonth())
                 setMonth(new Date(date.getFullYear(), date.getMonth(), 1)); }} aria-label={t("{value1}，{value2} 套穿搭", { value1: key, value2: dayEntries.length })}>
-        <span className="day-number">{date.getDate()}</span>{dayEntries[0] && <><div className="day-preview">{preview ? <img src={`/api/assets/${preview}`} alt="" loading="lazy"/> : <Shirt size={18}/>}</div><span className="day-label">{dayEntries[0].data.snapshot.name}</span><span className={`day-dot ${dayEntries.some(e => e.data.status === "worn") ? "worn" : ""}`}/></>}{dayEntries.length > 1 && <span className="day-more">+{dayEntries.length - 1}</span>}
+        <span className="day-number">{date.getDate()}</span>{dayEntries[0] && <><div className="day-preview">{preview ? <img src={assetUrl(preview)} alt="" loading="lazy"/> : <Shirt size={18}/>}</div><span className="day-label">{dayEntries[0].data.snapshot.name}</span><span className={`day-dot ${dayEntries.some(e => e.data.status === "worn") ? "worn" : ""}`}/></>}{dayEntries.length > 1 && <span className="day-more">+{dayEntries.length - 1}</span>}
       </button>;
         })}</div>
     <div className="calendar-legend"><span><i className="planned"/>{t("已计划")}</span><span><i className="worn"/>{t("已穿着")}</span><span>{t("点选日期，查看当天穿搭")}</span></div>
@@ -454,7 +471,8 @@ function CalendarEditor({ record, date, outfitId, outfits, items, onClose, onSav
     </form>
   </DialogContent></Dialog>;
 }
-function BackupPanel({ state, onImported }: {
+function BackupPanel({ state, onImported, onBusyChange }: {
+    onBusyChange: (busy: boolean) => void;
     state: ClosetState;
     onImported: (id: string) => Promise<void>;
 }) {
@@ -466,6 +484,7 @@ function BackupPanel({ state, onImported }: {
     const [manifest, setManifest] = useState<ClosetArchive | null>(null);
     const [lastExport, setLastExport] = useState("");
     const fileInput = useRef<HTMLInputElement>(null);
+    useEffect(() => { onBusyChange(busy); return () => onBusyChange(false); }, [busy, onBusyChange]);
     const exportAll = async () => { setBusy(true); setError(""); setProgress(t("读取最新衣橱\u2026")); try {
         const fresh = await api<ClosetState>(`/api/closet?collection=${encodeURIComponent(state.collectionId)}`);
         const blob = await exportArchive(fresh, setProgress);
@@ -512,15 +531,16 @@ function BackupPanel({ state, onImported }: {
     return <div className="backup-area"><div className="backup-grid">
       <section className="backup-card"><h2>{t("完整导出")}</h2><p>{t("每张原图保持原始文件内容。解压后，照片与清单都可以直接打开。")}</p><div className="backup-stats"><span>{t("{count} 条记录", { count: state.records.length })}</span><span>{t("{count} 张原图", { count: state.assets.length })}</span><span>{formatSize(state.assets.reduce((n, a) => n + a.size, 0))}</span></div><Button onClick={() => void exportAll()} disabled={busy}><Download size={16}/>{t("下载完整备份")}</Button>{lastExport && <small className="last-export">{t("已于 {time} 生成下载", { time: lastExport })}</small>}</section>
       <section className="backup-card"><h2>{t("导入与恢复")}</h2><p>{t("先核对原图和记录，再建立一个新的衣橱。原有衣橱和资料完整保留。")}</p><div className="import-drop"><PackageOpen size={20} strokeWidth={1.5}/><span>{t("选择 New Closet 的 .zip 备份包")}</span><small>{t("首版支持 2 GB / 2000 条记录以内的备份")}</small></div><input ref={fileInput} type="file" accept=".zip,application/zip" className="sr-only" aria-label={t("选择备份文件")} onChange={e => { const f = e.target.files?.[0]; if (f) void inspect(f); }}/><Button variant="outline" onClick={() => fileInput.current?.click()} disabled={busy}><Upload size={16}/>{t("选择备份并检查")}</Button></section>
-    </div>{busy && <div className="progress-banner" role="status"><Loader2 size={19} className="animate-spin"/><span>{progress || t("正在处理\u2026")} <small>{t("请保持此页面打开")}</small></span></div>}<FormError message={error}/><details className="usage-notes"><summary>{t("使用说明")}</summary><p>{t("在同一网络中打开本机服务地址，使用自己的账号和密码登录。联网时自动刷新；离线编辑和原生 App 暂未提供。")}</p></details>
+    </div>{busy && <div className="progress-banner" role="status"><Loader2 size={19} className="animate-spin"/><span>{progress || t("正在处理\u2026")} <small>{t("请保持此页面打开")}</small></span></div>}<FormError message={error}/><details className="usage-notes"><summary>{t("使用说明")}</summary><p>{t("在同一网络中打开本机服务地址，点击头像选择账号，无需密码。各账号的资料分开保存；离线编辑和原生 App 暂未提供。")}</p></details>
     <Dialog open={!!manifest} onOpenChange={(open: boolean) => { if (!open && !busy) {
         setManifest(null);
         setFile(null);
     } }}><DialogContent className="closet-dialog"><DialogHeader><DialogTitle>{t("备份检查通过")}</DialogTitle><DialogDescription>{t("图片内容与 SHA-256 一致，记录关联完整。确认后建立新衣橱。")}</DialogDescription></DialogHeader>{manifest && <div className="import-preview"><h3>{manifest.collection.name}</h3><p>{file?.name} · {formatSize(file?.size || 0)}</p><div><span>{t("单品")}<strong>{manifest.records.filter(r => r.kind === "item").length}</strong></span><span>{t("搭配")}<strong>{manifest.records.filter(r => r.kind === "outfit").length}</strong></span><span>{t("日历")}<strong>{manifest.records.filter(r => r.kind === "calendar").length}</strong></span><span>{t("分组")}<strong>{manifest.records.filter(record => record.kind === "subset").length}</strong></span><span>{t("我的尺码")}<strong>{manifest.records.some(record => record.kind === "personalSizes") ? t("已包含") : t("未填写")}</strong></span><span>{t("原图")}<strong>{manifest.assets.length}</strong></span></div></div>}{busy && <p className="inline-progress"><Loader2 size={16} className="animate-spin"/>{progress}</p>}<FormError message={error}/><DialogFooter><Button variant="outline" disabled={busy} onClick={() => { setManifest(null); setFile(null); }}>{t("取消")}</Button><Button disabled={busy} onClick={() => void restore()}>{busy ? t("恢复中\u2026") : t("导入为新衣橱")}<ArrowRight size={16}/></Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }
-function AssistantPanel({ state }: {
+function AssistantPanel({ state, onDraftChange }: {
     state: ClosetState;
+    onDraftChange: (dirty: boolean) => void;
 }) {
     const { t, locale } = useI18n();
     const [request, setRequest] = useState(t("用现有单品搭配三套适合日常出门的穿搭，考虑整体比例和走路的舒适度。"));
@@ -536,5 +556,5 @@ function AssistantPanel({ state }: {
     catch {
         toast.error(t("无法访问剪贴板，请在下方文本中手动复制"));
     } };
-    return <section className="assistant-layout"><div className="assistant-form"><div className="field"><Label htmlFor="ai-request">{t("这次想怎么穿？")}</Label><Textarea id="ai-request" rows={4} value={request} maxLength={3000} onChange={e => setRequest(e.target.value)}/></div><div className="field"><div className="context-heading"><Label htmlFor="ai-context">{t("可复制的衣橱上下文")}</Label><span>{t("{count} 件单品 · 不含照片", { count })}</span></div><Textarea id="ai-context" className="context-preview" rows={10} readOnly value={prompt}/></div><Button onClick={() => void copy()} disabled={!count}>{copied ? <Check size={16}/> : <Copy size={16}/>}{copied ? t("已复制") : t("复制给我常用的 AI")}</Button>{!count && <p className="field-hint">{t("添加单品后，就可以生成真实的衣橱上下文。")}</p>}<p className="assistant-note"><LockKeyhole size={16}/>{t("此页不会自动发送衣橱或照片给外部模型。当前尚未连接模型服务。")}</p></div></section>;
+    return <section className="assistant-layout"><div className="assistant-form"><div className="field"><Label htmlFor="ai-request">{t("这次想怎么穿？")}</Label><Textarea id="ai-request" rows={4} value={request} maxLength={3000} onChange={e => { setRequest(e.target.value); onDraftChange(true); }}/></div><div className="field"><div className="context-heading"><Label htmlFor="ai-context">{t("可复制的衣橱上下文")}</Label><span>{t("{count} 件单品 · 不含照片", { count })}</span></div><Textarea id="ai-context" className="context-preview" rows={10} readOnly value={prompt}/></div><Button onClick={() => void copy()} disabled={!count}>{copied ? <Check size={16}/> : <Copy size={16}/>}{copied ? t("已复制") : t("复制给我常用的 AI")}</Button>{!count && <p className="field-hint">{t("添加单品后，就可以生成真实的衣橱上下文。")}</p>}<p className="assistant-note"><LockKeyhole size={16}/>{t("此页不会自动发送衣橱或照片给外部模型。当前尚未连接模型服务。")}</p></div></section>;
 }

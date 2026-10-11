@@ -1,21 +1,20 @@
+import { profileFetch, withProfileActivity, assetUrl, announceProfileChange } from "./profile-client";
 import { tr } from "./i18n/core";
 import { Zip, ZipPassThrough, Unzip, UnzipInflate, strToU8, strFromU8 } from "fflate";
 import { validateArchive, type ClosetArchive, type ClosetState, type Asset } from "./domain";
-export class ApiClientError extends Error { constructor(public status: number, message: string) { super(message); } }
+export class ApiClientError extends Error { constructor(public status: number, message: string, public code?: string) { super(message); } }
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(path, { ...init, cache: "no-store" });
-    let data;
-    try {
-        data = await response.json();
-    }
-    catch {
-        throw new Error(tr("连接中断，请检查网络后重试"));
-    }
-    if (!response.ok)
-        throw new ApiClientError(response.status, tr((data as {
-            error?: string;
-        }).error || "请求失败"));
-    return data as T;
+    const work = async () => {
+        const response = await profileFetch(path, init);
+        let data;
+        try { data = await response.json(); } catch { throw new Error(tr("连接中断，请检查网络后重试")); }
+        if (!response.ok) {
+            if (data.code === "PROFILE_CHANGED") announceProfileChange();
+            throw new ApiClientError(response.status, tr(data.error || "请求失败"), data.code);
+        }
+        return data as T;
+    };
+    return init?.method && !["GET", "HEAD"].includes(init.method) && !path.startsWith("/api/profiles") ? withProfileActivity(work) : work();
 }
 export async function uploadAsset(file: File): Promise<Asset> {
     if (file.size > 20 * 1024 * 1024)
@@ -27,7 +26,7 @@ export async function uploadAsset(file: File): Promise<Asset> {
 export const hashBytes = async (bytes: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as BufferSource))).map(b => b.toString(16).padStart(2, "0")).join("");
 const imagePath = (a: Asset) => `assets/${a.hash}.${a.mime.split("/")[1]}`;
 export const manifestFromState = (state: ClosetState): ClosetArchive => validateArchive({ format: "new-closet", schemaVersion: 9, exportedAt: new Date().toISOString(), collection: { name: state.collections.find(c => c.id === state.collectionId)?.name || tr("我的衣橱") }, records: state.records, assets: state.assets, colorLibrary: state.colorLibrary || [] });
-export async function exportArchive(state: ClosetState, progress: (message: string) => void): Promise<Blob> {
+async function exportArchiveWork(state: ClosetState, progress: (message: string) => void): Promise<Blob> {
     const manifest = manifestFromState(state);
     const blobs: Blob[] = [];
     let zipError: Error | null = null;
@@ -41,7 +40,7 @@ export async function exportArchive(state: ClosetState, progress: (message: stri
     add("README.txt", strToU8("New Closet backup v9\nmanifest.json contains account custom colors, structured item colors, all records, item brands, nested groups and memberships, clothing fits/measurements, personal body measurements including knee circumference, shoe sizes, item/outfit photo galleries and covers, relationships, snapshots and original filenames.\nassets/ contains exact original bytes, named by SHA-256.\nImages and JSON can be opened independently of this app.\n"));
     for (const [index, asset] of manifest.assets.entries()) {
         progress(tr("正在打包原图 {value1} / {value2}", { value1: index + 1, value2: manifest.assets.length }));
-        const response = await fetch(`/api/assets/${asset.hash}`, { cache: "no-store" });
+        const response = await profileFetch(assetUrl(asset.hash, state.profile?.id), { cache: "no-store" });
         if (!response.ok)
             throw new Error(tr("原图读取失败，备份未生成，请重试"));
         const bytes = new Uint8Array(await response.arrayBuffer());
@@ -133,7 +132,7 @@ async function walkArchive(file: File, visit: (name: string, bytes: Uint8Array) 
     if (!names.has("manifest.json"))
         throw new Error(tr("没有找到 manifest.json"));
 }
-export async function inspectArchive(file: File, progress: (message: string) => void): Promise<ClosetArchive> {
+async function inspectArchiveWork(file: File, progress: (message: string) => void): Promise<ClosetArchive> {
     let manifest: ClosetArchive | null = null;
     const images = new Map<string, number>();
     await walkArchive(file, async (name, bytes) => {
@@ -157,7 +156,7 @@ export async function inspectArchive(file: File, progress: (message: string) => 
         throw new Error(tr("图片清单与实际文件数量不一致"));
     return result;
 }
-export async function importArchive(file: File, manifest: ClosetArchive, progress: (message: string) => void): Promise<string> {
+async function importArchiveWork(file: File, manifest: ClosetArchive, progress: (message: string) => void): Promise<string> {
     const assets = new Map(manifest.assets.map(a => [imagePath(a), a]));
     let uploaded = 0;
     await walkArchive(file, async (name, bytes) => {
@@ -185,3 +184,7 @@ export function downloadBlob(blob: Blob, filename: string) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
+
+export const exportArchive = (...args: Parameters<typeof exportArchiveWork>) => withProfileActivity(() => exportArchiveWork(...args));
+export const inspectArchive = (...args: Parameters<typeof inspectArchiveWork>) => withProfileActivity(() => inspectArchiveWork(...args));
+export const importArchive = (...args: Parameters<typeof importArchiveWork>) => withProfileActivity(() => importArchiveWork(...args));
