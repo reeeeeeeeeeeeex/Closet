@@ -2,6 +2,7 @@ import { selectedProfile, publicProfile, listStoredProfiles } from "./profiles";
 import { getColorLibrary } from "./color-library";
 import { localStorage, type LocalDatabase } from "./local-storage";
 import { ZodError } from "zod";
+import { MutationError } from "./mutations";
 import { recordSchema, type ClosetRecord, type Asset, type ClosetState, referencedAssets } from "./domain";
 export class ApiError extends Error { constructor(public status: number, message: string, public code?: string) { super(message); } }
 export async function context(request: Request) {
@@ -13,6 +14,7 @@ export async function context(request: Request) {
 }
 export const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 export function failure(error: unknown) {
+  if (error instanceof MutationError) return json({ error: error.message }, error.status);
   if (error instanceof ApiError) return json({ error: error.message, ...(error.code ? { code: error.code } : {}) }, error.status);
   if (error instanceof ZodError) return json({ error: error.issues[0]?.message || "内容格式不正确" }, 400);
   console.error("Closet operation failed", error instanceof Error ? error.message : "Unknown error");

@@ -2,6 +2,19 @@
 @import "tw-animate-css";
 @import "../vendor/shadcn-tailwind-4.13.0.css";
 
+.sync-panel { margin-bottom: 24px; display: grid; gap: 14px; }
+.sync-panel label { display: grid; gap: 6px; }
+.sync-conflict { padding: 16px; border: 1px solid #dbcaa8; border-radius: 12px; display: grid; gap: 12px; }
+.sync-versions { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 12px; }
+.sync-versions pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; font-size: 12px; }
+.sync-device { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.pairing-code { font-size: 24px; letter-spacing: .15em; }
+.sync-fields > div { display:grid; grid-template-columns:minmax(70px,1fr) 2fr; gap:8px; padding:4px 0; }
+.sync-fields dt { color:#747d88; }
+.sync-fields dd { overflow-wrap:anywhere; }
+.sync-photo-strip { display:flex; gap:6px; overflow:auto; }
+.sync-photo-strip img { width:80px; height:100px; object-fit:contain; }
+
 @utility scrollbar-thin {
   scrollbar-width: thin;
 }

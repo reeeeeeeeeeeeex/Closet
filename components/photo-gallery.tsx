@@ -1,6 +1,8 @@
 /* eslint-disable @next/next/no-img-element -- Preserve authenticated originals and local file previews. */
 "use client";
 import { assetUrl } from "@/lib/profile-client";
+import { getProfileContext, withProfileActivity } from "@/lib/profile-client";
+import { getClosetClient } from "@/lib/closet-client";
 import { useEffect, useRef, useState } from "react";
 import { Camera, Download, ImagePlus, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,9 +35,9 @@ export function PhotoEditor({ draft, onChange, kind, onError }: { draft: PhotoDr
     <div className="photo-gallery-preview">{active && source(active) ? <img src={source(active)} alt={kind === "item" ? t("单品照片预览") : t("搭配照片预览")}/> : <div className="photo-gallery-empty"><ImagePlus size={32} strokeWidth={1.3}/><span>{kind === "item" ? t("添加单品照片") : t("添加上身照或整套搭配照片")}</span></div>}</div>
     <div className="photo-actions"><Button type="button" variant="outline" disabled={draft.photos.length >= MAX_PHOTOS} onClick={() => camera.current?.click()}><Camera size={16}/>{t("拍照")}</Button><Button type="button" variant="outline" disabled={draft.photos.length >= MAX_PHOTOS} onClick={() => library.current?.click()}><Upload size={16}/>{t("添加照片")}</Button></div>
     <input ref={library} type="file" multiple className="sr-only" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" aria-label={kind === "item" ? t("添加单品照片") : t("添加搭配照片")} onChange={event => choose(event.currentTarget)}/>
-    <input ref={camera} type="file" capture="environment" className="sr-only" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" aria-label={kind === "item" ? t("拍摄单品照片") : t("拍摄搭配照片")} onChange={event => choose(event.currentTarget)}/>
+    <input ref={camera} type="file" capture="environment" className="sr-only" accept={getClosetClient() ? "image/*" : "image/jpeg,image/png,image/webp,image/gif,image/avif"} aria-label={kind === "item" ? t("拍摄单品照片") : t("拍摄搭配照片")} onChange={event => choose(event.currentTarget)}/>
     <div className="photo-thumbnails">{draft.photos.map((photo, index) => <button type="button" key={photo.key} className={active?.key === photo.key ? "active" : ""} aria-label={t("查看照片 {number}", { number: index + 1 })} aria-pressed={active?.key === photo.key} onClick={() => setActiveKey(photo.key)}>{source(photo) && <img src={source(photo)} alt={t("照片 {number}", { number: index + 1 })}/>}<span>{photo.key === draft.cover ? t("封面") : index + 1}</span></button>)}</div>
-    {active && <div className="photo-current-actions"><Button type="button" variant="outline" disabled={active.key === draft.cover} onClick={() => onChange({ ...draft, cover: active.key })}>{active.key === draft.cover ? t("当前封面") : t("设为封面")}</Button><Button type="button" variant="ghost" onClick={() => { onChange(removeDraftPhoto(draft, active.key)); onError(""); }}><X size={15}/>{t("移除当前照片")}</Button>{active.asset && <a className="text-link" href={assetUrl(active.asset)} download><Download size={14}/>{t("下载原图")}</a>}</div>}
+    {active && <div className="photo-current-actions"><Button type="button" variant="outline" disabled={active.key === draft.cover} onClick={() => onChange({ ...draft, cover: active.key })}>{active.key === draft.cover ? t("当前封面") : t("设为封面")}</Button><Button type="button" variant="ghost" onClick={() => { onChange(removeDraftPhoto(draft, active.key)); onError(""); }}><X size={15}/>{t("移除当前照片")}</Button>{active.asset && <a className="text-link" href={assetUrl(active.asset)} onClick={event => { const native = getClosetClient(); if (native?.saveAsset) { event.preventDefault(); void withProfileActivity(() => native.saveAsset!(active.asset!, getProfileContext()!)).catch(error => onError(error.message)); } }} download><Download size={14}/>{t("下载原图")}</a>}</div>}
     <p className="field-hint">{t("{count} / 20 张照片 · 单张最多 20 MB，不压缩原图", { count: draft.photos.length })}<br/>{kind === "item" ? t("封面用于列表和搭配中的单品拼图。移除封面后，第一张照片自动成为封面。") : t("搭配封面用于我的搭配和穿搭日历。移除封面后，第一张照片自动成为封面。")}</p>
   </div>;
 }

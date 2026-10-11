@@ -44,5 +44,6 @@
     "legacy",
     "outputs",
     "work"
+    ,".local", "android", "dist"
   ]
 }

@@ -29,6 +29,20 @@
       "when": 1791683600309,
       "tag": "0003_mute_zarda",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791687611303,
+      "tag": "0004_android_sync",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791687611304,
+      "tag": "0005_sync_deletions",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,9 @@
 import { assetUrl, setProfileContext, subscribeOperations, getOperationCount, subscribeProfileChanges } from "@/lib/profile-client";
 import type { Profile, ProfileState } from "@/lib/profile-types";
 import { ProfileMenu } from "@/components/profile-menu";
+import { getClosetClient } from "@/lib/closet-client";
+import { getProfileContext, withProfileActivity } from "@/lib/profile-client";
+import { SyncPanel } from "@/components/sync-panel";
 import { tr, translatedOptions } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -207,6 +210,14 @@ export default function Home({ profile }: { profile: Profile }) {
     const filteredOutfits = outfits.filter(o => (!subsetMembers || subsetMembers.has(o.id)) && o.data.archived === archived && (occasion === "all" || o.data.occasions.includes(occasion as Item["occasions"][number])) && [o.data.name, o.data.notes].join(" ").toLowerCase().includes(search.toLowerCase()));
     const goView = (v: View) => { setView(v); setDraftDirty(false); setSearch(""); setColorFilter([]); setCategory("all"); setSelectedSubsetId(null); setOccasion("all"); setArchived(false); };
     useEffect(() => {
+      const back = (event: Event) => {
+        if (editor || draftDirty) { event.preventDefault(); setReloadConfirm(true); return; }
+        if (view !== "wardrobe") { event.preventDefault(); goView("wardrobe"); }
+      };
+      window.addEventListener("closet-back", back);
+      return () => window.removeEventListener("closet-back", back);
+    });
+    useEffect(() => {
         const mc = (document as Document & {
             modelContext?: {
                 registerTool: (tool: unknown, options: {
@@ -246,7 +257,7 @@ export default function Home({ profile }: { profile: Profile }) {
         {view === "wardrobe" && !filteredItems.length && (items.length === 0 && !search && !colorFilter.length && category === "all" && occasion === "all" && !archived ? <Welcome onAdd={() => setEditor({ kind: "item" })} onImport={() => goView("backup")}/> : <EmptyState icon={Search} title={t("这里还没有单品")} text={t("试试其他分类，或清空筛选条件。")} action={t("清空筛选")} onAction={() => { setSearch(""); setColorFilter([]); setOccasion("all"); setArchived(false); }}/>) }
         {view === "outfits" && !filteredOutfits.length && <EmptyState icon={Layers3} title={t("没有找到这个搭配")} text={t("拍照、导入搭配照片，或从单品组合一套穿搭。")} action={t("新建搭配")} onAction={() => setEditor({ kind: "outfit" })}/>}</>}
         {view === "calendar" && <CalendarPanel entries={calendar} disabled={!!error} onAdd={date => setEditor({ kind: "calendar", date })} onEdit={record => setEditor({ kind: "calendar", record })}/>}
-        {view === "backup" && <BackupPanel state={state} onBusyChange={setPanelBusy} onImported={async (id) => { await refresh(id); goView("wardrobe"); }}/>}
+        {view === "backup" && <BackupPanel state={state} onBusyChange={setPanelBusy} onSynced={async () => { const next = await api<ClosetState>("/api/closet"); await refresh(next.collectionId); }} onImported={async (id) => { await refresh(id); goView("wardrobe"); }}/>}
         {view === "assistant" && <AssistantPanel state={state} onDraftChange={setDraftDirty}/>}
         {view === "personalSizes" && <PersonalSizesPanel key={state.collectionId} record={state.records.find((record): record is PersonalSizesRecord => record.kind === "personalSizes")} collectionName={state.collections.find(collection => collection.id === state.collectionId)?.name || t("我的衣橱")} disabled={!!error || syncing} onSave={savePersonalSizes} onDraftChange={setDraftDirty} onBusyChange={setPanelBusy} onRefresh={() => refresh()}/> }
       </>}
@@ -471,7 +482,8 @@ function CalendarEditor({ record, date, outfitId, outfits, items, onClose, onSav
     </form>
   </DialogContent></Dialog>;
 }
-function BackupPanel({ state, onImported, onBusyChange }: {
+function BackupPanel({ state, onImported, onBusyChange, onSynced }: {
+    onSynced: () => Promise<void>;
     onBusyChange: (busy: boolean) => void;
     state: ClosetState;
     onImported: (id: string) => Promise<void>;
@@ -481,14 +493,16 @@ function BackupPanel({ state, onImported, onBusyChange }: {
     const [progress, setProgress] = useState("");
     const [error, setError] = useState("");
     const [file, setFile] = useState<File | null>(null);
+    const [nativeHandle, setNativeHandle] = useState<string | null>(null);
     const [manifest, setManifest] = useState<ClosetArchive | null>(null);
     const [lastExport, setLastExport] = useState("");
     const fileInput = useRef<HTMLInputElement>(null);
     useEffect(() => { onBusyChange(busy); return () => onBusyChange(false); }, [busy, onBusyChange]);
     const exportAll = async () => { setBusy(true); setError(""); setProgress(t("读取最新衣橱\u2026")); try {
         const fresh = await api<ClosetState>(`/api/closet?collection=${encodeURIComponent(state.collectionId)}`);
-        const blob = await exportArchive(fresh, setProgress);
-        downloadBlob(blob, `new-closet-${localDate()}.zip`);
+        const native = getClosetClient();
+        if (native?.exportArchive) await withProfileActivity(() => native.exportArchive!(fresh));
+        else { const blob = await exportArchive(fresh, setProgress); downloadBlob(blob, `new-closet-${localDate()}.zip`); }
         setLastExport(new Date().toLocaleString(locale));
         toast.success(t("完整备份已生成，请保存下载文件"));
     }
@@ -513,9 +527,18 @@ function BackupPanel({ state, onImported, onBusyChange }: {
         if (fileInput.current)
             fileInput.current.value = "";
     } };
-    const restore = async () => { if (!file || !manifest)
+    const chooseBackup = async () => {
+        const native = getClosetClient();
+        if (!native?.pickArchive) { fileInput.current?.click(); return; }
+        setBusy(true); setError(""); setNativeHandle(null); setManifest(null);
+        try { const result = await withProfileActivity(() => native.pickArchive!()); if (result) { setManifest(result.manifest); setNativeHandle(result.handle); } }
+        catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
+    };
+    const restore = async () => { if ((!file && !nativeHandle) || !manifest)
         return; setBusy(true); setError(""); try {
-        const id = await importArchive(file, manifest, setProgress);
+        const native = getClosetClient();
+        const id = nativeHandle && native?.importArchive ? await withProfileActivity(() => native.importArchive!(nativeHandle, manifest, getProfileContext()!)) : await importArchive(file!, manifest, setProgress);
+        setNativeHandle(null);
         setManifest(null);
         setFile(null);
         toast.success(t("衣橱已完整恢复，原有衣橱保留"));
@@ -528,10 +551,10 @@ function BackupPanel({ state, onImported, onBusyChange }: {
         setBusy(false);
         setProgress("");
     } };
-    return <div className="backup-area"><div className="backup-grid">
+    return <div className="backup-area"><SyncPanel owner={state.profile!.id} onChanged={getClosetClient() ? onSynced : () => {}}/><div className="backup-grid">
       <section className="backup-card"><h2>{t("完整导出")}</h2><p>{t("每张原图保持原始文件内容。解压后，照片与清单都可以直接打开。")}</p><div className="backup-stats"><span>{t("{count} 条记录", { count: state.records.length })}</span><span>{t("{count} 张原图", { count: state.assets.length })}</span><span>{formatSize(state.assets.reduce((n, a) => n + a.size, 0))}</span></div><Button onClick={() => void exportAll()} disabled={busy}><Download size={16}/>{t("下载完整备份")}</Button>{lastExport && <small className="last-export">{t("已于 {time} 生成下载", { time: lastExport })}</small>}</section>
-      <section className="backup-card"><h2>{t("导入与恢复")}</h2><p>{t("先核对原图和记录，再建立一个新的衣橱。原有衣橱和资料完整保留。")}</p><div className="import-drop"><PackageOpen size={20} strokeWidth={1.5}/><span>{t("选择 New Closet 的 .zip 备份包")}</span><small>{t("首版支持 2 GB / 2000 条记录以内的备份")}</small></div><input ref={fileInput} type="file" accept=".zip,application/zip" className="sr-only" aria-label={t("选择备份文件")} onChange={e => { const f = e.target.files?.[0]; if (f) void inspect(f); }}/><Button variant="outline" onClick={() => fileInput.current?.click()} disabled={busy}><Upload size={16}/>{t("选择备份并检查")}</Button></section>
-    </div>{busy && <div className="progress-banner" role="status"><Loader2 size={19} className="animate-spin"/><span>{progress || t("正在处理\u2026")} <small>{t("请保持此页面打开")}</small></span></div>}<FormError message={error}/><details className="usage-notes"><summary>{t("使用说明")}</summary><p>{t("在同一网络中打开本机服务地址，点击头像选择账号，无需密码。各账号的资料分开保存；离线编辑和原生 App 暂未提供。")}</p></details>
+      <section className="backup-card"><h2>{t("导入与恢复")}</h2><p>{t("先核对原图和记录，再建立一个新的衣橱。原有衣橱和资料完整保留。")}</p><div className="import-drop"><PackageOpen size={20} strokeWidth={1.5}/><span>{t("选择 New Closet 的 .zip 备份包")}</span><small>{t("首版支持 2 GB / 2000 条记录以内的备份")}</small></div><input ref={fileInput} type="file" accept=".zip,application/zip" className="sr-only" aria-label={t("选择备份文件")} onChange={e => { const f = e.target.files?.[0]; if (f) void inspect(f); }}/><Button variant="outline" onClick={() => void chooseBackup()} disabled={busy}><Upload size={16}/>{t("选择备份并检查")}</Button></section>
+    </div>{busy && <div className="progress-banner" role="status"><Loader2 size={19} className="animate-spin"/><span>{progress || t("正在处理\u2026")} <small>{t("请保持此页面打开")}</small></span></div>}<FormError message={error}/><details className="usage-notes"><summary>{t("使用说明")}</summary><p>{t("各账号资料分开保存。Android App 支持离线编辑，局域网同步需电脑服务运行；卸载前请导出备份，覆盖升级会保留资料。")}</p></details>
     <Dialog open={!!manifest} onOpenChange={(open: boolean) => { if (!open && !busy) {
         setManifest(null);
         setFile(null);

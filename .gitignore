@@ -50,5 +50,15 @@ next-env.d.ts
 
 # Private local state and credentials
 /data/
+/.local/
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/app/src/main/assets/public/
+/android/app/src/main/assets/capacitor.config.json
+/android/app/src/main/assets/capacitor.plugins.json
+/android/app/src/androidTest/assets/client-test.js
+/android/capacitor-cordova-android-plugins/
+/android/local.properties
 /.test-runtime/
 /legacy/cloud/.openai/

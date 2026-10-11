@@ -1,4 +1,6 @@
 import { profileFetch, withProfileActivity, assetUrl, announceProfileChange } from "./profile-client";
+import { getProfileContext } from "./profile-client";
+import { getClosetClient } from "./closet-client";
 import { tr } from "./i18n/core";
 import { Zip, ZipPassThrough, Unzip, UnzipInflate, strToU8, strFromU8 } from "fflate";
 import { validateArchive, type ClosetArchive, type ClosetState, type Asset } from "./domain";
@@ -17,6 +19,8 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     return init?.method && !["GET", "HEAD"].includes(init.method) && !path.startsWith("/api/profiles") ? withProfileActivity(work) : work();
 }
 export async function uploadAsset(file: File): Promise<Asset> {
+    const client = getClosetClient();
+    if (client?.uploadAsset) return withProfileActivity(() => client.uploadAsset!(file, getProfileContext()!));
     if (file.size > 20 * 1024 * 1024)
         throw new Error(tr("单张图片最多 20 MB"));
     const body = new FormData();

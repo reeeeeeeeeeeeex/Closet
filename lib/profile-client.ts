@@ -1,3 +1,4 @@
+import { getClosetClient } from "./closet-client";
 let profileId: string | null = null;
 let operations = 0;
 const listeners = new Set<() => void>();
@@ -16,6 +17,6 @@ export async function withProfileActivity<T>(work: () => Promise<T>): Promise<T>
 export function profileFetch(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   if (profileId && !path.startsWith("/api/profiles")) headers.set("X-Closet-Profile", profileId);
-  return fetch(path, { ...init, headers, cache: "no-store" });
+  return (getClosetClient()?.request.bind(getClosetClient()) || fetch)(path, { ...init, headers, cache: "no-store" });
 }
-export const assetUrl = (hash: string, id = profileId) => `/api/assets/${hash}${id ? `?profile=${encodeURIComponent(id)}` : ""}`;
+export const assetUrl = (hash: string, id = profileId) => getClosetClient()?.assetUrl(hash, id) ?? `/api/assets/${hash}${id ? `?profile=${encodeURIComponent(id)}` : ""}`;
