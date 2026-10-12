@@ -4,10 +4,10 @@
 
 ## 交付包
 
-- `outputs/android/new-closet-1.0.0.apk`，10,548,851 字节。
+- `outputs/android/new-closet-1.0.0.apk`，10,548,995 字节。
 - 包名 `app.newcloset.android`，版本 `1.0.0` / `versionCode 1`。
 - 最低 API 29，编译与目标 API 36；系统 WebView 124+。
-- APK SHA-256：`5dfee1b101ecf332539201b941a676390ac31d49c9a331311845d5e9db676985`。
+- APK SHA-256：`9eb3d736145f96946fbeb16cfbf7729b3c23fd6c45489c8c53f88fe463c0aa99`。
 - 发布证书 SHA-256：`c42d6cb416221b0358cffbdbe6d52024938cd796f3a75f5c85dbb462bbe6af93`。
 - `apksigner verify` 通过；使用固定 RSA 发布密钥，APK Signature Scheme v2。密钥与密码未加入 Git，APK 不包含测试入口。
 
@@ -17,7 +17,11 @@
 
 ## Android UI v1 预览更新
 
-2026-10-12 在六个生图页面参考之后实现安卓新外观：四个底部导航、暖白照片网格、底部筛选、简洁日历、我的入口、全屏详情和大图。当前交付包就是此预览版，另存为 `outputs/android-ui-v1/new-closet-ui-v1.apk`。构建、静态检查、类型和 15 组测试通过；Android 15 / WebView 124 的导航草稿保护、照片手势裁剪和实际相机入口保存三项仪器验收通过。基础完整离线/同步和旧照片版本的 API 29 验收记录保留为历史证据，本次没有声称把这些完整项目都在新 UI 包上重跑。详细结果见 [Android UI v1](android-ui-v1.md)。
+2026-10-12 在六个生图页面参考之后实现安卓新外观：四个底部导航、暖白照片网格、底部筛选、简洁日历、我的入口、全屏详情和大图。该历史预览包保留为 `outputs/android-ui-v1/new-closet-ui-v1.apk`。构建、静态检查、类型和 15 组测试通过；Android 15 / WebView 124 的导航草稿保护、照片手势裁剪和实际相机入口保存三项仪器验收通过。基础完整离线/同步和旧照片版本的 API 29 验收记录保留为历史证据，本次没有声称把这些完整项目都在新 UI 包上重跑。详细结果见 [Android UI v1](android-ui-v1.md)。
+
+## Android UI v2 紧凑更新
+
+当前交付包更新为 v2：去掉主页面品牌、大标题、统计副标题和账号头像，收紧详情、大图、日历、尺码与备份页面，说明和灵感上下文按需展开。九张生图参考与实际生产预览截图保存在 `outputs/android-ui-v2/`。最终构建、静态检查、类型和 15 组测试通过；最终 APK 在 API 35 / WebView 124 的三项界面仪器检查及一项强制停止后覆盖安装资料保持检查通过。此次未连接物理手机，未重跑 v2 的 API 29 验收。详情和最终校验值见 [Android UI v2](android-ui-v2.md)。
 
 ## 已完成的自动检查
 

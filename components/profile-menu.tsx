@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Check, ChevronUp, Loader2, Pencil, Plus } from "lucide-react";
+import { Check, ChevronRight, ChevronUp, Loader2, Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +13,8 @@ import type { Profile, ProfileState } from "@/lib/profile-types";
 import { useI18n } from "@/lib/i18n/provider";
 
 type Task = { action: "select"; id: string } | { action: "create"; name: string };
-export function ProfileMenu({ current, disabled, hasDraft, onSelected, onRenamed }: {
-  current: Profile; disabled: boolean; hasDraft: boolean;
+export function ProfileMenu({ current, disabled, hasDraft, onSelected, onRenamed, compact = false }: {
+  current: Profile; disabled: boolean; hasDraft: boolean; compact?: boolean;
   onSelected: (profile: Profile) => void; onRenamed: (profile: Profile) => void;
 }) {
   const { t } = useI18n();
@@ -47,7 +47,8 @@ export function ProfileMenu({ current, disabled, hasDraft, onSelected, onRenamed
     finally { setBusy(false); }
   }
   return <>
-    <Popover open={open} onOpenChange={value => { setOpen(value); if (value) void load(); }}><PopoverTrigger asChild><button className="profile-switch" type="button" disabled={disabled || busy} aria-label={t("管理和切换账号")}><div className="profile-mark">{Array.from(current.name)[0]}</div><div><strong title={current.name}>{current.name}</strong><span>{t("切换账号")}</span></div><ChevronUp size={15}/></button></PopoverTrigger>
+    <Popover open={open} onOpenChange={value => { setOpen(value); if (value) void load(); }}><PopoverTrigger asChild><button className={`profile-switch ${compact ? "profile-switch-compact" : ""}`} type="button" disabled={disabled || busy} aria-label={t("管理和切换账号")}>
+      {!compact && <div className="profile-mark">{Array.from(current.name)[0]}</div>}<div><strong title={current.name}>{current.name}</strong><span>{t("切换账号")}</span></div>{compact ? <ChevronRight size={18}/> : <ChevronUp size={15}/>}</button></PopoverTrigger>
       <PopoverContent side="top" align="start" collisionPadding={12} className="profile-menu" aria-label={t("账号列表")}>
         {loading ? <p className="field-hint">{t("正在读取账号…")}</p> : <div className="profile-list">{profiles.map(profile => <div className="profile-row" key={profile.id}><button type="button" className="profile-choice" disabled={busy || disabled} onClick={() => select({ action: "select", id: profile.id })} aria-label={t("切换到 {name}", { name: profile.name })} aria-current={selectedId === profile.id ? "true" : undefined}><span className="profile-mini-mark">{Array.from(profile.name)[0]}</span><span>{profile.name}</span>{selectedId === profile.id && <Check size={15}/>}</button><Button type="button" variant="ghost" size="icon" disabled={busy || disabled} aria-label={t("修改 {name} 的名称", { name: profile.name })} onClick={() => { setOpen(false); setError(""); setName(profile.name); setEditing({ id: profile.id }); }}><Pencil size={14}/></Button></div>)}</div>}
         {error && <p className="form-error" role="alert">{error}</p>}
