@@ -20,6 +20,12 @@ export function removeDraftPhoto(draft: PhotoDraft, key: string): PhotoDraft {
   const photos = draft.photos.filter(photo => photo.key !== key);
   return { photos, cover: draft.cover === key ? photos[0]?.key || null : draft.cover };
 }
+/** Cropping adds a separate photo; originals and historical snapshots stay intact. */
+export function appendCroppedPhoto(draft: PhotoDraft, file: File, sourceKey: string): PhotoDraft {
+  if (!draft.photos.some(photo => photo.key === sourceKey)) throw new Error(tr("原照片已改变，请重新打开后裁剪。"));
+  const next = appendPhotoFiles(draft, [file]);
+  return { ...next, cover: draft.cover === sourceKey ? next.photos[next.photos.length - 1].key : draft.cover };
+}
 export async function savePhotoDraft(draft: PhotoDraft): Promise<Required<PhotoData>> {
   const hashes = new Map<string, string>();
   for (const photo of draft.photos) {

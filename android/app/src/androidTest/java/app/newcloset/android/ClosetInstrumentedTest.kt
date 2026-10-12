@@ -185,4 +185,60 @@ class ClosetInstrumentedTest {
         if(InstrumentationRegistry.getArguments().getString("checkUpgrade")!="true")return
         ActivityScenario.launch(MainActivity::class.java).use { scenario -> ready(scenario);runJs(scenario,"const n=window.Capacitor.Plugins.ClosetStorage;const root=JSON.parse((await n.read({key:'root'})).value);const doc=JSON.parse((await n.read({key:'profile:'+root.current})).value);if(!doc.replica.collections.flatMap(c=>c.records).some(r=>r.data.name?.startsWith('手机离线验收-')))throw Error('Upgrade lost previously saved item');return true;") }
     }
+    @Test fun photoViewerGesturesAndCrop(){
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            ready(scenario);loadClient(scenario)
+            val fixture=runJs(scenario,"""
+                const c=ClosetTest;await c.bootstrap();
+                const created=await c.androidClient.request('/api/profiles',{method:'POST',body:JSON.stringify({action:'create',name:'Photo viewer '+Date.now()})});
+                if(!created.ok)throw Error(await created.text());const owner=(await created.json()).profile.id;c.setProfileContext(owner);
+                const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=800;const ctx=canvas.getContext('2d');ctx.fillStyle='#ff0000';ctx.fillRect(0,0,600,800);ctx.fillStyle='#00ff00';ctx.fillRect(600,0,600,800);
+                const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+                const asset=await c.androidClient.uploadAsset(new File([blob],'viewer-original.png',{type:'image/png'}),owner);
+                const state=await (await c.androidClient.request('/api/closet')).json();
+                const saved=await c.androidClient.request('/api/closet',{method:'POST',body:JSON.stringify({op:'save',kind:'item',collectionId:state.collectionId,data:{name:'大图裁剪验收',category:'top',color:'',occasions:[],seasons:[],notes:'',asset:asset.hash,photos:[asset.hash],archived:false}})});
+                if(!saved.ok)throw Error(await saved.text());return {owner,hash:asset.hash};
+            """.trimIndent()).getJSONObject("value")
+            scenario.recreate();ready(scenario)
+            eval(scenario,"document.querySelector('.item-card > button.photo').click();true")
+            runJs(scenario,"for(let i=0;i<100;i++){if(document.querySelector('.photo-viewer-image')?.naturalWidth===1200)return true;await new Promise(r=>setTimeout(r,100))}throw Error('Photo click did not open original');")
+            runJs(scenario,"const image=document.querySelector('.photo-viewer-image').getBoundingClientRect(),stage=document.querySelector('.photo-viewer-stage').getBoundingClientRect(),dialog=document.querySelector('.photo-viewer').getBoundingClientRect();if(image.width>stage.width+1||image.height>stage.height+1||Math.abs(dialog.x)>1||Math.abs(dialog.y)>1)throw Error('Photo is clipped or viewer is offset');return true;")
+            val center=JSONObject(eval(scenario,"(()=>{const r=document.querySelector('.photo-viewer-stage').getBoundingClientRect();return {x:(r.x+r.width/2)*devicePixelRatio,y:(r.y+r.height/2)*devicePixelRatio}})()"))
+            val origin=IntArray(2);scenario.onActivity { it.bridge.webView.getLocationOnScreen(origin) }
+            val cx=origin[0]+center.getDouble("x").toFloat();val cy=origin[1]+center.getDouble("y").toFloat()
+            val down=SystemClock.uptimeMillis();val instrumentation=InstrumentationRegistry.getInstrumentation()
+            fun touch(action:Int,count:Int,distance:Float){
+                val properties=Array(count){i->MotionEvent.PointerProperties().apply{id=i;toolType=MotionEvent.TOOL_TYPE_FINGER}}
+                val coords=Array(count){i->MotionEvent.PointerCoords().apply{x=cx+(if(i==0)-distance else distance);y=cy;pressure=1f;size=1f}}
+                val event=MotionEvent.obtain(down,SystemClock.uptimeMillis(),action,count,properties,coords,0,0,1f,1f,0,0,android.view.InputDevice.SOURCE_TOUCHSCREEN,0)
+                instrumentation.sendPointerSync(event);event.recycle();Thread.sleep(40)
+            }
+            touch(MotionEvent.ACTION_DOWN,1,60f)
+            touch(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),2,60f)
+            for(i in 1..10)touch(MotionEvent.ACTION_MOVE,2,60f+i*14f)
+            touch(MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),2,200f)
+            touch(MotionEvent.ACTION_UP,1,200f)
+            runJs(scenario,"if(parseInt(document.querySelector('.photo-viewer output').textContent)<200)throw Error('Native two-finger gesture did not zoom');return true;")
+            runJs(scenario,"""
+                const stage=document.querySelector('.photo-viewer-stage'),rect=stage.getBoundingClientRect(),before=parseInt(document.querySelector('.photo-viewer output').textContent);
+                stage.dispatchEvent(new WheelEvent('wheel',{deltaY:100,clientX:rect.x+rect.width/2,clientY:rect.y+rect.height/2,bubbles:true,cancelable:true}));
+                await new Promise(r=>setTimeout(r,100));if(parseInt(document.querySelector('.photo-viewer output').textContent)>=before)throw Error('Wheel did not zoom out');
+                [...document.querySelectorAll('.photo-viewer button')].find(b=>b.textContent==='裁剪').click();return true;
+            """.trimIndent())
+            runJs(scenario,"const select=document.querySelector('.photo-viewer select');select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));await new Promise(r=>setTimeout(r,100));const r=document.querySelector('.photo-crop-selection').getBoundingClientRect();if(Math.abs(r.width-r.height)>1)throw Error('Square crop is not square');[...document.querySelectorAll('.photo-viewer button')].find(b=>b.textContent==='保存为新照片').click();return true;")
+            runJs(scenario,"""
+                const n=window.Capacitor.Plugins.ClosetStorage;
+                for(let i=0;i<100;i++){const doc=JSON.parse((await n.read({key:'profile:'+${JSONObject.quote(fixture.getString("owner"))}})).value);const record=doc.replica.collections[0].records[0];if(record.data.photos.length===2){if(!record.data.photos.includes(${JSONObject.quote(fixture.getString("hash"))}))throw Error('Crop removed original');if(record.data.asset===${JSONObject.quote(fixture.getString("hash"))})throw Error('Cover did not use cropped copy');return true;}await new Promise(r=>setTimeout(r,100))}throw Error('Crop did not commit: '+document.body.innerText);
+            """.trimIndent())
+            scenario.recreate();ready(scenario);loadClient(scenario)
+            runJs(scenario,"""
+                const c=ClosetTest,root=await c.bootstrap();c.setProfileContext(root.current);const state=await (await c.androidClient.request('/api/closet')).json(),record=state.records[0];
+                if(record.data.photos.length!==2)throw Error('Restart lost cropped copy');
+                const image=new Image();image.src=c.localAssetUrl(record.data.asset,root.current);await image.decode();if(image.naturalWidth!==640||image.naturalHeight!==640)throw Error('Wrong crop resolution');
+                const canvas=document.createElement('canvas');canvas.width=640;canvas.height=640;const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);if(ctx.getImageData(10,10,1,1).data[0]!==255||ctx.getImageData(630,10,1,1).data[1]!==255)throw Error('Crop pixel colors changed');
+                const raw=await (await fetch(c.localAssetUrl(${JSONObject.quote(fixture.getString("hash"))},root.current))).arrayBuffer();
+                const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',raw))).map(b=>b.toString(16).padStart(2,'0')).join('');if(hash!==${JSONObject.quote(fixture.getString("hash"))})throw Error('Original bytes changed');return true;
+            """.trimIndent())
+        }
+    }
 }

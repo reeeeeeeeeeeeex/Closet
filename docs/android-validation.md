@@ -1,15 +1,19 @@
 # Android 1.0.0 验证记录
 
-日期：2026-10-11。安装与配对步骤、构建命令和签名保管见 [Android 说明](android.md)。
+基础验收日期：2026-10-11；照片功能更新：2026-10-12。安装与配对步骤、构建命令和签名保管见 [Android 说明](android.md)。
 
 ## 交付包
 
-- `outputs/android/new-closet-1.0.0.apk`，10,537,287 字节。
+- `outputs/android/new-closet-1.0.0.apk`，10,542,567 字节。
 - 包名 `app.newcloset.android`，版本 `1.0.0` / `versionCode 1`。
 - 最低 API 29，编译与目标 API 36；系统 WebView 124+。
-- APK SHA-256：`f67d6f02ccd80f4318e9d0c44ab509aa748b382d362227698806d117b45d1251`。
+- APK SHA-256：`bb735f2cb77273113ccbeb90cbf29c2064962937dcf0fc14cbb218fb3192e0b8`。
 - 发布证书 SHA-256：`c42d6cb416221b0358cffbdbe6d52024938cd796f3a75f5c85dbb462bbe6af93`。
 - `apksigner verify` 通过；使用固定 RSA 发布密钥，APK Signature Scheme v2。密钥与密码未加入 Git，APK 不包含测试入口。
+
+## 照片查看器更新
+
+新版 Web 和 APK 共用大图查看器，底部提供编辑、裁剪、下载和缩放重置。裁剪另存 PNG，原图和日历快照保留。操作及测试入口见 [照片查看器说明](photo-viewer.md)。以下基础离线与同步完整验收在 2026-10-11 完成；本次照片功能更新的针对性结果追加在该说明中，不把旧包测试记为新包全部重测。
 
 ## 已完成的自动检查
 
