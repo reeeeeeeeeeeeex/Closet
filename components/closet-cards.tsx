@@ -40,24 +40,24 @@ function SelectionMarker({ selection }: { selection: CardSelection }) {
     return <><span className="pick-check" aria-hidden="true">{selection.selected && <Check size={13}/>}</span>{!!selection.indicators?.length && <div className="card-indicators">{selection.indicators.map(label => <small key={label}>{label}</small>)}</div>}</>;
 }
 
-export function ItemCard({ item, onOpen, selection, onCrop }: { item: ItemRecord; onOpen: () => void; selection?: CardSelection; onCrop?: CropPhoto }) {
+export function ItemCard({ item, onOpen, selection, onCrop, compact = false }: { item: ItemRecord; onOpen: () => void; selection?: CardSelection; onCrop?: CropPhoto; compact?: boolean }) {
     const { t } = useI18n();
     const [viewing, setViewing] = useState(false);
     const style = itemColorStyle(item.data);
     const first = style.values[0];
     const name = first ? isCommonColor(first) ? t(first.name) : first.name : "";
     const summary = !first ? "" : style.mode === "colorblock" ? t("拼色 · {count} 色", { count: style.values.length }) : style.mode === "primary" && style.values.length > 1 ? t("{name}＋{count} 辅色", { name, count: style.values.length - 1 }) : name;
-    const details = <><div className="item-category" title={itemColorText(item.data)}>{t(CATEGORIES[item.data.category])}{summary && ` / ${summary}`}</div><h3>{item.data.name}</h3><OccasionLabels values={item.data.occasions}/><ItemLabels item={item.data} showMeasurements={false}/></>;
+    const details = compact && !selection ? <><h3>{item.data.name}</h3><p className="android-card-meta">{t(CATEGORIES[item.data.category])}{item.data.brand && ` · ${item.data.brand}`}</p></> : <><div className="item-category" title={itemColorText(item.data)}>{t(CATEGORIES[item.data.category])}{summary && ` / ${summary}`}</div><h3>{item.data.name}</h3><OccasionLabels values={item.data.occasions}/><ItemLabels item={item.data} showMeasurements={false}/></>;
     if (selection) return <button type="button" className={`item-card selectable-card ${selection.selected ? 'picked' : ''}`} onClick={onOpen} aria-label={selection.label} aria-pressed={selection.selected}><Photo asset={item.data.asset} name={item.data.name}/><div className="item-card-body">{details}</div><SelectionMarker selection={selection}/></button>;
     return <><div className="item-card"><Photo asset={item.data.asset} name={item.data.name} onOpen={() => item.data.asset ? setViewing(true) : onOpen()}/><button type="button" className="item-card-body" onClick={onOpen} aria-label={t("编辑 {name}", { name: item.data.name })}>{details}<span className="card-edit"><ArrowUpRight size={18}/></span></button></div>
       {viewing && <PhotoViewer photos={photoAssets(item.data).map(hash => ({ key: hash, src: assetUrl(hash), asset: hash }))} initialKey={item.data.asset} name={item.data.name} onClose={() => setViewing(false)} onEdit={onOpen} onCrop={onCrop}/>}</>;
 }
 
-export function OutfitCard({ outfit, items, onOpen, onCalendar, selection, onCrop }: { outfit: OutfitRecord; items: ItemRecord[]; onOpen: () => void; onCalendar?: () => void; selection?: CardSelection; onCrop?: CropPhoto }) {
+export function OutfitCard({ outfit, items, onOpen, onCalendar, selection, onCrop, compact = false }: { outfit: OutfitRecord; items: ItemRecord[]; onOpen: () => void; onCalendar?: () => void; selection?: CardSelection; onCrop?: CropPhoto; compact?: boolean }) {
     const { t } = useI18n();
     const [viewing, setViewing] = useState(false);
     const visual = <OutfitCollage asset={outfit.data.asset} itemIds={outfit.data.itemIds} items={items}/>;
-    const details = <><div className="item-category">{outfit.data.asset ? t("搭配照片 \u00B7 ") : ""}{outfit.data.itemIds.length ? t("{value1} 件单品", { value1: outfit.data.itemIds.length }) : t("未关联单品")}</div><h3>{outfit.data.name}</h3><OccasionLabels values={outfit.data.occasions}/></>;
+    const details = compact && !selection ? <><h3>{outfit.data.name}</h3><p className="android-card-meta">{t("{value1} 件单品", { value1: outfit.data.itemIds.length })}</p></> : <><div className="item-category">{outfit.data.asset ? t("搭配照片 \u00B7 ") : ""}{outfit.data.itemIds.length ? t("{value1} 件单品", { value1: outfit.data.itemIds.length }) : t("未关联单品")}</div><h3>{outfit.data.name}</h3><OccasionLabels values={outfit.data.occasions}/></>;
     const photos = photoAssets(outfit.data);
     const viewPhotos = photos.length ? photos : [...new Set(outfit.data.itemIds.flatMap(id => { const item = items.find(value => value.id === id); return item ? photoAssets(item.data) : []; }))];
     const footer = <div className="outfit-footer"><span>{outfit.data.notes || t("喜欢的组合，留给刚好的日子。")}</span>{!selection && onCalendar && <Button type="button" variant="ghost" size="icon" aria-label={t("安排 {value1} 的穿搭日期", { value1: outfit.data.name })} onClick={onCalendar}><CalendarDays size={19}/></Button>}</div>;

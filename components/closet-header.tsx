@@ -6,10 +6,11 @@ import { Cloud, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/provider";
 
-export function ClosetHeader({ menu, stats, error, loading, syncing, synced, onAdd, onRefresh }: {
+export function ClosetHeader({ menu, stats, error, loading, syncing, synced, onAdd, onRefresh, compact = false }: {
   menu: ReactNode; stats?: { items: number; outfits: number; worn: number };
   error: boolean; loading: boolean; syncing: boolean; synced: string;
   onAdd: () => void; onRefresh: () => void;
+  compact?: boolean;
 }) {
   const { t } = useI18n();
   const [localStatus,setLocalStatus] = useState<SyncStatus|null>(null);
@@ -21,6 +22,7 @@ export function ClosetHeader({ menu, stats, error, loading, syncing, synced, onA
     return () => window.removeEventListener('closet-local-change',refresh);
   },[mobile,synced]);
   const localLabel = localStatus?.syncing ? t('已保存到手机 · 同步中') : localStatus?.conflicts.length ? t('已保存到手机 · 存在冲突') : localStatus?.dirty || localStatus?.pending ? t('已保存到手机 · 待同步') : localStatus?.lastSync ? t('已保存到手机 · 已同步到电脑') : t('已保存到手机');
+  if (compact) return <span className={`sync-label ${error ? 'sync-error' : ''}`}>{error ? t('连接待恢复') : loading ? t('正在连接') : mobile ? localLabel : t('已保存到电脑')}</span>;
   return <header className={`topbar ${stats ? "has-wardrobe-stats" : ""}`}>
     <div className="topbar-menu">{menu}</div>
     {stats && <div className="stats-summary" aria-label={t("衣橱统计")}><span>{t("单品")} <strong>{stats.items}</strong></span><i aria-hidden="true">·</i><span>{t("搭配")} <strong>{stats.outfits}</strong></span><i aria-hidden="true">·</i><span>{t("已穿")} <strong>{stats.worn}</strong></span></div>}

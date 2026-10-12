@@ -159,7 +159,7 @@ class ClosetInstrumentedTest {
         }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             ready(scenario)
-            eval(scenario,"document.querySelector('header button.main-action').click();true")
+            eval(scenario,"document.querySelector('.android-add, header button.main-action').click();true")
             runJs(scenario,"for(let i=0;i<100;i++){if(document.querySelector('#item-name')&&document.querySelector('.photo-actions button'))return true;await new Promise(r=>setTimeout(r,100))}throw Error('Item form did not open: '+document.body.innerText);")
             // File inputs require a real user gesture; evaluateJavascript().click() is intentionally blocked.
             eval(scenario,"document.querySelector('.photo-actions button').scrollIntoView({block:'center'});true")
@@ -180,6 +180,25 @@ class ClosetInstrumentedTest {
             runJs(scenario,"for(let i=0;i<100;i++){if(document.body.innerText.includes("+JSONObject.quote(itemName)+"))return true;await new Promise(r=>setTimeout(r,100))}throw Error('Reload did not show saved item');")
         }
         } finally { Intents.release() }
+    }
+    @Test fun androidNavigationAndDraftProtection(){
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            ready(scenario)
+            runJs(scenario,"""
+                if(document.documentElement.dataset.closetUi!=='android'||document.querySelectorAll('.android-bottom-nav button').length!==4)throw Error('Android appearance not loaded');
+                const clickTab=async(name,title)=>{[...document.querySelectorAll('.android-bottom-nav button')].find(b=>b.textContent.includes(name)).click();for(let i=0;i<50;i++){if(document.querySelector('.android-page-heading h1')?.textContent===title)return;await new Promise(r=>setTimeout(r,50))}throw Error('Tab failed: '+name)};
+                await clickTab('搭配','我的搭配');await clickTab('日历','穿搭日历');await clickTab('我的','我的');
+                [...document.querySelectorAll('.android-my-links button')].find(b=>b.textContent.includes('我的尺码')).click();await new Promise(r=>setTimeout(r,200));
+                const input=document.querySelector('.personal-sizes-panel input[type=number]');if(!input)throw Error('Sizes page unavailable');const nextHeight=input.value==='123'?'124':'123';Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,nextHeight);input.dispatchEvent(new Event('input',{bubbles:true}));await new Promise(r=>setTimeout(r,200));
+                [...document.querySelectorAll('.android-bottom-nav button')].find(b=>b.textContent.includes('衣橱')).click();await new Promise(r=>setTimeout(r,150));
+                if(!document.querySelector('[role=alertdialog]')?.innerText.includes('切换页面前放弃草稿'))throw Error('Draft navigation was not guarded');
+                [...document.querySelectorAll('[role=alertdialog] button')].find(b=>b.textContent==='保留草稿').click();await new Promise(r=>setTimeout(r,100));
+                if(document.querySelector('.personal-sizes-panel input[type=number]').value!==nextHeight)throw Error('Keep draft lost edits');
+                [...document.querySelectorAll('.android-bottom-nav button')].find(b=>b.textContent.includes('衣橱')).click();await new Promise(r=>setTimeout(r,100));
+                [...document.querySelectorAll('[role=alertdialog] button')].find(b=>b.textContent==='放弃草稿并切换').click();await new Promise(r=>setTimeout(r,100));
+                if(document.querySelector('.android-page-heading h1').textContent!=='我的衣橱')throw Error('Discard navigation failed');return true;
+            """.trimIndent())
+        }
     }
     @Test fun verifyPreviouslySavedItem(){
         if(InstrumentationRegistry.getArguments().getString("checkUpgrade")!="true")return

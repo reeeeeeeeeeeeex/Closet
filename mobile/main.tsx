@@ -13,7 +13,7 @@ installClosetClient(androidClient);
 installSyncClient({pair,unpair,sync:synchronize,async status(owner){const {binding,dirty,syncing}=await syncStatus(owner);return {paired:!!binding,url:binding?.url,lastSync:binding?.lastSync,dirty,syncing,conflicts:binding?.conflicts||[],pending:!!binding?.pending};}});
 const root=createRoot(document.getElementById('root')!);
 bootstrap().then(state=>{
-  root.render(<I18nProvider initialLocale="zh-CN"><Closet profile={state.profiles.find(p=>p.id===state.current)!}/></I18nProvider>);
+  root.render(<I18nProvider initialLocale="zh-CN"><Closet appearance="android" profile={state.profiles.find(p=>p.id===state.current)!}/></I18nProvider>);
 }).catch(error=>root.render(<main style={{padding:24}}><h1>本地资料暂时无法打开</h1><p>{String(error.message||error)}</p><button onClick={()=>location.reload()}>重试</button></main>));
 App.addListener('backButton',()=>{
   const dialog=document.querySelector('[role="dialog"], [role="alertdialog"]');

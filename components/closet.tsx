@@ -23,6 +23,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { CATEGORIES, OCCASIONS, SEASONS, wardrobePrompt, type Item, type ItemRecord, type Outfit, type OutfitRecord, type CalendarRecord, type ClosetState, type ClosetRecord, type ClosetArchive, type Subset, type SubsetRecord, type PersonalSizesRecord, type PersonalSizes } from "@/lib/domain";
 import { Photo, OutfitCollage, ItemCard, OutfitCard } from "@/components/closet-cards";
+import { AndroidAccount, AndroidHeader, AndroidNavigation, AndroidOptionalSection, AndroidSearch, type ClosetView } from "@/components/android-shell";
 import { ClosetHeader } from "@/components/closet-header";
 import { PersonalSizesPanel } from "@/components/personal-sizes";
 import { SubsetBrowser } from "@/components/subsets";
@@ -47,7 +48,7 @@ const blankOutfit: Outfit = { name: "", itemIds: [], asset: null, occasions: [],
 const errorMessage = (e: unknown) => e instanceof Error ? tr(e.message) : tr("操作失败，请重试");
 const localDate = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const formatSize = (bytes: number) => bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-type View = "personalSizes" | "wardrobe" | "outfits" | "calendar" | "backup" | "assistant";
+type View = ClosetView;
 type Editor = {
     kind: "item";
     record?: ItemRecord;
@@ -109,7 +110,13 @@ function Navigation({ view, onView, state, profileMenu }: {
     </SidebarContent>
     <SidebarFooter className="profile-footer">{profileMenu}</SidebarFooter></Sidebar>;
 }
-export default function Home({ profile }: { profile: Profile }) {
+export default function Home({ profile, appearance = "web" }: { profile: Profile; appearance?: "web" | "android" }) {
+    const android = appearance === "android";
+    useEffect(() => {
+      if (!android) return;
+      const node = document.documentElement, previous = node.dataset.closetUi; node.dataset.closetUi = "android";
+      return () => { if (previous) node.dataset.closetUi = previous; else delete node.dataset.closetUi; };
+    }, [android]);
     const { t, locale } = useI18n();
     const [currentProfile, setCurrentProfile] = useState(profile);
     const [draftDirty, setDraftDirty] = useState(false);
@@ -117,6 +124,7 @@ export default function Home({ profile }: { profile: Profile }) {
     const operations = useSyncExternalStore(subscribeOperations, getOperationCount, () => 0);
     const [state, setState] = useState<ClosetState | null>(null);
     const [view, setView] = useState<View>("wardrobe");
+    const [pendingView, setPendingView] = useState<View | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [profileChanged, setProfileChanged] = useState(false);
@@ -216,7 +224,7 @@ export default function Home({ profile }: { profile: Profile }) {
     const goView = (v: View) => { setView(v); setDraftDirty(false); setSearch(""); setColorFilter([]); setCategory("all"); setSelectedSubsetId(null); setOccasion("all"); setArchived(false); };
     useEffect(() => {
       const back = (event: Event) => {
-        if (editor || draftDirty) { event.preventDefault(); setReloadConfirm(true); return; }
+        if (editor || draftDirty) { event.preventDefault(); if (android && !editor) setPendingView("account"); else setReloadConfirm(true); return; }
         if (view !== "wardrobe") { event.preventDefault(); goView("wardrobe"); }
       };
       window.addEventListener("closet-back", back);
@@ -250,26 +258,45 @@ export default function Home({ profile }: { profile: Profile }) {
         await refresh(); return result.record;
     };
     const wardrobeStats = state && view === "wardrobe" ? { items: activeItems.length, outfits: activeOutfits.length, worn: calendar.filter(c => c.data.status === "worn").length } : undefined;
-    const titles = { personalSizes: t("我的尺码"), wardrobe: t("我的衣橱"), outfits: t("我的搭配"), calendar: t("穿搭日历"), backup: t("数据与备份"), assistant: t("AI 穿搭灵感") };
-    return <SidebarProvider style={{ "--sidebar-width": "248px" } as React.CSSProperties}><Navigation view={view} onView={goView} state={state} profileMenu={<ProfileMenu current={currentProfile} disabled={operations > 0 || panelBusy || loading} hasDraft={!!editor || draftDirty} onSelected={next => { setProfileContext(next.id); window.location.reload(); }} onRenamed={next => { if (next.id === currentProfile.id) setCurrentProfile(next); }}/> }/><SidebarInset className="main-inset"><ClosetHeader menu={<SidebarTrigger className="md:hidden"/>} stats={wardrobeStats} error={!!error} loading={loading} syncing={syncing} synced={synced} onRefresh={() => void refresh()} onAdd={() => setEditor({ kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"] })}/>
+    const titles = { personalSizes: t("我的尺码"), wardrobe: t("我的衣橱"), outfits: t("我的搭配"), calendar: t("穿搭日历"), backup: t("数据与备份"), assistant: t("AI 穿搭灵感"), account: t("我的") };
+    const profileMenu = <ProfileMenu current={currentProfile} disabled={operations > 0 || panelBusy || loading} hasDraft={!!editor || draftDirty} onSelected={next => { setProfileContext(next.id); window.location.reload(); }} onRenamed={next => { if (next.id === currentProfile.id) setCurrentProfile(next); }}/>;
+    const status = <ClosetHeader compact menu={null} error={!!error} loading={loading} syncing={syncing} synced={synced} onAdd={() => {}} onRefresh={() => void refresh()}/>;
+    const categoryNavigation = <div className="wardrobe-toolbar"><div className="category-tabs" role="group" aria-label={t("单品分类")}>{Object.entries({ all: t("全部"), ...translatedOptions(CATEGORIES, t) }).map(([key, label]) => <button key={key} onClick={() => { setCategory(key); setSelectedSubsetId(null); }} className={category === key ? "active" : ""}>{label}<span>{key === "all" ? items.filter(i => i.data.archived === archived).length : items.filter(i => i.data.category === key && i.data.archived === archived).length}</span></button>)}</div></div>;
+    const renderToolbar = (controls: React.ReactNode) => android ? <>
+      <AndroidSearch value={search} onChange={setSearch} placeholder={view === "wardrobe" ? t("搜索衣服、品牌…") : t("寻找我的搭配…")} count={colorFilter.length + (occasion === "all" ? 0 : 1) + (archived ? 1 : 0)} onReset={() => { setColorFilter([]); setOccasion("all"); setArchived(false); }}>
+        {view === "wardrobe" && <ColorFilter colors={wardrobeColors(items)} selected={colorFilter} onChange={setColorFilter}/>}
+        <Picker label={t("场合筛选")} value={occasion} onChange={setOccasion} options={{ all: t("所有场合"), ...translatedOptions(OCCASIONS, t) }}/>
+        <button type="button" className={`archive-filter ${archived ? "on" : ""}`} aria-pressed={archived} onClick={() => setArchived(!archived)}><Archive size={16}/>{t("已收起")}</button>
+        <div className="android-group-controls">{controls}</div>
+      </AndroidSearch>
+      {view === "wardrobe" ? categoryNavigation : <div className="android-occasion-tabs">{Object.entries({ all: t("全部"), ...translatedOptions(OCCASIONS, t) }).map(([key,label]) => <button key={key} type="button" className={occasion === key ? "active" : ""} onClick={() => setOccasion(key)}>{label}</button>)}</div>}
+    </> : <div className={view === "outfits" ? "filter-row outfit-toolbar" : "filter-row"}><div className="search-box"><Search size={17}/><Input value={search} onChange={e => setSearch(e.target.value)} placeholder={view === "wardrobe" ? t("找一件单品、品牌、颜色或备注\u2026") : t("寻找我的搭配\u2026")} aria-label={t("搜索")}/>{search && <button aria-label={t("清空搜索")} onClick={() => setSearch("")}><X size={14}/></button>}</div><div className="filter-controls">{view === "wardrobe" && <ColorFilter colors={wardrobeColors(items)} selected={colorFilter} onChange={setColorFilter}/>}<Picker label={t("场合筛选")} value={occasion} onChange={setOccasion} options={{ all: t("所有场合"), ...translatedOptions(OCCASIONS, t) }}/><button className={`archive-filter ${archived ? "on" : ""}`} aria-pressed={archived} onClick={() => setArchived(!archived)} title={t("查看已收起的单品或搭配")}><Archive size={16}/><span>{t("已收起")}</span></button>{view === "outfits" && <Button className="main-action" disabled={!!error} onClick={() => setEditor({ kind: "outfit" })}><Plus size={18}/>{t("新建搭配")}</Button>}{controls}</div></div>;
+    const secondary = ["personalSizes", "backup", "assistant"].includes(view);
+    const subtitle = view === "wardrobe" ? t("{items} 件单品 · {outfits} 套搭配", { items: activeItems.length, outfits: activeOutfits.length }) : view === "outfits" ? t("把喜欢的组合，留给每一天") : view === "calendar" ? t("记录每一天的穿着") : undefined;
+    const navigate = (next: View) => { if (draftDirty) setPendingView(next); else goView(next); };
+    return <SidebarProvider className={android ? "android-app" : undefined} style={{ "--sidebar-width": "248px" } as React.CSSProperties}>
+      {!android && <Navigation view={view} onView={goView} state={state} profileMenu={profileMenu}/>}
+      <SidebarInset className="main-inset">{android ? <AndroidHeader title={titles[view]} subtitle={subtitle} profileMenu={profileMenu} status={status} secondary={secondary} onBack={() => navigate("account")}/> : <ClosetHeader menu={<SidebarTrigger className="md:hidden"/>} stats={wardrobeStats} error={!!error} loading={loading} syncing={syncing} synced={synced} onRefresh={() => void refresh()} onAdd={() => setEditor({ kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"] })}/>}
     <main className="workspace">
       {state && state.collections.length > 1 && <div className="collection-switch"><span>{t("当前衣橱")}</span><Picker label={t("切换衣橱")} value={state.collectionId} options={Object.fromEntries(state.collections.map(c => [c.id, c.name]))} onChange={v => void refresh(v)}/></div>}
-      <h1 className="sr-only">{titles[view]}</h1>
+      {!android && <h1 className="sr-only">{titles[view]}</h1>}
       {error && <div className="error-banner" role="alert"><AlertCircle size={19}/><div><strong>{t("暂时无法同步衣橱")}</strong><p>{error}</p>{profileChanged && <Button variant="outline" onClick={() => { if (draftDirty || editor) { setReloadConfirm(true); } else window.location.reload(); }}>{t("载入当前账号")}</Button>}</div><Button variant="outline" onClick={() => void refresh()}>{t("重试")}</Button></div>}
       {loading ? <div className="loading-grid">{[1, 2, 3, 4].map(n => <Skeleton key={n} className="h-72 rounded-2xl"/>)}</div> : state && <>
-        {view === "wardrobe" && <><div className="wardrobe-toolbar"><div className="category-tabs" role="group" aria-label={t("单品分类")}>{Object.entries({ all: t("全部"), ...translatedOptions(CATEGORIES, t) }).map(([key, label]) => <button key={key} onClick={() => { setCategory(key); setSelectedSubsetId(null); }} className={category === key ? "active" : ""}>{label}<span>{key === "all" ? items.filter(i => i.data.archived === archived).length : items.filter(i => i.data.category === key && i.data.archived === archived).length}</span></button>)}</div></div></>}
-        {(view === "wardrobe" || view === "outfits") && <><SubsetBrowser renderToolbar={controls => <div className={view === "outfits" ? "filter-row outfit-toolbar" : "filter-row"}><div className="search-box"><Search size={17}/><Input value={search} onChange={e => setSearch(e.target.value)} placeholder={view === "wardrobe" ? t("找一件单品、品牌、颜色或备注\u2026") : t("寻找我的搭配\u2026")} aria-label={t("搜索")}/>{search && <button aria-label={t("清空搜索")} onClick={() => setSearch("")}><X size={14}/></button>}</div><div className="filter-controls">{view === "wardrobe" && <ColorFilter colors={wardrobeColors(items)} selected={colorFilter} onChange={setColorFilter}/>}<Picker label={t("场合筛选")} value={occasion} onChange={setOccasion} options={{ all: t("所有场合"), ...translatedOptions(OCCASIONS, t) }}/><button className={`archive-filter ${archived ? "on" : ""}`} aria-pressed={archived} onClick={() => setArchived(!archived)} title={t("查看已收起的单品或搭配")}><Archive size={16}/><span>{t("已收起")}</span></button>{view === "outfits" && <Button className="main-action" disabled={!!error} onClick={() => setEditor({ kind: "outfit" })}><Plus size={18}/>{t("新建搭配")}</Button>}{controls}</div></div>} key={state.collectionId + ":" + view + ":" + subsetRoot + ":" + (activeSubset?.id || "root")} records={state.records} scope={scope} root={subsetRoot} activeId={activeSubset?.id || null} disabled={!!error || syncing} onSelect={setSelectedSubsetId} onSave={saveSubset} onDelete={removeSubset} visibleRecords={view === "wardrobe" ? filteredItems : filteredOutfits} onAdd={subsetId => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"], subsetId } : { kind: "outfit", subsetId })} renderCards={records => view === "wardrobe" ? <div className="item-grid">{records.map(record => record.kind === "item" && <ItemCard key={record.id} item={record} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "item", record })}/>)}</div> : <div className="outfit-grid">{records.map(record => record.kind === "outfit" && <OutfitCard key={record.id} outfit={record} items={items} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "outfit", record })} onCalendar={() => setEditor({ kind: "calendar", outfitId: record.id, date: localDate() })}/>)}</div>} />
+        {view === "wardrobe" && !android && categoryNavigation}
+        {(view === "wardrobe" || view === "outfits") && <><SubsetBrowser renderToolbar={renderToolbar} key={state.collectionId + ":" + view + ":" + subsetRoot + ":" + (activeSubset?.id || "root")} records={state.records} scope={scope} root={subsetRoot} activeId={activeSubset?.id || null} disabled={!!error || syncing} onSelect={setSelectedSubsetId} onSave={saveSubset} onDelete={removeSubset} visibleRecords={view === "wardrobe" ? filteredItems : filteredOutfits} onAdd={subsetId => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"], subsetId } : { kind: "outfit", subsetId })} renderCards={records => view === "wardrobe" ? <div className="item-grid">{records.map(record => record.kind === "item" && <ItemCard compact={android} key={record.id} item={record} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "item", record })}/>)}</div> : <div className="outfit-grid">{records.map(record => record.kind === "outfit" && <OutfitCard compact={android} key={record.id} outfit={record} items={items} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "outfit", record })} onCalendar={() => setEditor({ kind: "calendar", outfitId: record.id, date: localDate() })}/>)}</div>} />
         {view === "wardrobe" && !filteredItems.length && (items.length === 0 && !search && !colorFilter.length && category === "all" && occasion === "all" && !archived ? <Welcome onAdd={() => setEditor({ kind: "item" })} onImport={() => goView("backup")}/> : <EmptyState icon={Search} title={t("这里还没有单品")} text={t("试试其他分类，或清空筛选条件。")} action={t("清空筛选")} onAction={() => { setSearch(""); setColorFilter([]); setOccasion("all"); setArchived(false); }}/>) }
         {view === "outfits" && !filteredOutfits.length && <EmptyState icon={Layers3} title={t("没有找到这个搭配")} text={t("拍照、导入搭配照片，或从单品组合一套穿搭。")} action={t("新建搭配")} onAction={() => setEditor({ kind: "outfit" })}/>}</>}
-        {view === "calendar" && <CalendarPanel entries={calendar} disabled={!!error} onAdd={date => setEditor({ kind: "calendar", date })} onEdit={record => setEditor({ kind: "calendar", record })}/>}
+        {view === "calendar" && <CalendarPanel compact={android} entries={calendar} disabled={!!error} onAdd={date => setEditor({ kind: "calendar", date })} onEdit={record => setEditor({ kind: "calendar", record })}/>}
         {view === "backup" && <BackupPanel state={state} onBusyChange={setPanelBusy} onSynced={async () => { const next = await api<ClosetState>("/api/closet"); await refresh(next.collectionId); }} onImported={async (id) => { await refresh(id); goView("wardrobe"); }}/>}
         {view === "assistant" && <AssistantPanel state={state} onDraftChange={setDraftDirty}/>}
+        {view === "account" && android && <AndroidAccount profileMenu={profileMenu} status={status} onView={navigate}/> }
         {view === "personalSizes" && <PersonalSizesPanel key={state.collectionId} record={state.records.find((record): record is PersonalSizesRecord => record.kind === "personalSizes")} collectionName={state.collections.find(collection => collection.id === state.collectionId)?.name || t("我的衣橱")} disabled={!!error || syncing} onSave={savePersonalSizes} onDraftChange={setDraftDirty} onBusyChange={setPanelBusy} onRefresh={() => refresh()}/> }
       </>}
-    </main></SidebarInset><Toaster theme="light" position="top-center" richColors/>
+    </main></SidebarInset>{android && <AndroidNavigation view={view} onView={navigate} disabled={operations > 0 || panelBusy || loading} onAdd={!error && (view === "wardrobe" || view === "outfits") ? () => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"] } : { kind: "outfit" }) : undefined}/>}<Toaster theme="light" position="top-center" richColors/>
+    <AlertDialog open={pendingView !== null} onOpenChange={open => { if (!open) setPendingView(null); }}><AlertDialogContent className="closet-dialog"><AlertDialogHeader><AlertDialogTitle>{t("切换页面前放弃草稿？")}</AlertDialogTitle><AlertDialogDescription>{t("当前页面有未保存的内容，可以先保留并继续编辑。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("保留草稿")}</AlertDialogCancel><AlertDialogAction onClick={() => { if (pendingView) goView(pendingView); setPendingView(null); }}>{t("放弃草稿并切换")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <AlertDialog open={reloadConfirm} onOpenChange={setReloadConfirm}><AlertDialogContent className="closet-dialog"><AlertDialogHeader><AlertDialogTitle>{t("载入当前账号前放弃草稿？")}</AlertDialogTitle><AlertDialogDescription>{t("当前页面有未保存的内容。重新载入后会放弃这些草稿，已保存的资料保留。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("保留草稿")}</AlertDialogCancel><AlertDialogAction onClick={() => window.location.reload()}>{t("放弃草稿并载入")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-    {editor?.kind === "item" && <ItemEditor key={editor.record?.id || "new-item"} record={editor.record} initialCategory={editor.initialCategory} brands={itemBrands(items)} colorLibrary={state?.colorLibrary || []} onClose={() => setEditor(null)} onSave={save}/>}
-    {editor?.kind === "outfit" && <OutfitEditor key={editor.record?.id || "new-outfit"} record={editor.record} items={items} onClose={() => setEditor(null)} onSave={save}/>}
+    {editor?.kind === "item" && <ItemEditor compact={android} key={editor.record?.id || "new-item"} record={editor.record} initialCategory={editor.initialCategory} brands={itemBrands(items)} colorLibrary={state?.colorLibrary || []} onClose={() => setEditor(null)} onSave={save}/>}
+    {editor?.kind === "outfit" && <OutfitEditor compact={android} key={editor.record?.id || "new-outfit"} record={editor.record} items={items} onClose={() => setEditor(null)} onSave={save}/>}
     {editor?.kind === "calendar" && <CalendarEditor key={editor.record?.id || "new-calendar"} record={editor.record} date={editor.date} outfitId={editor.outfitId} outfits={outfits} items={items} onClose={() => setEditor(null)} onSave={save} onDelete={removeCalendar}/>}
   </SidebarProvider>;
 }
@@ -290,7 +317,8 @@ function EmptyState({ icon: Icon, title, text, action, onAction }: {
 function FormError({ message }: {
     message: string;
 }) { return message ? <div className="form-error" role="alert"><AlertCircle size={16}/><span>{message}</span></div> : null; }
-function ItemEditor({ record, initialCategory, brands, colorLibrary, onClose, onSave }: {
+function ItemEditor({ record, initialCategory, brands, colorLibrary, onClose, onSave, compact = false }: {
+    compact?: boolean;
     record?: ItemRecord;
     initialCategory?: Item["category"];
     brands: string[];
@@ -322,9 +350,10 @@ function ItemEditor({ record, initialCategory, brands, colorLibrary, onClose, on
         setBusy(false);
     } };
     return <Dialog open onOpenChange={(open: boolean) => { if (!open && !busy)
-        onClose(); }}><DialogContent className="closet-dialog editor-dialog item-dialog" onEscapeKeyDown={event => { if (cancelScreenPick.current) { event.preventDefault(); cancelScreenPick.current(); } }}><DialogHeader><DialogTitle>{record ? t("单品详情") : t("添加单品")}</DialogTitle><DialogDescription>{t("原图会完整保存。你可以随时补充或修改信息。")}</DialogDescription></DialogHeader><form onSubmit={e => { e.preventDefault(); void submit(); }}><fieldset disabled={busy}><div className="item-form-grid"><PhotoEditor draft={photos} onChange={setPhotos} kind="item" onError={setError}/><div className="form-fields"><div className="field"><Label htmlFor="item-name">{t("单品名称")}<span>*</span></Label><Input id="item-name" required maxLength={100} autoFocus value={data.name} placeholder={t("例如：短款牛仔外套")} onChange={e => setData({ ...data, name: e.target.value })}/></div><BrandField value={data.brand || ""} brands={brands} onChange={brand => setData({ ...data, brand })}/><div className="field-pair"><div className="field"><Label>{t("分类")}</Label><Picker label={t("单品分类")} value={data.category} onChange={value => { const category = value as Item["category"]; const allowed = CATEGORY_MEASUREMENTS[category] || []; setData({ ...data, category, fit: garmentCategory(category) ? data.fit : null, shoeFit: category === "shoes" ? data.shoeFit : null, shoeSize: category === "shoes" ? data.shoeSize : { eu: null, cn: null }, measurements: Object.fromEntries(Object.entries(data.measurements).filter(([key]) => allowed.some(value => value === key))) }); }} options={translatedOptions(CATEGORIES, t)}/></div></div><ColorField draft={colors} onChange={setColors} library={colorLibrary} sampling={onSample => <ColorSamplingTools photos={photos} onSample={onSample} onScreenPicking={cancel => { cancelScreenPick.current = cancel; }}/>}/><ItemDetailsFields item={data} onChange={setData}/><div className="field"><Label>{t("适合场合")}</Label><Chips options={OCCASIONS} value={data.occasions} onChange={occasions => setData({ ...data, occasions })}/></div><div className="field"><Label>{t("季节")}</Label><Chips options={SEASONS} value={data.seasons} onChange={seasons => setData({ ...data, seasons })}/></div><div className="field"><Label htmlFor="item-notes">{t("穿着备注")}</Label><Textarea id="item-notes" maxLength={3000} rows={3} value={data.notes} placeholder={t("版型、搭配想法，或舒适度\u2026")} onChange={e => setData({ ...data, notes: e.target.value })}/></div></div></div></fieldset><FormError message={error}/><DialogFooter className="editor-footer">{record && <Button type="button" variant="ghost" className="mr-auto" disabled={busy} onClick={() => void submit(!data.archived)}><Archive size={16}/>{data.archived ? t("放回衣橱") : t("收起单品")}</Button>}<Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy}>{busy ? <Loader2 size={16} className="animate-spin"/> : <Check size={16}/>}{busy ? t("保存中\u2026") : t("保存单品")}</Button></DialogFooter></form></DialogContent></Dialog>;
+        onClose(); }}><DialogContent className="closet-dialog editor-dialog item-dialog" onEscapeKeyDown={event => { if (cancelScreenPick.current) { event.preventDefault(); cancelScreenPick.current(); } }}><DialogHeader><DialogTitle>{record ? t("单品详情") : t("添加单品")}</DialogTitle><DialogDescription>{t("原图会完整保存。你可以随时补充或修改信息。")}</DialogDescription></DialogHeader><form onSubmit={e => { e.preventDefault(); void submit(); }}><fieldset disabled={busy}><div className="item-form-grid"><PhotoEditor compact={compact} draft={photos} onChange={setPhotos} kind="item" onError={setError}/><div className="form-fields"><div className="field"><Label htmlFor="item-name">{t("单品名称")}<span>*</span></Label><Input id="item-name" required maxLength={100} autoFocus value={data.name} placeholder={t("例如：短款牛仔外套")} onChange={e => setData({ ...data, name: e.target.value })}/></div><BrandField value={data.brand || ""} brands={brands} onChange={brand => setData({ ...data, brand })}/><div className="field-pair"><div className="field"><Label>{t("分类")}</Label><Picker label={t("单品分类")} value={data.category} onChange={value => { const category = value as Item["category"]; const allowed = CATEGORY_MEASUREMENTS[category] || []; setData({ ...data, category, fit: garmentCategory(category) ? data.fit : null, shoeFit: category === "shoes" ? data.shoeFit : null, shoeSize: category === "shoes" ? data.shoeSize : { eu: null, cn: null }, measurements: Object.fromEntries(Object.entries(data.measurements).filter(([key]) => allowed.some(value => value === key))) }); }} options={translatedOptions(CATEGORIES, t)}/></div></div><AndroidOptionalSection enabled={compact} title={t("颜色")}><ColorField draft={colors} onChange={setColors} library={colorLibrary} sampling={onSample => <ColorSamplingTools photos={photos} onSample={onSample} onScreenPicking={cancel => { cancelScreenPick.current = cancel; }}/>}/></AndroidOptionalSection><AndroidOptionalSection enabled={compact} title={t("版型与尺寸")}><ItemDetailsFields item={data} onChange={setData}/></AndroidOptionalSection><div className="field"><Label>{t("适合场合")}</Label><Chips options={OCCASIONS} value={data.occasions} onChange={occasions => setData({ ...data, occasions })}/></div><div className="field"><Label>{t("季节")}</Label><Chips options={SEASONS} value={data.seasons} onChange={seasons => setData({ ...data, seasons })}/></div><AndroidOptionalSection enabled={compact} title={t("穿着备注")}><div className="field"><Label htmlFor="item-notes">{t("穿着备注")}</Label><Textarea id="item-notes" maxLength={3000} rows={3} value={data.notes} placeholder={t("版型、搭配想法，或舒适度\u2026")} onChange={e => setData({ ...data, notes: e.target.value })}/></div></AndroidOptionalSection></div></div></fieldset><FormError message={error}/><DialogFooter className="editor-footer">{record && <Button type="button" variant="ghost" className="mr-auto" disabled={busy} onClick={() => void submit(!data.archived)}><Archive size={16}/>{data.archived ? t("放回衣橱") : t("收起单品")}</Button>}<Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy}>{busy ? <Loader2 size={16} className="animate-spin"/> : <Check size={16}/>}{busy ? t("保存中\u2026") : t("保存单品")}</Button></DialogFooter></form></DialogContent></Dialog>;
 }
-function OutfitEditor({ record, items, onClose, onSave }: {
+function OutfitEditor({ record, items, onClose, onSave, compact = false }: {
+    compact?: boolean;
     record?: OutfitRecord;
     items: ItemRecord[];
     onClose: () => void;
@@ -357,7 +386,7 @@ function OutfitEditor({ record, items, onClose, onSave }: {
         onClose(); }}><DialogContent className="closet-dialog editor-dialog outfit-dialog">
     <DialogHeader><DialogTitle>{record ? t("编辑搭配") : t("新建搭配")}</DialogTitle><DialogDescription>{t("保存搭配照片，也可以关联单品。之后修改不会改变日历里已保存的快照。")}</DialogDescription></DialogHeader>
     <form onSubmit={event => { event.preventDefault(); void submit(); }}>
-      <fieldset disabled={busy}><OutfitFields data={data} onChange={setData} photos={photos} onPhotos={setPhotos} items={items} onError={setError}/></fieldset>
+      <fieldset disabled={busy}><OutfitFields compact={compact} data={data} onChange={setData} photos={photos} onPhotos={setPhotos} items={items} onError={setError}/></fieldset>
       <FormError message={error}/><DialogFooter className="editor-footer">
         {record && <Button variant="ghost" type="button" className="mr-auto" disabled={busy} onClick={() => void submit(!data.archived)}><Archive size={16}/>{data.archived ? t("恢复搭配") : t("收起搭配")}</Button>}
         <Button variant="outline" type="button" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy}>{busy && <Loader2 size={16} className="animate-spin"/>}{t("保存搭配")}</Button>
@@ -365,7 +394,8 @@ function OutfitEditor({ record, items, onClose, onSave }: {
     </form>
   </DialogContent></Dialog>;
 }
-function CalendarPanel({ entries, disabled, onAdd, onEdit }: {
+function CalendarPanel({ entries, disabled, onAdd, onEdit, compact = false }: {
+    compact?: boolean;
     entries: CalendarRecord[];
     disabled: boolean;
     onAdd: (date: string) => void;
@@ -379,7 +409,8 @@ function CalendarPanel({ entries, disabled, onAdd, onEdit }: {
     const first = new Date(month.getFullYear(), month.getMonth(), 1);
     const start = new Date(first);
     start.setDate(first.getDate() - (first.getDay() + 6) % 7);
-    const days = Array.from({ length: 42 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; });
+    const calendarLength = compact ? Math.ceil(((first.getDay() + 6) % 7 + new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()) / 7) * 7 : 42;
+    const days = Array.from({ length: calendarLength }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; });
     const today = localDate();
     const selectedEntries = entries.filter(e => e.data.date === selected);
     const jump = (year: number, target: number) => {
@@ -390,10 +421,10 @@ function CalendarPanel({ entries, disabled, onAdd, onEdit }: {
     };
     const validYear = /^\d{4}$/.test(jumpYear) && Number(jumpYear) >= 1900 && Number(jumpYear) <= 9999;
     return <div className="calendar-layout"><div className="calendar-board">
-    <div className="calendar-heading">
+    {compact ? <div className="android-month-header"><Button variant="ghost" size="icon" aria-label={t("上个月")} onClick={() => jump(month.getFullYear(), month.getMonth() - 1)}><ChevronLeft size={21}/></Button><button type="button" aria-label={t("选择年份和月份")} onClick={() => { setJumpYear(String(month.getFullYear())); setJumpOpen(true); }}>{t("{year} 年 {month} 月", { year: month.getFullYear(), month: month.getMonth() + 1 })}</button><Button variant="ghost" size="icon" aria-label={t("下个月")} onClick={() => jump(month.getFullYear(), month.getMonth() + 1)}><ChevronRight size={21}/></Button></div> : (<div className="calendar-heading">
       <Button variant="ghost" className="calendar-month-title" aria-label={t("选择年份和月份")} onClick={() => { setJumpYear(String(month.getFullYear())); setJumpOpen(true); }}>{month.getFullYear()} <span>/</span> {String(month.getMonth() + 1).padStart(2, "0")}<ChevronDown size={18}/></Button>
       <div className="calendar-actions"><div className="calendar-navigation"><Button variant="ghost" size="icon" aria-label={t("上个月")} onClick={() => jump(month.getFullYear(), month.getMonth() - 1)}><ChevronLeft size={19}/></Button><Button variant="outline" size="sm" onClick={() => { setMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1)); setSelected(today); }}>{t("今天")}</Button><Button variant="ghost" size="icon" aria-label={t("下个月")} onClick={() => jump(month.getFullYear(), month.getMonth() + 1)}><ChevronRight size={19}/></Button></div><Button className="main-action" disabled={disabled} onClick={() => onAdd(today)}><Plus size={17}/>{t("添加穿搭")}</Button></div>
-    </div>
+    </div>)}
     <div className="calendar-weekdays">{[t("一"), t("二"), t("三"), t("四"), t("五"), t("六"), t("日")].map(d => <span key={d}>{d}</span>)}</div>
     <div className="calendar-days">{days.map(date => {
             const key = localDate(date);
@@ -404,14 +435,16 @@ function CalendarPanel({ entries, disabled, onAdd, onEdit }: {
         <span className="day-number">{date.getDate()}</span>{dayEntries[0] && <><div className="day-preview">{preview ? <img src={assetUrl(preview)} alt="" loading="lazy"/> : <Shirt size={18}/>}</div><span className="day-label">{dayEntries[0].data.snapshot.name}</span><span className={`day-dot ${dayEntries.some(e => e.data.status === "worn") ? "worn" : ""}`}/></>}{dayEntries.length > 1 && <span className="day-more">+{dayEntries.length - 1}</span>}
       </button>;
         })}</div>
-    <div className="calendar-legend"><span><i className="planned"/>{t("已计划")}</span><span><i className="worn"/>{t("已穿着")}</span><span>{t("点选日期，查看当天穿搭")}</span></div>
-  </div><aside className="day-detail"><div className="day-detail-heading"><span>{t("当天穿搭")}</span><h3>{new Date(selected + "T12:00:00").toLocaleDateString(locale, { month: "long", day: "numeric", weekday: "long" })}</h3></div>
+    <div className="calendar-legend">{compact && <button type="button" className="android-calendar-today" onClick={() => { setMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1)); setSelected(today); }}>{t("回到今天")}</button>}<span><i className="planned"/>{t("已计划")}</span><span><i className="worn"/>{t("已穿着")}</span><span>{t("点选日期，查看当天穿搭")}</span></div>
+  </div><aside className="day-detail"><div className="day-detail-heading"><span>{t("当天穿搭")}</span><h3>{new Date(selected + "T12:00:00").toLocaleDateString(locale, compact ? { month: "long", day: "numeric" } : { month: "long", day: "numeric", weekday: "long" })}{compact && selected === today && " · " + t("今天")}</h3></div>
     {selectedEntries.length ? selectedEntries.map(entry => <button key={entry.id} className="day-outfit" onClick={() => onEdit(entry)}>
+      {compact ? <div className="android-day-content"><div className="android-day-photo">{entry.data.snapshot.asset ? <Photo asset={entry.data.snapshot.asset} name={entry.data.snapshot.name}/> : <div className="android-day-pieces">{entry.data.snapshot.items.slice(0,3).map(item => <Photo key={item.id} asset={item.data.asset} name={item.data.name}/>)}</div>}</div><div className="android-day-caption"><strong>{entry.data.snapshot.name}</strong><span className={`status-badge ${entry.data.status}`}>{entry.data.status === "worn" ? t("已穿着") : t("已计划")}</span>{entry.data.notes && <p>{entry.data.notes}</p>}</div></div> : <>
       {entry.data.snapshot.asset && <Photo asset={entry.data.snapshot.asset} name={entry.data.snapshot.name} className="day-outfit-photo"/>}
       {!!entry.data.snapshot.items.length && <div className="snapshot-photos">{entry.data.snapshot.items.slice(0, 3).map(i => <Photo key={i.id} asset={i.data.asset} name={i.data.name}/>)}</div>}
       <div className="flex justify-between items-center gap-2"><strong>{entry.data.snapshot.name}</strong><span className={`status-badge ${entry.data.status}`}>{entry.data.status === "worn" ? t("已穿着") : t("已计划")}</span></div>{entry.data.notes && <p>{entry.data.notes}</p>}
+</>}
     </button>) : <div className="day-empty"><CalendarDays size={32} strokeWidth={1.1}/><p>{t("这一天，还留着空白。")}</p><span>{t("拍一张穿搭照，或选择已有搭配。")}</span></div>}
-    <Button variant="outline" className="w-full" onClick={() => onAdd(selected)}><Plus size={17}/>{t("添加当天穿搭")}</Button><p className="snapshot-note"><LockKeyhole size={13}/>{t("保存当时的照片与单品快照")}</p>
+    <Button variant="outline" className="w-full" onClick={() => onAdd(selected)}><Plus size={17}/>{compact ? t("记录这一天的穿搭") : t("添加当天穿搭")}</Button><p className="snapshot-note"><LockKeyhole size={13}/>{t("保存当时的照片与单品快照")}</p>
   </aside>
   <Dialog open={jumpOpen} onOpenChange={setJumpOpen}><DialogContent className="closet-dialog month-jump-dialog"><DialogHeader><DialogTitle>{t("跳转到年月")}</DialogTitle><DialogDescription>{t("选择年份，再点击要查看的月份。")}</DialogDescription></DialogHeader>
     <div className="year-jump"><Button variant="ghost" size="icon" aria-label={t("上一年")} disabled={!validYear || Number(jumpYear) <= 1900} onClick={() => setJumpYear(String(Number(jumpYear) - 1))}><ChevronLeft size={18}/></Button><div className="field"><Label htmlFor="calendar-year">{t("年份")}</Label><Input id="calendar-year" type="number" min={1900} max={9999} step={1} value={jumpYear} onChange={event => setJumpYear(event.target.value)}/></div><Button variant="ghost" size="icon" aria-label={t("下一年")} disabled={!validYear || Number(jumpYear) >= 9999} onClick={() => setJumpYear(String(Number(jumpYear) + 1))}><ChevronRight size={18}/></Button></div>

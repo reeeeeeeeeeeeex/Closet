@@ -26,4 +26,4 @@ Android 仪器测试 `ClosetInstrumentedTest#photoViewerGesturesAndCrop` 使用�
 - 最终 Release APK 在 Android 10 / API 29 和 Android 15 / API 35 均覆盖安装成功，各自执行照片仪器测试得到 `OK (1 test)`。验证了实际双指 MotionEvent、滚轮事件、全屏图片比例、640×640 裁剪及像素颜色、原图字节、Activity 重建后资料保留。
 - 两套模拟器均使用 WebView 124；API 29 延续基础验收的 192 MB ART 堆配置。本次没有真实手机连接，真机触摸、厂商系统及长时间大照片压力仍需实际设备确认。
 - 原始仪器日志：`.test-runtime/android-results/photo-view-api29.txt` 和 `photo-view-api35.txt`。截图：`outputs/android/photo-viewer.jpg`、`photo-viewer-crop.jpg`（使用红绿测试照片）。
-- APK：`outputs/android/new-closet-1.0.0.apk`，10,542,567 字节，SHA-256 `bb735f2cb77273113ccbeb90cbf29c2064962937dcf0fc14cbb218fb3192e0b8`。沿用原发布签名、包名与版本，可覆盖安装。
+- 当时验收 APK 已保留为 `outputs/android/new-closet-1.0.0-before-ui-v1.apk`，10,542,567 字节，SHA-256 `bb735f2cb77273113ccbeb90cbf29c2064962937dcf0fc14cbb218fb3192e0b8`。沿用原发布签名、包名与版本，可覆盖安装。

@@ -11,7 +11,7 @@ import { MAX_PHOTOS, photoAssets, type PhotoData } from "@/lib/domain";
 import { appendCroppedPhoto, appendPhotoFiles, removeDraftPhoto, type PhotoDraft } from "@/lib/photo-draft";
 import { PhotoViewer } from "@/components/photo-viewer";
 
-export function PhotoEditor({ draft, onChange, kind, onError }: { draft: PhotoDraft; onChange: (draft: PhotoDraft) => void; kind: "item" | "outfit"; onError: (message: string) => void }) {
+export function PhotoEditor({ draft, onChange, kind, onError, compact = false }: { compact?: boolean; draft: PhotoDraft; onChange: (draft: PhotoDraft) => void; kind: "item" | "outfit"; onError: (message: string) => void }) {
   const { t } = useI18n();
   const library = useRef<HTMLInputElement>(null);
   const camera = useRef<HTMLInputElement>(null);
@@ -43,7 +43,7 @@ export function PhotoEditor({ draft, onChange, kind, onError }: { draft: PhotoDr
     <input ref={camera} type="file" capture="environment" className="sr-only" accept={getClosetClient() ? "image/*" : "image/jpeg,image/png,image/webp,image/gif,image/avif"} aria-label={kind === "item" ? t("拍摄单品照片") : t("拍摄搭配照片")} onChange={event => choose(event.currentTarget)}/>
     <div className="photo-thumbnails">{draft.photos.map((photo, index) => <button type="button" key={photo.key} className={active?.key === photo.key ? "active" : ""} aria-label={t("查看照片 {number}", { number: index + 1 })} aria-pressed={active?.key === photo.key} onClick={() => setActiveKey(photo.key)}>{source(photo) && <img src={source(photo)} alt={t("照片 {number}", { number: index + 1 })}/>}<span>{photo.key === draft.cover ? t("封面") : index + 1}</span></button>)}</div>
     {active && <div className="photo-current-actions"><Button type="button" variant="outline" disabled={active.key === draft.cover} onClick={() => onChange({ ...draft, cover: active.key })}>{active.key === draft.cover ? t("当前封面") : t("设为封面")}</Button><Button type="button" variant="ghost" onClick={() => { onChange(removeDraftPhoto(draft, active.key)); onError(""); }}><X size={15}/>{t("移除当前照片")}</Button>{active.asset && <a className="text-link" href={assetUrl(active.asset)} onClick={event => { const native = getClosetClient(); if (native?.saveAsset) { event.preventDefault(); void withProfileActivity(() => native.saveAsset!(active.asset!, getProfileContext()!)).catch(error => onError(error.message)); } }} download><Download size={14}/>{t("下载原图")}</a>}</div>}
-    <p className="field-hint">{t("{count} / 20 张照片 · 单张最多 20 MB，不压缩原图", { count: draft.photos.length })}<br/>{kind === "item" ? t("封面用于列表和搭配中的单品拼图。移除封面后，第一张照片自动成为封面。") : t("搭配封面用于我的搭配和穿搭日历。移除封面后，第一张照片自动成为封面。")}</p>
+    <p className="field-hint">{t("{count} / 20 张照片 · 单张最多 20 MB，不压缩原图", { count: draft.photos.length })}{!compact && <><br/>{kind === "item" ? t("封面用于列表和搭配中的单品拼图。移除封面后，第一张照片自动成为封面。") : t("搭配封面用于我的搭配和穿搭日历。移除封面后，第一张照片自动成为封面。")}</>}</p>
   </div>;
 }
 

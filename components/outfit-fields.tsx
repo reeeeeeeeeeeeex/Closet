@@ -10,7 +10,8 @@ import { PhotoEditor } from "@/components/photo-gallery";
 import type { PhotoDraft } from "@/lib/photo-draft";
 import { ItemCard } from "@/components/closet-cards";
 import { CATEGORIES, OCCASIONS, type ItemRecord, type Outfit } from "@/lib/domain";
-export function OutfitFields({ data, onChange, photos, onPhotos, items, onError }: {
+export function OutfitFields({ data, onChange, photos, onPhotos, items, onError, compact = false }: {
+    compact?: boolean;
     data: Outfit;
     onChange: (data: Outfit) => void;
     photos: PhotoDraft;
@@ -24,7 +25,7 @@ export function OutfitFields({ data, onChange, photos, onPhotos, items, onError 
     const selectable = items.filter(item => !item.data.archived || data.itemIds.includes(item.id));
     const available = selectable.filter(item => filter === "all" || item.data.category === filter);
     return <div className="outfit-draft">
-    <PhotoEditor draft={photos} onChange={onPhotos} kind="outfit" onError={onError}/>
+    <PhotoEditor compact={compact} draft={photos} onChange={onPhotos} kind="outfit" onError={onError}/>
     <div className="form-fields">
       <div className="field"><Label htmlFor={`${id}-name`}>{t("搭配名称")}</Label><Input id={`${id}-name`} required maxLength={100} value={data.name} onChange={event => onChange({ ...data, name: event.target.value })} placeholder={t("例如：轻松的周五")}/></div>
       <div className="field"><Label>{t("适合场合")}</Label><div className="chip-row">{Object.entries(OCCASIONS).map(([value, name]) => <button type="button" key={value} className={`chip ${data.occasions.includes(value as Outfit["occasions"][number]) ? "selected" : ""}`} aria-pressed={data.occasions.includes(value as Outfit["occasions"][number])} onClick={() => { const occasion = value as Outfit["occasions"][number]; onChange({ ...data, occasions: data.occasions.includes(occasion) ? data.occasions.filter(o => o !== occasion) : [...data.occasions, occasion] }); }}>{t(name)}</button>)}</div></div>
