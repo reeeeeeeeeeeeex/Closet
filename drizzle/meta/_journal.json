@@ -43,6 +43,13 @@
       "when": 1791687611304,
       "tag": "0005_sync_deletions",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791898263561,
+      "tag": "0006_reflective_sunspot",
+      "breakpoints": true
     }
   ]
 }

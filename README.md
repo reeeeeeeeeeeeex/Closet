@@ -59,7 +59,7 @@ pnpm start
 - ZIP 中有 `manifest.json`、`README.txt` 和 `assets/<sha256>.<extension>`。
 - 数据格式为 `format: "new-closet"`、`schemaVersion: 9`（仍可导入 v1 / v2 / v3 / v4 / v5 / v6 / v7 / v8），不包含平台用户 ID、物理路径或凭据。
 - 导入先检查版本、唯一 ID、关联、图片大小和 SHA-256；数据库事务建立新衣橱，失败回滚。
-- AI 页面生成可复制的真实衣橱上下文，尚未接入外部模型。
+- AI 页面支持 OpenAI 兼容和 Anthropic 原生接口，内置 AI 与外部 MCP 共用衣橱工具，可按授权读取照片、查询资料、保存搭配和安排日历，也保留文字上下文。配置见 [AI 与 MCP](docs/ai-mcp.md)。
 
 电脑端使用本地 Web 服务；Android 1.0.0 将界面和资料保存在手机，支持离线编辑与手动局域网双向同步。安装、配对、构建和签名保管见 [Android 说明](docs/android.md)，实际验证范围见 [验证记录](docs/android-validation.md)。不包含自动抠图或自动 AI 推荐。单张照片最多 20 MB，支持 JPG / PNG / WebP / GIF / AVIF；HEIC 需转换。每个衣橱最多 2000 条记录，导入包最多 2 GB，清单最多 3 MB。
 
@@ -75,6 +75,7 @@ pnpm test
 `pnpm test` 需要先完成生产构建。测试使用随机本地端口和隔离的 `.test-runtime/`，不会写入个人 `data/`。浏览器验收同样使用生产构建产物，结束后关闭 Closet 的全部服务及端口，包括正式服务和临时测试服务；不要自动重启正式服务。
 
 - `tests/portability.mjs`：原图 ZIP 字节往返、快照独立性与损坏备份拒绝。
+- `tests/ai-mcp.mjs`：生产 MCP HTTP/stdio、账号隔离、照片内容、两种模型工具循环、权限、写入重试、密钥和取消检查；模拟供应商验证请求格式，真实模型效果需另行验证。
 - `tests/runtime.mjs`：真实生产 Node 服务的密码登录、授权、SQLite CRUD、冲突、事务回滚、重启持久化和实际 ZIP 导入导出。
 - `drizzle/`：SQLite 迁移，首次使用数据库时自动按文件顺序执行并记录。
 - `lib/local-storage.ts` / `lib/local-auth.ts`：本地磁盘、数据库与认证适配层。

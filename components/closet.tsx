@@ -6,6 +6,7 @@ import { ProfileMenu } from "@/components/profile-menu";
 import { getClosetClient } from "@/lib/closet-client";
 import { getProfileContext, withProfileActivity } from "@/lib/profile-client";
 import { SyncPanel } from "@/components/sync-panel";
+import { AiAssistant } from "@/components/ai-assistant";
 import { tr, translatedOptions } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -76,13 +77,14 @@ function Chips<T extends string>({ options, value, onChange }: {
         string
     ][]).map(([id, label]) => <button type="button" className={`chip ${value.includes(id) ? "selected" : ""}`} key={id} aria-pressed={value.includes(id)} onClick={() => onChange(value.includes(id) ? value.filter(v => v !== id) : [...value, id])}>{t(label)}</button>)}</div>;
 }
-function Picker({ value, onChange, options, label }: {
+function Picker({ value, onChange, options, label, disabled = false }: {
     value: string;
     onChange: (value: string) => void;
     options: Record<string, string>;
     label: string;
+    disabled?: boolean;
 }) {
-    return <Select value={value} onValueChange={onChange}><SelectTrigger className="w-full" aria-label={label}><SelectValue placeholder={label}/></SelectTrigger><SelectContent>{Object.entries(options).map(([key, name]) => <SelectItem key={key} value={key}>{name}</SelectItem>)}</SelectContent></Select>;
+    return <Select disabled={disabled} value={value} onValueChange={onChange}><SelectTrigger className="w-full" aria-label={label}><SelectValue placeholder={label}/></SelectTrigger><SelectContent>{Object.entries(options).map(([key, name]) => <SelectItem key={key} value={key}>{name}</SelectItem>)}</SelectContent></Select>;
 }
 function Navigation({ view, onView, state, profileMenu }: {
     profileMenu: React.ReactNode;
@@ -125,6 +127,7 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
     const [state, setState] = useState<ClosetState | null>(null);
     const [view, setView] = useState<View>("wardrobe");
     const [pendingView, setPendingView] = useState<View | null>(null);
+    const [pendingCollection, setPendingCollection] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [profileChanged, setProfileChanged] = useState(false);
@@ -272,12 +275,12 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
       {view === "wardrobe" ? categoryNavigation : <div className="android-occasion-tabs">{Object.entries({ all: t("全部"), ...translatedOptions(OCCASIONS, t) }).map(([key,label]) => <button key={key} type="button" className={occasion === key ? "active" : ""} onClick={() => setOccasion(key)}>{label}</button>)}</div>}
     </> : <div className={view === "outfits" ? "filter-row outfit-toolbar" : "filter-row"}><div className="search-box"><Search size={17}/><Input value={search} onChange={e => setSearch(e.target.value)} placeholder={view === "wardrobe" ? t("找一件单品、品牌、颜色或备注\u2026") : t("寻找我的搭配\u2026")} aria-label={t("搜索")}/>{search && <button aria-label={t("清空搜索")} onClick={() => setSearch("")}><X size={14}/></button>}</div><div className="filter-controls">{view === "wardrobe" && <ColorFilter colors={wardrobeColors(items)} selected={colorFilter} onChange={setColorFilter}/>}<Picker label={t("场合筛选")} value={occasion} onChange={setOccasion} options={{ all: t("所有场合"), ...translatedOptions(OCCASIONS, t) }}/><button className={`archive-filter ${archived ? "on" : ""}`} aria-pressed={archived} onClick={() => setArchived(!archived)} title={t("查看已收起的单品或搭配")}><Archive size={16}/><span>{t("已收起")}</span></button>{view === "outfits" && <Button className="main-action" disabled={!!error} onClick={() => setEditor({ kind: "outfit" })}><Plus size={18}/>{t("新建搭配")}</Button>}{controls}</div></div>;
     const secondary = ["personalSizes", "backup", "assistant"].includes(view);
-    const navigate = (next: View) => { if (draftDirty) setPendingView(next); else goView(next); };
+    const navigate = (next: View) => { if (operations > 0 || panelBusy) return; if (draftDirty) setPendingView(next); else goView(next); };
     return <SidebarProvider className={android ? "android-app" : undefined} style={{ "--sidebar-width": "248px" } as React.CSSProperties}>
-      {!android && <Navigation view={view} onView={goView} state={state} profileMenu={profileMenu}/>}
+      {!android && <Navigation view={view} onView={navigate} state={state} profileMenu={profileMenu}/>}
       <SidebarInset className="main-inset">{android ? <AndroidHeader title={titles[view]} status={status} secondary={secondary} onBack={() => navigate("account")}/> : <ClosetHeader menu={<SidebarTrigger className="md:hidden"/>} stats={wardrobeStats} error={!!error} loading={loading} syncing={syncing} synced={synced} onRefresh={() => void refresh()} onAdd={() => setEditor({ kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"] })}/>}
     <main className="workspace">
-      {state && state.collections.length > 1 && <div className="collection-switch"><span>{t("当前衣橱")}</span><Picker label={t("切换衣橱")} value={state.collectionId} options={Object.fromEntries(state.collections.map(c => [c.id, c.name]))} onChange={v => void refresh(v)}/></div>}
+      {state && state.collections.length > 1 && <div className="collection-switch"><span>{t("当前衣橱")}</span><Picker disabled={operations > 0 || panelBusy} label={t("切换衣橱")} value={state.collectionId} options={Object.fromEntries(state.collections.map(c => [c.id, c.name]))} onChange={v => { if (draftDirty || editor) setPendingCollection(v); else void refresh(v); }}/></div>}
       {!android && <h1 className="sr-only">{titles[view]}</h1>}
       {error && <div className="error-banner" role="alert"><AlertCircle size={19}/><div><strong>{t("暂时无法同步衣橱")}</strong><p>{error}</p>{profileChanged && <Button variant="outline" onClick={() => { if (draftDirty || editor) { setReloadConfirm(true); } else window.location.reload(); }}>{t("载入当前账号")}</Button>}</div><Button variant="outline" onClick={() => void refresh()}>{t("重试")}</Button></div>}
       {loading ? <div className="loading-grid">{[1, 2, 3, 4].map(n => <Skeleton key={n} className="h-72 rounded-2xl"/>)}</div> : state && <>
@@ -287,11 +290,12 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
         {view === "outfits" && !filteredOutfits.length && <EmptyState icon={Layers3} title={t("没有找到这个搭配")} text={t("拍照、导入搭配照片，或从单品组合一套穿搭。")} action={t("新建搭配")} onAction={() => setEditor({ kind: "outfit" })}/>}</>}
         {view === "calendar" && <CalendarPanel compact={android} entries={calendar} disabled={!!error} onAdd={date => setEditor({ kind: "calendar", date })} onEdit={record => setEditor({ kind: "calendar", record })}/>}
         {view === "backup" && <BackupPanel state={state} onBusyChange={setPanelBusy} onSynced={async () => { const next = await api<ClosetState>("/api/closet"); await refresh(next.collectionId); }} onImported={async (id) => { await refresh(id); goView("wardrobe"); }}/>}
-        {view === "assistant" && <AssistantPanel compact={android} state={state} onDraftChange={setDraftDirty}/>}
+        {view === "assistant" && <AssistantPanel key={state.profile?.id + ":" + state.collectionId} compact={android} state={state} onDraftChange={setDraftDirty} onBusyChange={setPanelBusy} onRefresh={() => refresh()}/>}
         {view === "account" && android && <AndroidAccount profileMenu={profileMenu} status={status} onView={navigate}/> }
         {view === "personalSizes" && <PersonalSizesPanel compact={android} key={state.collectionId} record={state.records.find((record): record is PersonalSizesRecord => record.kind === "personalSizes")} collectionName={state.collections.find(collection => collection.id === state.collectionId)?.name || t("我的衣橱")} disabled={!!error || syncing} onSave={savePersonalSizes} onDraftChange={setDraftDirty} onBusyChange={setPanelBusy} onRefresh={() => refresh()}/> }
       </>}
     </main></SidebarInset>{android && <AndroidNavigation view={view} onView={navigate} disabled={operations > 0 || panelBusy || loading} onAdd={!error && (view === "wardrobe" || view === "outfits") ? () => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"] } : { kind: "outfit" }) : undefined}/>}<Toaster theme="light" position="top-center" richColors/>
+    <AlertDialog open={pendingCollection !== null} onOpenChange={open => { if (!open) setPendingCollection(null); }}><AlertDialogContent className="closet-dialog"><AlertDialogHeader><AlertDialogTitle>{t("切换衣橱前放弃草稿？")}</AlertDialogTitle><AlertDialogDescription>{t("当前页面有未保存的内容，可以先保留并继续编辑。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("保留草稿")}</AlertDialogCancel><AlertDialogAction onClick={() => { const target = pendingCollection; setPendingCollection(null); setDraftDirty(false); setEditor(null); if (target) void refresh(target); }}>{t("放弃草稿并切换")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <AlertDialog open={pendingView !== null} onOpenChange={open => { if (!open) setPendingView(null); }}><AlertDialogContent className="closet-dialog"><AlertDialogHeader><AlertDialogTitle>{t("切换页面前放弃草稿？")}</AlertDialogTitle><AlertDialogDescription>{t("当前页面有未保存的内容，可以先保留并继续编辑。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("保留草稿")}</AlertDialogCancel><AlertDialogAction onClick={() => { if (pendingView) goView(pendingView); setPendingView(null); }}>{t("放弃草稿并切换")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <AlertDialog open={reloadConfirm} onOpenChange={setReloadConfirm}><AlertDialogContent className="closet-dialog"><AlertDialogHeader><AlertDialogTitle>{t("载入当前账号前放弃草稿？")}</AlertDialogTitle><AlertDialogDescription>{t("当前页面有未保存的内容。重新载入后会放弃这些草稿，已保存的资料保留。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("保留草稿")}</AlertDialogCancel><AlertDialogAction onClick={() => window.location.reload()}>{t("放弃草稿并载入")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     {editor?.kind === "item" && <ItemEditor compact={android} key={editor.record?.id || "new-item"} record={editor.record} initialCategory={editor.initialCategory} brands={itemBrands(items)} colorLibrary={state?.colorLibrary || []} onClose={() => setEditor(null)} onSave={save}/>}
@@ -598,9 +602,11 @@ function BackupPanel({ state, onImported, onBusyChange, onSynced }: {
     } }}><DialogContent className="closet-dialog"><DialogHeader><DialogTitle>{t("备份检查通过")}</DialogTitle><DialogDescription>{t("图片内容与 SHA-256 一致，记录关联完整。确认后建立新衣橱。")}</DialogDescription></DialogHeader>{manifest && <div className="import-preview"><h3>{manifest.collection.name}</h3><p>{file?.name} · {formatSize(file?.size || 0)}</p><div><span>{t("单品")}<strong>{manifest.records.filter(r => r.kind === "item").length}</strong></span><span>{t("搭配")}<strong>{manifest.records.filter(r => r.kind === "outfit").length}</strong></span><span>{t("日历")}<strong>{manifest.records.filter(r => r.kind === "calendar").length}</strong></span><span>{t("分组")}<strong>{manifest.records.filter(record => record.kind === "subset").length}</strong></span><span>{t("我的尺码")}<strong>{manifest.records.some(record => record.kind === "personalSizes") ? t("已包含") : t("未填写")}</strong></span><span>{t("原图")}<strong>{manifest.assets.length}</strong></span></div></div>}{busy && <p className="inline-progress"><Loader2 size={16} className="animate-spin"/>{progress}</p>}<FormError message={error}/><DialogFooter><Button variant="outline" disabled={busy} onClick={() => { setManifest(null); setFile(null); }}>{t("取消")}</Button><Button disabled={busy} onClick={() => void restore()}>{busy ? t("恢复中\u2026") : t("导入为新衣橱")}<ArrowRight size={16}/></Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }
-function AssistantPanel({ state, onDraftChange, compact = false }: {
+function AssistantPanel({ state, onDraftChange, onBusyChange, onRefresh, compact = false }: {
     state: ClosetState;
     onDraftChange: (dirty: boolean) => void;
+    onBusyChange: (busy: boolean) => void;
+    onRefresh: () => Promise<unknown>;
     compact?: boolean;
 }) {
     const { t, locale } = useI18n();
@@ -608,6 +614,7 @@ function AssistantPanel({ state, onDraftChange, compact = false }: {
     const [copied, setCopied] = useState(false);
     const prompt = wardrobePrompt(state, request, locale);
     const count = state.records.filter(r => r.kind === "item" && !r.data.archived).length;
+    const native = getClosetClient() !== null;
     const copy = async () => { try {
         await navigator.clipboard.writeText(prompt);
         setCopied(true);
@@ -617,5 +624,6 @@ function AssistantPanel({ state, onDraftChange, compact = false }: {
     catch {
         toast.error(t("无法访问剪贴板，请在下方文本中手动复制"));
     } };
+    if (!native) return <AiAssistant state={state} onDraftChange={onDraftChange} onBusyChange={onBusyChange} onRefresh={onRefresh}/>;
     return <section className="assistant-layout"><div className="assistant-form"><div className="field"><Label htmlFor="ai-request">{t("这次想怎么穿？")}</Label><Textarea id="ai-request" rows={4} value={request} maxLength={3000} onChange={e => { setRequest(e.target.value); onDraftChange(true); }}/></div><AndroidOptionalSection enabled={compact} title={t("可复制的衣橱上下文")}><div className="field"><div className="context-heading"><Label className={compact ? "sr-only" : undefined} htmlFor="ai-context">{t("可复制的衣橱上下文")}</Label><span>{t("{count} 件单品 · 不含照片", { count })}</span></div><Textarea id="ai-context" className="context-preview" rows={10} readOnly value={prompt}/></div></AndroidOptionalSection><Button onClick={() => void copy()} disabled={!count}>{copied ? <Check size={16}/> : <Copy size={16}/>}{copied ? t("已复制") : t("复制给我常用的 AI")}</Button>{!count && <p className="field-hint">{t("添加单品后，就可以生成真实的衣橱上下文。")}</p>}<p className="assistant-note"><LockKeyhole size={16}/>{t("此页不会自动发送衣橱或照片给外部模型。当前尚未连接模型服务。")}</p></div></section>;
 }

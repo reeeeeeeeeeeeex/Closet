@@ -25,3 +25,15 @@ export const syncCodes = sqliteTable('sync_codes', {codeHash:text('code_hash').p
 export const syncDevices = sqliteTable('sync_devices', {id:text('id').primaryKey(),owner:text('owner').notNull(),deviceId:text('device_id').notNull(),name:text('name').notNull(),tokenHash:text('token_hash').notNull().unique(),createdAt:text('created_at').notNull()});
 export const syncReceipts = sqliteTable('sync_receipts', {deviceId:text('device_id').notNull(),requestId:text('request_id').notNull(),bodyHash:text('body_hash').notNull(),response:text('response').notNull()},t=>[primaryKey({columns:[t.deviceId,t.requestId]})]);
 export const syncTombstones = sqliteTable('sync_tombstones', {owner:text('owner').notNull(),syncId:text('sync_id').notNull(),recordId:text('record_id').notNull(),deletedAt:text('deleted_at').notNull()},t=>[primaryKey({columns:[t.owner,t.syncId,t.recordId]})]);
+export const aiSettings = sqliteTable('ai_settings', {
+  owner: text('owner').primaryKey().references(() => accounts.id), provider: text('provider').notNull(), baseUrl: text('base_url').notNull(), model: text('model').notNull(), encryptedKey: text('encrypted_key').notNull(), scopes: text('scopes').notNull(),
+});
+export const mcpConnections = sqliteTable('mcp_connections', {
+  id: text('id').primaryKey(), owner: text('owner').notNull().references(() => accounts.id), collectionId: text('collection_id').notNull(), name: text('name').notNull(), tokenHash: text('token_hash').notNull().unique(), scopes: text('scopes').notNull(), createdAt: text('created_at').notNull(),
+}, t => [foreignKey({ columns: [t.owner, t.collectionId], foreignColumns: [collections.owner, collections.id] })]);
+export const toolActivity = sqliteTable('tool_activity', {
+  id: text('id').primaryKey(), owner: text('owner').notNull().references(() => accounts.id), source: text('source').notNull(), tool: text('tool').notNull(), collectionId: text('collection_id').notNull(), ok: integer('ok').notNull(), createdAt: text('created_at').notNull(),
+});
+export const toolReceipts = sqliteTable('tool_receipts', {
+  owner: text('owner').notNull(), collectionId: text('collection_id').notNull(), requestId: text('request_id').notNull(), bodyHash: text('body_hash').notNull(), response: text('response').notNull(),
+}, t => [primaryKey({ columns: [t.owner, t.collectionId, t.requestId] }), foreignKey({ columns: [t.owner, t.collectionId], foreignColumns: [collections.owner, collections.id] })]);

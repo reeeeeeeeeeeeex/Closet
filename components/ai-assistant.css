@@ -1,0 +1,30 @@
+.ai-workspace { display: grid; gap: 18px; max-width: 900px; width: 100%; margin: 0 auto; }
+.ai-card { background: white; border: 1px solid #e7e9ee; border-radius: 18px; padding: 22px; min-width: 0; }
+.ai-card > summary { cursor: pointer; font-weight: 600; }
+.ai-card[open] > summary { margin-bottom: 18px; }
+.ai-card .field-hint { margin: 12px 0; }
+.ai-settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.ai-wide { grid-column: 1 / -1; }
+.ai-select { width: 100%; height: 42px; border: 1px solid #dddfe5; border-radius: 8px; padding: 0 10px; background: white; }
+.ai-permissions { display: flex; flex-wrap: wrap; gap: 14px; margin: 18px 0; }
+.ai-permissions label { display: flex; gap: 7px; align-items: center; font-size: 14px; }
+.ai-permissions input { width: 16px; height: 16px; accent-color: #62789c; }
+.ai-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.ai-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ai-muted { color: #77808e; font-weight: normal; font-size: 13px; overflow-wrap: anywhere; margin-left: 12px; }
+.ai-transcript { max-height: 560px; overflow: auto; margin: 16px 0; }
+.ai-empty { padding: 24px 12px; color: #7c8491; line-height: 1.8; }
+.ai-message { margin: 12px 0; padding: 16px; border-radius: 12px; background: #f7f8fb; }
+.ai-message-user { background: #eef2f8; }
+.ai-message > strong { display: block; font-size: 13px; margin-bottom: 8px; color: #647087; }
+.ai-message > div { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; font-size: 14px; }
+.ai-tool-trace { font-size: 13px; padding: 12px; border: 1px solid #eee; border-radius: 10px; color: #657086; }
+.ai-tool-trace > div { margin-top: 8px; }
+.ai-tool-trace pre { overflow: auto; max-height: 180px; white-space: pre-wrap; }
+.ai-token { padding: 16px; background: #f2f5f9; border-radius: 12px; margin-top: 16px; }
+.ai-token button { margin: 10px 6px 0 0; }
+.ai-connections { list-style: none; padding: 0; margin: 18px 0; }
+.ai-connections li { display: flex; gap: 12px; justify-content: space-between; align-items: center; padding: 12px 0; border-top: 1px solid #eee; }
+.ai-connections small { display: block; color: #7c8491; margin-top: 4px; overflow-wrap: anywhere; }
+.ai-activity { font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .ai-card { padding: 16px; } .ai-settings-grid { grid-template-columns: 1fr; } .ai-permissions { gap: 12px; } .ai-muted { max-width: 160px; } }
