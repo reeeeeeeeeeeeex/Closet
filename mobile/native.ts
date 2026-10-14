@@ -1,6 +1,13 @@
 import { registerPlugin } from "@capacitor/core";
 import type { Asset, ClosetArchive } from "../lib/domain";
+import type { ModelSettings } from "../lib/ai-types";
 interface NativeStorage {
+  modelSettings(options:{owner:string}):Promise<{settings:ModelSettings|null}>;
+  saveModelSettings(options:{owner:string;settings:ModelSettings & {apiKey?:string}}):Promise<{settings:ModelSettings}>;
+  clearModelSettings(options:{owner:string}):Promise<void>;
+  modelRequest(options:{owner:string;requestId:string;body:string}):Promise<{status:number;body:string}>;
+  cancelModelRequest(options:{requestId:string}):Promise<void>;
+  previewAsset(options:{owner:string;hash:string;size:number}):Promise<{data:string;mimeType:"image/jpeg"}>;
   read(options:{key:string}):Promise<{revision:number;value:string|null;filesRoot:string}>;
   write(options:{key:string;expected:number;value:string}):Promise<{revision:number}>;
   beginFile(options:{owner:string}):Promise<{handle:string}>;

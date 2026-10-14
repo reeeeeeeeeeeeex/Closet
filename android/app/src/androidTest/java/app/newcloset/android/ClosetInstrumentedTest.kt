@@ -43,6 +43,44 @@ class ClosetInstrumentedTest {
         val source=InstrumentationRegistry.getInstrumentation().context.assets.open("client-test.js").bufferedReader().use { it.readText() }
         eval(scenario,source+";true")
     }
+    @Test fun phoneModelAndMcpTools() {
+        val modelAddress = InstrumentationRegistry.getArguments().getString("closetModelAddress") ?: return
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            ready(scenario); loadClient(scenario)
+            runJs(scenario, """
+                const c=ClosetTest,n=window.Capacitor.Plugins.ClosetStorage,root=await c.bootstrap(),owner=root.current;c.setProfileContext(owner);
+                const request=async(path,data,method=data?'POST':'GET')=>{const response=await c.androidClient.request(path,{method,headers:{'X-Closet-Profile':owner},body:data?JSON.stringify(data):undefined});const json=await response.json();if(!response.ok)throw Error(json.error);return json};
+                const state=await request('/api/closet'),canvas=document.createElement('canvas');canvas.width=96;canvas.height=128;const context=canvas.getContext('2d');context.fillStyle='#214f90';context.fillRect(0,0,96,128);
+                const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png')),asset=await c.androidClient.uploadAsset(new File([blob],'native-ai.png',{type:'image/png'}),owner);
+                const item=await request('/api/closet',{op:'save',collectionId:state.collectionId,kind:'item',data:{name:'AI native shirt',category:'top',color:'蓝',seasons:[],occasions:['work'],notes:'',asset:asset.hash,photos:[asset.hash],archived:false}});
+                const settings={provider:'openai',baseUrl:${JSONObject.quote(modelAddress)},model:'fixture-vision',apiKey:'android-fixture-key',scopes:['read','photos','sizes','write']};
+                const configured=await request('/api/ai/settings',settings);if(JSON.stringify(configured).includes('android-fixture-key')||configured.settings.apiKey!==undefined)throw Error('Model key crossed bridge');
+                const stored=await n.read({key:'ai:'+owner});if(stored.value.includes('android-fixture-key')||!stored.value.includes('encryptedKey'))throw Error('Model key not encrypted');
+                const before=new Uint8Array(await (await fetch(c.localAssetUrl(asset.hash,owner))).arrayBuffer());
+                const chat=async()=>{const response=await c.androidClient.request('/api/ai/chat',{method:'POST',headers:{'X-Closet-Profile':owner},body:JSON.stringify({collectionId:state.collectionId,prompt:'看看我的照片',history:[]})});if(!response.ok)throw Error(await response.text());const events=(await response.text()).trim().split('\n').map(v=>JSON.parse(v));if(events.at(-1).type!=='answer'||!events.some(e=>e.type==='tool_result'&&e.imageCount===1))throw Error('Phone model loop failed: '+JSON.stringify(events));};
+                await chat();await request('/api/ai/settings',{...settings,provider:'anthropic'});await chat();
+                const mcp=await c.connectToolsMcp({collectionId:state.collectionId,scopes:settings.scopes},c.phoneTools(owner,state.collectionId,settings.scopes,new AbortController().signal));
+                const args={requestId:crypto.randomUUID(),name:'AI phone outfit',itemIds:[item.id]};const first=await mcp.client.callTool({name:'create_outfit',arguments:args}),again=await mcp.client.callTool({name:'create_outfit',arguments:args});if(first.structuredContent.id!==again.structuredContent.id)throw Error('Phone write duplicated');
+                await mcp.client.callTool({name:'plan_outfit',arguments:{requestId:crypto.randomUUID(),outfitId:first.structuredContent.id,date:'2026-10-15'}});await mcp.close();
+                await request('/api/ai/settings',{...settings,scopes:['read']});let denied=false;try{await n.previewAsset({owner,hash:asset.hash,size:1024})}catch{denied=true}if(!denied)throw Error('Native photo permission bypass');
+                const after=new Uint8Array(await (await fetch(c.localAssetUrl(asset.hash,owner))).arrayBuffer());if(before.length!==after.length||before.some((v,i)=>v!==after[i]))throw Error('Preview rewrote original');
+                const saved=await request('/api/closet');if(saved.records.filter(r=>r.id===first.structuredContent.id).length!==1||!saved.records.some(r=>r.kind==='calendar'&&r.data.outfitId===first.structuredContent.id))throw Error('Local write missing');
+                if(JSON.stringify(c.manifestFromState(saved)).includes('encryptedKey'))throw Error('Backup contains model credentials');
+                await request('/api/ai/settings',settings);
+                const my=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='我的');if(!my)throw Error('My navigation missing');my.click();
+                for(let i=0;i<100&&!document.querySelector('.android-my-links');i++)await new Promise(r=>setTimeout(r,100));
+                [...document.querySelectorAll('.android-my-links button')].find(b=>b.textContent.trim()==='穿搭灵感').click();
+                for(let i=0;i<100&&!document.querySelector('#ai-chat-prompt');i++)await new Promise(r=>setTimeout(r,100));
+                [...document.querySelectorAll('.ai-card > summary')].find(b=>b.textContent.includes('模型设置')).click();
+                const field=document.querySelector('#ai-chat-prompt');if(!field)throw Error('Phone AI screen missing');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(field,'看看我的照片');field.dispatchEvent(new Event('input',{bubbles:true}));await new Promise(r=>setTimeout(r,200));
+                const send=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='发送');if(!send||send.disabled)throw Error('Phone AI send unavailable');send.click();
+                for(let i=0;i<150&&!document.body.innerText.includes('手机本地 MCP 已读取真实照片');i++)await new Promise(r=>setTimeout(r,100));
+                if(!document.body.innerText.includes('手机本地 MCP 已读取真实照片')||!document.body.innerText.includes('电脑无需运行'))throw Error('Phone AI UI did not complete: '+document.body.innerText);
+                const snapshot={owner,recordIds:(await c.readDocument(owner)).value.replica.collections.flatMap(v=>v.records.map(r=>r.id)).sort(),encryptedKey:JSON.parse((await n.read({key:'ai:'+owner})).value).encryptedKey};const oldSnapshot=await n.read({key:'ai-upgrade-fixture'});await n.write({key:'ai-upgrade-fixture',expected:oldSnapshot.revision,value:JSON.stringify(snapshot)});
+                return {owner,itemId:item.id,hash:asset.hash};
+            """.trimIndent())
+        }
+    }
     @Test fun offlineAccountAndAllRecordTypes(){
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             ready(scenario);loadClient(scenario)
@@ -203,6 +241,18 @@ class ClosetInstrumentedTest {
     @Test fun verifyPreviouslySavedItem(){
         if(InstrumentationRegistry.getArguments().getString("checkUpgrade")!="true")return
         ActivityScenario.launch(MainActivity::class.java).use { scenario -> ready(scenario);runJs(scenario,"const n=window.Capacitor.Plugins.ClosetStorage;const root=JSON.parse((await n.read({key:'root'})).value);const doc=JSON.parse((await n.read({key:'profile:'+root.current})).value);if(!doc.replica.collections.flatMap(c=>c.records).some(r=>r.data.name?.startsWith('手机离线验收-')))throw Error('Upgrade lost previously saved item');return true;") }
+    }
+    @Test fun phoneAiUpgradeKeepsCredentialsAndRecords() {
+        if (InstrumentationRegistry.getArguments().getString("checkAiUpgrade") != "true") return
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            ready(scenario)
+            runJs(scenario, """
+                const n=window.Capacitor.Plugins.ClosetStorage,snapshot=JSON.parse((await n.read({key:'ai-upgrade-fixture'})).value),root=JSON.parse((await n.read({key:'root'})).value);if(root.current!==snapshot.owner)throw Error('Upgrade changed selected owner');
+                const doc=JSON.parse((await n.read({key:'profile:'+root.current})).value),ids=doc.replica.collections.flatMap(c=>c.records.map(r=>r.id)).sort();if(JSON.stringify(ids)!==JSON.stringify(snapshot.recordIds))throw Error('Upgrade lost records');
+                const stored=JSON.parse((await n.read({key:'ai:'+root.current})).value);if(stored.encryptedKey!==snapshot.encryptedKey)throw Error('Upgrade changed stored credential');
+                const response=await n.modelRequest({owner:root.current,requestId:crypto.randomUUID(),body:JSON.stringify({messages:[{role:'user',content:'upgrade probe'}],tools:[]})});if(response.status!==200)throw Error('Keystore key did not survive upgrade');return {records:ids.length};
+            """.trimIndent())
+        }
     }
     @Test fun photoViewerGesturesAndCrop(){
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->

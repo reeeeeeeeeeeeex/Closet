@@ -18,7 +18,7 @@ function ScopePicker({ value, onChange, disabled = false, prefix }: { value: Too
   const labels: [ToolScope, string][] = [["read", t("读取衣橱资料")], ["photos", t("查看照片")], ["sizes", t("读取身体尺码")], ["write", t("保存搭配与日历")]];
   return <div className="ai-permissions">{labels.map(([scope, label]) => <label key={scope} htmlFor={prefix + scope}><input id={prefix + scope} type="checkbox" checked={value.includes(scope)} disabled={disabled || scope === "read"} onChange={e => onChange(e.target.checked ? [...value, scope] : value.filter(v => v !== scope))}/>{label}</label>)}</div>;
 }
-export function AiAssistant({ state, onDraftChange, onBusyChange, onRefresh }: { state: ClosetState; onDraftChange: (v: boolean) => void; onBusyChange: (v: boolean) => void; onRefresh: () => Promise<unknown> }) {
+export function AiAssistant({ state, onDraftChange, onBusyChange, onRefresh, native = false }: { state: ClosetState; onDraftChange: (v: boolean) => void; onBusyChange: (v: boolean) => void; onRefresh: () => Promise<unknown>; native?: boolean }) {
   const { t, locale } = useI18n();
   const [settings, setSettings] = useState<ModelSettings>(initialSettings), [configured, setConfigured] = useState(false), [key, setKey] = useState(""), [dirty, setDirty] = useState(false);
   const [loaded, setLoaded] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
@@ -96,7 +96,7 @@ export function AiAssistant({ state, onDraftChange, onBusyChange, onRefresh }: {
         <div className="field ai-wide"><Label htmlFor="ai-key">API Key</Label><Input id="ai-key" type="password" autoComplete="off" disabled={busy} value={key} maxLength={4000} placeholder={settings.hasKey ? t("已保存，留空继续使用") : t("填写服务密钥")} onChange={e => { setKey(e.target.value); setDirty(true); onDraftChange(true); }}/></div>
       </div>
       <ScopePicker prefix="model-" value={settings.scopes} disabled={busy} onChange={scopes => update({ scopes })}/>
-      <p className="field-hint">{t("选择支持工具调用的模型；查看照片还需要模型支持视觉。密钥仅在电脑服务保存。")}</p>
+      <p className="field-hint">{native ? t("手机直接连接模型服务，查询本机衣橱和照片。密钥通过 Android Keystore 加密保存，电脑无需运行。") : t("选择支持工具调用的模型；查看照片还需要模型支持视觉。密钥仅在电脑服务保存。")}</p>
       <div className="ai-actions"><Button disabled={!loaded || busy || !settings.model.trim()} onClick={() => void saveSettings()}>{t("保存模型设置")}</Button>{configured && <Button variant="outline" disabled={busy} onClick={() => void work(async () => { await api("/api/ai/settings", { method: "DELETE" }); setConfigured(false); setSettings(initialSettings); setKey(""); setDirty(false); onDraftChange(!!prompt.trim() || !!connectionName.trim()); })}>{t("清除模型配置")}</Button>}</div>
     </details>
     <div className="ai-card ai-chat">
@@ -109,7 +109,7 @@ export function AiAssistant({ state, onDraftChange, onBusyChange, onRefresh }: {
       <Label htmlFor="ai-chat-prompt">{t("这次想怎么穿？")}</Label><Textarea id="ai-chat-prompt" rows={3} maxLength={3000} disabled={busy} value={prompt} onChange={e => { setPrompt(e.target.value); onDraftChange(dirty || !!connectionName.trim() || !!e.target.value.trim()); }}/>
       <div className="ai-actions"><Button disabled={!loaded || busy || !configured || dirty || !prompt.trim()} onClick={() => void send()}><Send size={16}/>{t("发送")}</Button>{busy && <Button variant="outline" onClick={() => abort.current?.abort()}><Square size={14}/>{t("停止")}</Button>}<Button variant="ghost" disabled={busy || !messages.length} onClick={() => { setMessages([]); setEvents([]); }}>{t("开始新对话")}</Button></div>{dirty && <p className="field-hint">{t("先保存模型设置，再发送需求。")}</p>}
     </div>
-    <details className="ai-card"><summary>{t("外部 AI 连接（MCP）")}</summary><p className="field-hint">{t("每个连接固定授权当前账号的指定衣橱。可以随时撤销，网页切换账号不会改变外部连接的资料范围。")}</p>
+    {!native && <details className="ai-card"><summary>{t("外部 AI 连接（MCP）")}</summary><p className="field-hint">{t("每个连接固定授权当前账号的指定衣橱。可以随时撤销，网页切换账号不会改变外部连接的资料范围。")}</p>
       <div className="field"><Label htmlFor="mcp-name">{t("连接名称")}</Label><Input id="mcp-name" value={connectionName} maxLength={100} disabled={busy} placeholder={t("例如：我的 AI 客户端")} onChange={e => { setConnectionName(e.target.value); onDraftChange(dirty || !!prompt.trim() || !!e.target.value.trim()); }}/></div>
       <ScopePicker prefix="connection-" value={connectionScopes} disabled={busy} onChange={setConnectionScopes}/>
       <Button disabled={!loaded || busy || !connectionName.trim()} onClick={() => void createExternal()}>{t("为当前衣橱创建连接")}</Button>
@@ -117,7 +117,7 @@ export function AiAssistant({ state, onDraftChange, onBusyChange, onRefresh }: {
       <p className="field-hint">{t("HTTP 地址：当前 Closet 服务地址后加 /mcp；认证头为 Authorization: Bearer 加连接令牌。本机也可使用项目附带的 stdio 入口。")}</p>
       <ul className="ai-connections">{connections.map(c => <li key={c.id}><div><strong>{c.name}</strong><small>{state.collections.find(v => v.id === c.collectionId)?.name || c.collectionId} · {c.scopes.join(" / ")}</small></div><Button variant="outline" disabled={busy} onClick={() => void work(async () => { await api("/api/mcp/connections", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: c.id }) }); setNewToken(""); await reloadExternal(); })}>{t("撤销连接")}</Button></li>)}</ul>
       <details><summary>{t("最近的衣橱操作")}</summary><Button variant="ghost" disabled={busy} onClick={() => void work(reloadExternal)}>{t("刷新操作记录")}</Button>{activity.map(a => <p className="ai-activity" key={a.id}>{a.source} · {labels[a.tool] || a.tool} · {a.ok ? t("已完成") : t("未完成")} · {new Date(a.createdAt).toLocaleString(locale)}</p>)}</details>
-    </details>
+    </details>}
     <details className="ai-card"><summary>{t("可复制的衣橱上下文")}</summary><Textarea aria-label={t("可复制的衣橱上下文")} readOnly rows={8} value={wardrobePrompt(state, prompt, locale)}/><Button variant="outline" onClick={() => void copy(wardrobePrompt(state, prompt, locale))}><Copy size={16}/>{t("复制文字上下文")}</Button><p className="field-hint">{t("复制的文字不含照片；连接模型后可通过工具查看照片。")}</p></details>
     {error && <p className="form-error" role="alert">{error}</p>}
   </section>;

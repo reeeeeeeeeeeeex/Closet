@@ -24,6 +24,13 @@ class ClosetStoragePlugin : Plugin() {
     private val workers = Executors.newFixedThreadPool(3)
     private val dbLock = Any()
     private lateinit var db: SQLiteDatabase
+    private val ai by lazy { ClosetAi(context, db, dbLock) }
+    @PluginMethod fun modelSettings(call: PluginCall) = run(call) { ai.settings(call) }
+    @PluginMethod fun saveModelSettings(call: PluginCall) = run(call) { ai.saveSettings(call) }
+    @PluginMethod fun clearModelSettings(call: PluginCall) = run(call) { ai.clearSettings(call) }
+    @PluginMethod fun modelRequest(call: PluginCall) = run(call) { ai.request(call) }
+    @PluginMethod fun previewAsset(call: PluginCall) = run(call) { ai.preview(call) }
+    @PluginMethod fun cancelModelRequest(call: PluginCall) { try { ai.cancel(call) } catch (e: Exception) { call.reject("取消请求失败", e) } }
     private val imageLimit = 20L * 1024 * 1024
     private val archiveLimit = 2L * 1024 * 1024 * 1024
     override fun load() {

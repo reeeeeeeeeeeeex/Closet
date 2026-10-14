@@ -3,8 +3,9 @@ import { Native } from "./native";
 import { type Replica, emptyReplica, normalizeReplica } from "../lib/sync-model";
 import type { Profile } from "../lib/profile-types";
 import type { SyncBinding } from "./sync";
+import type { ToolActivity } from "../lib/ai-types";
 export type RootState = { version:1;deviceId:string;profiles:Profile[];current:string };
-export type LocalDocument = { version:1;replica:Replica;binding?:SyncBinding };
+export type LocalDocument = { version:1;replica:Replica;binding?:SyncBinding;aiActivity?:ToolActivity[];aiReceipts?:{collectionId:string;requestId:string;hash:string;result:Record<string,unknown>}[] };
 let tail:Promise<unknown>=Promise.resolve();
 export function locked<T>(work:()=>Promise<T>):Promise<T>{const next=tail.then(work,work);tail=next.catch(()=>{});return next;}
 export async function read<T>(key:string){const data=await Native.read({key});return {revision:data.revision,value:data.value?JSON.parse(data.value) as T:null,filesRoot:data.filesRoot};}

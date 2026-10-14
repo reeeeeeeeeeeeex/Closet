@@ -70,6 +70,6 @@ OpenAI 的文字工具结果后追加带实际图片的多模态 user 消息；A
 
 先 `pnpm build`，再 `pnpm test`。新增 `tests/ai-mcp.mjs` 使用隔离数据和独立端口，通过与 pnpm start 相同的生产入口运行，检查 HTTP/stdio、账号隔离、权限拒绝、原图保留、两种模型请求内实际 JPEG、写入重试、密钥、错误和取消。测试结束关闭全部 Closet 服务，包括正式 4320 和临时服务；不自动重启。`scripts/stop-services.ps1` 只结束路径属于本项目的服务，其他程序占用端口会报告。
 
-供应商请求通过本地模拟服务器验格式，未消耗真实模型额度；尚未检验真实模型的视觉理解或推荐质量，需填写用户选定的模型后检验。Android 原生离线应用保留复制文字上下文；本版 AI/MCP 运行在电脑服务，手机浏览器访问电脑服务也可使用。
+供应商请求通过本地模拟服务器验格式，未消耗真实模型额度；尚未检验真实模型的视觉理解或推荐质量，需填写用户选定的模型后检验。Android 原生应用也支持手机直接连接模型并调用本地 MCP 工具，不依赖电脑 Closet 服务；详情见 [安卓本地 AI](android-ai.md)。外部 HTTP/stdio 接入仍由电脑端提供。
 
 参考：[MCP 工具](https://modelcontextprotocol.io/specification/latest/server/tools)、[OpenAI 工具调用](https://developers.openai.com/api/docs/guides/function-calling)、[Anthropic 工具调用](https://platform.claude.com/docs/en/agents-and-tools/tool-use/implement-tool-use)、[Anthropic 视觉](https://platform.claude.com/docs/en/build-with-claude/vision)。

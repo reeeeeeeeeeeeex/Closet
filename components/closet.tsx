@@ -7,10 +7,11 @@ import { getClosetClient } from "@/lib/closet-client";
 import { getProfileContext, withProfileActivity } from "@/lib/profile-client";
 import { SyncPanel } from "@/components/sync-panel";
 import { AiAssistant } from "@/components/ai-assistant";
+import { LockKeyhole } from "lucide-react";
 import { tr, translatedOptions } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Shirt, Layers3, CalendarDays, Database, Sparkles, Plus, Search, ArrowRight, Download, Upload, Check, X, Archive, ChevronLeft, ChevronRight, ChevronDown, LockKeyhole, Copy, Loader2, Camera, AlertCircle, PackageOpen, Ruler, } from "lucide-react";
+import { Shirt, Layers3, CalendarDays, Database, Sparkles, Plus, Search, ArrowRight, Download, Upload, Check, X, Archive, ChevronLeft, ChevronRight, ChevronDown,  Loader2, Camera, AlertCircle, PackageOpen, Ruler, } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,7 +23,7 @@ import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter,
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { CATEGORIES, OCCASIONS, SEASONS, wardrobePrompt, type Item, type ItemRecord, type Outfit, type OutfitRecord, type CalendarRecord, type ClosetState, type ClosetRecord, type ClosetArchive, type Subset, type SubsetRecord, type PersonalSizesRecord, type PersonalSizes } from "@/lib/domain";
+import { CATEGORIES, OCCASIONS, SEASONS, type Item, type ItemRecord, type Outfit, type OutfitRecord, type CalendarRecord, type ClosetState, type ClosetRecord, type ClosetArchive, type Subset, type SubsetRecord, type PersonalSizesRecord, type PersonalSizes } from "@/lib/domain";
 import { Photo, OutfitCollage, ItemCard, OutfitCard } from "@/components/closet-cards";
 import { AndroidAccount, AndroidHeader, AndroidNavigation, AndroidOptionalSection, AndroidSearch, type ClosetView } from "@/components/android-shell";
 import { ClosetHeader } from "@/components/closet-header";
@@ -602,28 +603,12 @@ function BackupPanel({ state, onImported, onBusyChange, onSynced }: {
     } }}><DialogContent className="closet-dialog"><DialogHeader><DialogTitle>{t("备份检查通过")}</DialogTitle><DialogDescription>{t("图片内容与 SHA-256 一致，记录关联完整。确认后建立新衣橱。")}</DialogDescription></DialogHeader>{manifest && <div className="import-preview"><h3>{manifest.collection.name}</h3><p>{file?.name} · {formatSize(file?.size || 0)}</p><div><span>{t("单品")}<strong>{manifest.records.filter(r => r.kind === "item").length}</strong></span><span>{t("搭配")}<strong>{manifest.records.filter(r => r.kind === "outfit").length}</strong></span><span>{t("日历")}<strong>{manifest.records.filter(r => r.kind === "calendar").length}</strong></span><span>{t("分组")}<strong>{manifest.records.filter(record => record.kind === "subset").length}</strong></span><span>{t("我的尺码")}<strong>{manifest.records.some(record => record.kind === "personalSizes") ? t("已包含") : t("未填写")}</strong></span><span>{t("原图")}<strong>{manifest.assets.length}</strong></span></div></div>}{busy && <p className="inline-progress"><Loader2 size={16} className="animate-spin"/>{progress}</p>}<FormError message={error}/><DialogFooter><Button variant="outline" disabled={busy} onClick={() => { setManifest(null); setFile(null); }}>{t("取消")}</Button><Button disabled={busy} onClick={() => void restore()}>{busy ? t("恢复中\u2026") : t("导入为新衣橱")}<ArrowRight size={16}/></Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }
-function AssistantPanel({ state, onDraftChange, onBusyChange, onRefresh, compact = false }: {
+function AssistantPanel({ state, onDraftChange, onBusyChange, onRefresh }: {
     state: ClosetState;
     onDraftChange: (dirty: boolean) => void;
     onBusyChange: (busy: boolean) => void;
     onRefresh: () => Promise<unknown>;
     compact?: boolean;
 }) {
-    const { t, locale } = useI18n();
-    const [request, setRequest] = useState(t("用现有单品搭配三套适合日常出门的穿搭，考虑整体比例和走路的舒适度。"));
-    const [copied, setCopied] = useState(false);
-    const prompt = wardrobePrompt(state, request, locale);
-    const count = state.records.filter(r => r.kind === "item" && !r.data.archived).length;
-    const native = getClosetClient() !== null;
-    const copy = async () => { try {
-        await navigator.clipboard.writeText(prompt);
-        setCopied(true);
-        toast.success(t("已复制，可粘贴给你常用的 AI"));
-        setTimeout(() => setCopied(false), 3000);
-    }
-    catch {
-        toast.error(t("无法访问剪贴板，请在下方文本中手动复制"));
-    } };
-    if (!native) return <AiAssistant state={state} onDraftChange={onDraftChange} onBusyChange={onBusyChange} onRefresh={onRefresh}/>;
-    return <section className="assistant-layout"><div className="assistant-form"><div className="field"><Label htmlFor="ai-request">{t("这次想怎么穿？")}</Label><Textarea id="ai-request" rows={4} value={request} maxLength={3000} onChange={e => { setRequest(e.target.value); onDraftChange(true); }}/></div><AndroidOptionalSection enabled={compact} title={t("可复制的衣橱上下文")}><div className="field"><div className="context-heading"><Label className={compact ? "sr-only" : undefined} htmlFor="ai-context">{t("可复制的衣橱上下文")}</Label><span>{t("{count} 件单品 · 不含照片", { count })}</span></div><Textarea id="ai-context" className="context-preview" rows={10} readOnly value={prompt}/></div></AndroidOptionalSection><Button onClick={() => void copy()} disabled={!count}>{copied ? <Check size={16}/> : <Copy size={16}/>}{copied ? t("已复制") : t("复制给我常用的 AI")}</Button>{!count && <p className="field-hint">{t("添加单品后，就可以生成真实的衣橱上下文。")}</p>}<p className="assistant-note"><LockKeyhole size={16}/>{t("此页不会自动发送衣橱或照片给外部模型。当前尚未连接模型服务。")}</p></div></section>;
+    return <AiAssistant native={getClosetClient() !== null} state={state} onDraftChange={onDraftChange} onBusyChange={onBusyChange} onRefresh={onRefresh}/>;
 }

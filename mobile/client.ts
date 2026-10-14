@@ -7,6 +7,8 @@ import { mutateRecords, MutationError } from "../lib/mutations";
 import { colorKey,isCommonColor,itemColorStyle,type LibraryColor } from "../lib/colors";
 import { getProfileContext } from "../lib/profile-client";
 import { manifestFromState } from "../lib/portable";
+import { phoneAiRequest } from "./ai";
+import { McpToolError } from "../lib/mcp-core";
 const nameSchema=z.string().trim().min(1,"请填写账号名称").max(100,"账号名称不能超过 100 个字符");
 export function mergeColors(colors:LibraryColor[], additions:LibraryColor[]){const map=new Map(colors.map(c=>[colorKey(c),c]));for(const c of additions){if(isCommonColor(c))continue;const old=map.get(colorKey(c));if(!old||c.usedAt>old.usedAt)map.set(colorKey(c),c);}return [...map.values()];}
 export const androidClient:ClosetClient={
@@ -31,6 +33,7 @@ export const androidClient:ClosetClient={
       }
       const owner=new Headers(init.headers).get('X-Closet-Profile')||getProfileContext();
       if(!owner||owner!==root.current)return Response.json({error:'账号已切换，请重新载入',code:'PROFILE_CHANGED'},{status:409});
+      if(url.pathname.startsWith('/api/ai/')||url.pathname==='/api/mcp/connections')return await phoneAiRequest(owner,url.pathname,method,body,init.signal||undefined);
       if(url.pathname!=='/api/closet')throw new MutationError(404,'本地接口不存在');
       if(method==='GET'){
         const replica=(await readDocument(owner)).value.replica;
@@ -53,7 +56,7 @@ export const androidClient:ClosetClient={
         const additions=c.records.flatMap(r=>r.kind==='item'?itemColorStyle(r.data).values.map(v=>({...v,usedAt:r.updatedAt})):[]);
         doc.replica.colorLibrary=mergeColors(doc.replica.colorLibrary,additions);return next.result;
       });return Response.json(result);
-    }catch(e){return Response.json({error:e instanceof z.ZodError?e.issues[0]?.message:e instanceof Error?e.message:'操作失败'},{status:e instanceof MutationError?e.status:400});}
+    }catch(e){return Response.json({error:e instanceof z.ZodError?e.issues[0]?.message:e instanceof Error?e.message:'操作失败',...(e instanceof McpToolError && e.status===409 ? {code:'PROFILE_CHANGED'} : {})},{status:e instanceof MutationError||e instanceof McpToolError?e.status:400});}
   },
   async uploadAsset(file,owner){
     if(file.size>20*1024*1024||!file.size)throw Error('单张图片最多 20 MB，且不能为空');
