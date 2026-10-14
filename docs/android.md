@@ -2,13 +2,15 @@
 
 ## 安装
 
-首版为 New Closet 1.0.0，包名 `app.newcloset.android`，支持 Android 10（API 29）及以上，需要系统 Android System WebView 124 或更新版本。老系统如仍使用出厂 WebView，请先在系统应用商店更新；App 会显示更新提示。将 `outputs/android/new-closet-1.0.0.apk` 复制到手机并打开，允许此次使用的文件管理器安装应用。SHA-256 在同目录的 `.apk.sha256` 文件中。
+当前发布为 New Closet 1.1.0，包名 `app.newcloset.android`，支持 Android 10（API 29）及以上，需要系统 Android System WebView 124 或更新版本。老系统如仍使用出厂 WebView，请先在系统应用商店更新；App 会显示更新提示。将 `outputs/android/new-closet-1.1.0.apk` 复制到手机并打开，允许此次使用的文件管理器安装应用。SHA-256 在同目录的 `.apk.sha256` 文件中。沿用原签名，可直接覆盖安装；本次验证见 [1.1.0 发布验证](android-1.1-validation.md)。
 
 安装包内含完整界面。账号、单品、分组、搭配、日历快照、尺码、颜色库和原图都保存在 App 的私有目录，不依赖电脑运行。覆盖安装同签名更新会保留资料。卸载会删除私有资料，卸载前请在“数据与备份”导出 ZIP。
 
 安卓 UI 使用底部“衣橱、搭配、日历、我的”导航；尺码和数据与备份位于“我的”。主页面直接从搜索或月份开始，账号以文字显示，测量说明和灵感上下文按需展开。本版设计参考、实际截图和测试见 [Android UI v2](android-ui-v2.md)。
 
 ## 照片查看与裁剪
+
+“我的 → 穿搭灵感”可配置 OpenAI 兼容或 Anthropic 原生模型，手机直接连接模型并调用手机本地 MCP 工具读取资料和照片，电脑 Closet 服务无需运行。密钥由 Android Keystore 加密，资料与保存结果保留在手机。配置和权限见 [安卓本地 AI](android-ai.md)。
 
 点击照片直接展开大图，双指或滚轮缩放，放大后拖动查看；底部提供编辑、裁剪和原图下载。裁剪结果保存为新照片，原图保留。详情表单内的裁剪还需保存资料才会提交。参见 [照片查看器说明](photo-viewer.md)。
 

@@ -39,11 +39,16 @@ $gradleTask = if ($DebugBuild) { 'assembleDebug' } else { 'assembleRelease' }
 Invoke-Checked $taskGradle @('-p','android',$gradleTask,'--no-daemon','--console=plain')
 New-Item -ItemType Directory -Force -Path 'outputs/android' | Out-Null
 $variant = if ($DebugBuild) { 'debug' } else { 'release' }
-$apkName = if ($DebugBuild) { 'new-closet-1.0.0-test.apk' } else { 'new-closet-1.0.0.apk' }
+$taskVersion = [regex]::Match([IO.File]::ReadAllText((Join-Path (Get-Location) 'android/app/build.gradle')), 'versionName\s+"([^"]+)"').Groups[1].Value
+if (-not $taskVersion) { throw 'Android versionName is missing.' }
+$apkName = if ($DebugBuild) { "new-closet-$taskVersion-test.apk" } else { "new-closet-$taskVersion.apk" }
 $destination = Join-Path 'outputs/android' $apkName
 Copy-Item -LiteralPath "android/app/build/outputs/apk/$variant/app-$variant.apk" -Destination $destination
 Invoke-Checked (Join-Path $taskSdk 'build-tools/36.0.0/apksigner.bat') @('verify','--verbose',$destination)
-$checksum = (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash.ToLowerInvariant()
+$taskHash = [Security.Cryptography.SHA256]::Create()
+$taskApkStream = [IO.File]::OpenRead((Join-Path (Get-Location) $destination))
+try { $checksum = ([BitConverter]::ToString($taskHash.ComputeHash($taskApkStream))).Replace('-', '').ToLowerInvariant() }
+finally { $taskApkStream.Dispose(); $taskHash.Dispose() }
 [IO.File]::WriteAllText((Join-Path (Get-Location) ($destination + '.sha256')), "$checksum  $apkName`n")
 Write-Output "APK: $destination"
 Write-Output "SHA-256: $checksum"

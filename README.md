@@ -61,7 +61,7 @@ pnpm start
 - 导入先检查版本、唯一 ID、关联、图片大小和 SHA-256；数据库事务建立新衣橱，失败回滚。
 - AI 页面支持 OpenAI 兼容和 Anthropic 原生接口，内置 AI 与外部 MCP 共用衣橱工具，可按授权读取照片、查询资料、保存搭配和安排日历，也保留文字上下文。配置见 [AI 与 MCP](docs/ai-mcp.md)。
 
-电脑端使用本地 Web 服务；Android 1.0.0 将界面和资料保存在手机，支持离线编辑与手动局域网双向同步。安装、配对、构建和签名保管见 [Android 说明](docs/android.md)，实际验证范围见 [验证记录](docs/android-validation.md)。不包含自动抠图或自动 AI 推荐。单张照片最多 20 MB，支持 JPG / PNG / WebP / GIF / AVIF；HEIC 需转换。每个衣橱最多 2000 条记录，导入包最多 2 GB，清单最多 3 MB。
+电脑端使用本地 Web 服务；Android 1.1.0 将界面和资料保存在手机，支持离线编辑与手动局域网双向同步。安装、配对、构建和签名保管见 [Android 说明](docs/android.md)，实际验证范围见 [1.1.0 验证记录](docs/android-1.1-validation.md)。不包含自动抠图或自动 AI 推荐。单张照片最多 20 MB，支持 JPG / PNG / WebP / GIF / AVIF；HEIC 需转换。每个衣橱最多 2000 条记录，导入包最多 2 GB，清单最多 3 MB。
 
 ## 开发与验证
 
