@@ -79,6 +79,47 @@ class ClosetInstrumentedTest {
         val source=InstrumentationRegistry.getInstrumentation().context.assets.open("client-test.js").bufferedReader().use { it.readText() }
         eval(scenario,source+";true")
     }
+    @Test fun modalViewportStability(){
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            ready(scenario,"en")
+            // WebView 124 reports zero safe-area insets on this emulator. Substitute
+            // device insets in the loaded CSS to cover edge-to-edge phone layouts.
+            val safeTop=InstrumentationRegistry.getArguments().getString("safeAreaTop","24")!!.toInt()
+            eval(scenario,"""
+                (()=>{const insets={top:$safeTop,right:${if(safeTop>0)8 else 0},bottom:${if(safeTop>0)16 else 0},left:${if(safeTop>0)8 else 0}};
+                const visit=rules=>{for(const rule of rules){if(rule.style)for(const property of Array.from(rule.style)){const value=rule.style.getPropertyValue(property);if(value.includes('env(safe-area-inset-'))rule.style.setProperty(property,value.replace(/env\(safe-area-inset-(top|right|bottom|left)(?:,[^)]*)?\)/g,(_,edge)=>insets[edge]+'px'),rule.style.getPropertyPriority(property));}if(rule.cssRules)visit(rule.cssRules)}};
+                for(const sheet of document.styleSheets)visit(sheet.cssRules);return true})()
+            """.trimIndent())
+            val samples=mutableMapOf<String,JSONObject>()
+            fun sample(label:String){
+                val result=eval(scenario,"""
+                    (()=>{const rect=s=>{const r=document.querySelector(s)?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null};const b=getComputedStyle(document.body);return {scrollY,innerHeight,body:rect('body'),root:rect('#root'),app:rect('.android-app'),workspace:rect('.workspace'),nav:rect('.android-bottom-nav'),dialog:rect('[role=dialog]'),paddingTop:b.paddingTop,paddingBottom:b.paddingBottom,marginTop:b.marginTop,position:b.position,overflow:b.overflow,active:document.activeElement?.outerHTML.slice(0,250),viewport:{height:visualViewport.height,offsetTop:visualViewport.offsetTop,pageTop:visualViewport.pageTop}}})()
+                """.trimIndent())
+                val metrics=JSONObject(result)
+                scenario.onActivity { metrics.put("nativeScroll",it.bridge.webView.scrollY);metrics.put("nativeY",it.bridge.webView.y);android.util.Log.i("ClosetViewport",label+" "+metrics.toString()) }
+                samples[label]=metrics
+            }
+            fun tap(selector:String){
+                val p=JSONObject(eval(scenario,"(()=>{const r=document.querySelector(${JSONObject.quote(selector)}).getBoundingClientRect();return {x:(r.x+r.width/2)*devicePixelRatio,y:(r.y+r.height/2)*devicePixelRatio}})()"))
+                val origin=IntArray(2);scenario.onActivity { it.bridge.webView.getLocationOnScreen(origin) }
+                val down=SystemClock.uptimeMillis()
+                for(action in listOf(MotionEvent.ACTION_DOWN,MotionEvent.ACTION_UP)){val event=MotionEvent.obtain(down,SystemClock.uptimeMillis(),action,origin[0]+p.getDouble("x").toFloat(),origin[1]+p.getDouble("y").toFloat(),0);InstrumentationRegistry.getInstrumentation().sendPointerSync(event);event.recycle()}
+                Thread.sleep(700)
+            }
+            sample("wardrobe-before");tap(".android-filter-trigger");sample("filter-open")
+            tap(".android-filter-footer .android-primary");sample("filter-closed")
+            tap(".android-bottom-nav button:nth-child(3)");sample("calendar-before")
+            tap(".android-month-header > button:not([data-slot])");sample("month-open")
+            tap(".month-jump-dialog [data-slot=dialog-close]");sample("month-closed")
+            for(label in listOf("filter-open","month-open"))assertFalse("$label did not open a dialog",samples.getValue(label).isNull("dialog"))
+            for(label in listOf("filter-closed","month-closed"))assertTrue("$label left a dialog open",samples.getValue(label).isNull("dialog"))
+            for((before,after) in listOf("wardrobe-before" to "filter-open","wardrobe-before" to "filter-closed","calendar-before" to "month-open","calendar-before" to "month-closed")){
+                val original=samples.getValue(before);val current=samples.getValue(after)
+                for(element in listOf("app","nav"))for(axis in listOf("x","y","width"))assertEquals("$after moved $element.$axis: "+samples.toString(),original.getJSONObject(element).getDouble(axis),current.getJSONObject(element).getDouble(axis),1.0)
+                for(value in listOf("scrollY","nativeScroll","nativeY"))assertEquals("$after changed $value",original.getDouble(value),current.getDouble(value),1.0)
+            }
+        }
+    }
     @Test fun phoneModelAndMcpTools() {
         val modelAddress = InstrumentationRegistry.getArguments().getString("closetModelAddress") ?: return
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
