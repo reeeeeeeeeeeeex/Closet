@@ -1,6 +1,6 @@
 # Android 1.2.1 viewport fix / 界面位移修复
 
-Validated on 2026-10-15. This is a local signed fix APK; it has not been published as a GitHub release.
+Validated on 2026-10-15. Release: [v1.2.1](https://github.com/reeeeeeeeeeeeex/Closet/releases/tag/v1.2.1).
 
 ## Cause and fix
 
@@ -27,7 +27,7 @@ The regression fails on 1.2.0 and passes on 1.2.1. It checks the app and bottom 
 
 Raw logs are local under `.test-runtime/android-results/viewport-*.txt`. No computer Closet service was needed for these offline tests. All Closet services and the isolated test emulator are closed afterward.
 
-## Local artifact
+## Release artifact
 
 - APK: `outputs/android/new-closet-1.2.1.apk`, 10,694,740 bytes.
 - Application ID: `app.newcloset.android`; version 1.2.1 / versionCode 4.
@@ -42,4 +42,4 @@ No physical phone was used. Confirmation on the affected phone is still pending.
 
 在实际 Android WebView 中模拟顶部 24px 安全区后，旧版打开两种弹层均从 y=24 变为 y=0，关闭后恢复；新版打开、关闭均保持 y=24。页面与原生 WebView 的滚动位置一直为 0。零安全区场景也通过验证。
 
-最终签名 APK 的上述 5 项针对性回归、生产构建和代码检查通过。安装包沿用原签名，可覆盖安装。本次为本地修复包，尚未发布到 GitHub Release，也尚未在用户的物理手机上验证。
+最终签名 APK 的上述 5 项针对性回归、生产构建和代码检查通过。安装包沿用原签名，可覆盖安装，随 v1.2.1 GitHub Release 提供。本次尚未在用户的物理手机上验证。
