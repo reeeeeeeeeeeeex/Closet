@@ -79,17 +79,115 @@ class ClosetInstrumentedTest {
         val source=InstrumentationRegistry.getInstrumentation().context.assets.open("client-test.js").bufferedReader().use { it.readText() }
         eval(scenario,source+";true")
     }
+    private fun substituteSafeArea(scenario:ActivityScenario<MainActivity>):Int {
+        // WebView 124 reports zero insets on this emulator. Exercise phone insets
+        // in the real stylesheet without changing the release application.
+        val safeTop=InstrumentationRegistry.getArguments().getString("safeAreaTop","24")!!.toInt()
+        eval(scenario,"""
+                (()=>{const insets={top:$safeTop,right:${if(safeTop>0)8 else 0},bottom:${if(safeTop>0)16 else 0},left:${if(safeTop>0)8 else 0}};
+                const visit=rules=>{for(const rule of rules){if(rule.style?.cssText.includes('env(safe-area-inset-'))rule.style.cssText=rule.style.cssText.replace(/env\(safe-area-inset-(top|right|bottom|left)(?:,[^)]*)?\)/g,(_,edge)=>insets[edge]+'px');if(rule.cssRules)visit(rule.cssRules)}};
+                for(const sheet of document.styleSheets)visit(sheet.cssRules);return true})()
+        """.trimIndent())
+        return safeTop
+    }
+    private fun editorMetrics(scenario:ActivityScenario<MainActivity>,label:String):JSONObject {
+        val painted=CountDownLatch(1)
+        scenario.onActivity { it.bridge.webView.postVisualStateCallback(0,object:android.webkit.WebView.VisualStateCallback(){override fun onComplete(requestId:Long){painted.countDown()}}) }
+        assertTrue("Editor frame was not drawn",painted.await(10,TimeUnit.SECONDS))
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        val metrics=JSONObject(eval(scenario,"""
+            (()=>{const dialog=document.querySelector('.editor-dialog');const rect=s=>{const r=dialog.querySelector(s).getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height}};
+            return {header:rect('[data-slot=dialog-header]'),footer:rect('.editor-footer'),close:rect('[data-slot=dialog-close]'),fields:rect('fieldset'),pageScroll:scrollY,dialogScroll:dialog.scrollTop,fieldScroll:dialog.querySelector('fieldset').scrollTop,translate:getComputedStyle(dialog).translate,viewportTop:visualViewport.offsetTop,viewportBottom:visualViewport.offsetTop+visualViewport.height}})()
+        """.trimIndent()))
+        scenario.onActivity { metrics.put("nativeScroll",it.bridge.webView.scrollY) }
+        android.util.Log.i("ClosetEditorLayout",label+" "+metrics.toString())
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { screenshot ->
+            File(context.getExternalFilesDir(null),"editor-layout-$label.png").outputStream().use { screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) }
+            screenshot.recycle()
+        }
+        return metrics
+    }
+    private fun assertEditorFrame(metrics:JSONObject,safeTop:Int,label:String) {
+        assertEquals("$label footer moved away from viewport bottom: $metrics",metrics.getDouble("viewportBottom"),metrics.getJSONObject("footer").getDouble("bottom"),1.0)
+        assertTrue("$label header entered status bar: $metrics",metrics.getJSONObject("header").getDouble("top")>=safeTop-1)
+        assertTrue("$label close button entered status bar: $metrics",metrics.getJSONObject("close").getDouble("top")>=safeTop-1)
+        assertTrue("$label fields overlap footer: $metrics",metrics.getJSONObject("fields").getDouble("bottom")<=metrics.getJSONObject("footer").getDouble("top")+1)
+        assertEquals("$label scrolled the page",0.0,metrics.getDouble("pageScroll"),1.0)
+        assertEquals("$label scrolled the native WebView",0,metrics.getInt("nativeScroll"))
+    }
+    @Test fun editorViewportStability(){
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            ready(scenario)
+            val safeTop=substituteSafeArea(scenario)
+            for(kind in listOf("item","outfit")) {
+                if(kind=="outfit")eval(scenario,"document.querySelector('.android-bottom-nav button:nth-child(2)').click();true")
+                eval(scenario,"document.querySelector('.android-add').click();true")
+                runJs(scenario,"for(let i=0;i<100;i++){if(document.querySelector('.editor-dialog form'))return true;await new Promise(r=>setTimeout(r,50))}throw Error('Editor did not open');")
+                eval(scenario,"document.activeElement?.blur();true")
+                Thread.sleep(700)
+                editorMetrics(scenario,"$kind-before")
+                val bounds=JSONObject(eval(scenario,"(()=>{const r=document.querySelector('.editor-dialog').getBoundingClientRect();return {x:(r.x+r.width/2)*devicePixelRatio,start:(r.y+r.height*.7)*devicePixelRatio,end:(r.y+r.height*.25)*devicePixelRatio}})()"))
+                val origin=IntArray(2);scenario.onActivity { it.bridge.webView.getLocationOnScreen(origin) }
+                val down=SystemClock.uptimeMillis();val instrumentation=InstrumentationRegistry.getInstrumentation()
+                for(step in 0..20){
+                    val y=bounds.getDouble("start")+(bounds.getDouble("end")-bounds.getDouble("start"))*step/20
+                    val action=if(step==0)MotionEvent.ACTION_DOWN else if(step==20)MotionEvent.ACTION_UP else MotionEvent.ACTION_MOVE
+                    val event=MotionEvent.obtain(down,SystemClock.uptimeMillis(),action,origin[0]+bounds.getDouble("x").toFloat(),origin[1]+y.toFloat(),0)
+                    instrumentation.sendPointerSync(event);event.recycle();Thread.sleep(20)
+                }
+                Thread.sleep(700)
+                val after=editorMetrics(scenario,"$kind-scrolled")
+                assertTrue("$kind did not scroll: $after",after.getDouble("dialogScroll")+after.getDouble("fieldScroll")>40)
+                assertEditorFrame(after,safeTop,kind)
+                eval(scenario,"document.querySelector('.editor-dialog [data-slot=dialog-close]').click();true")
+                Thread.sleep(300)
+            }
+        }
+    }
+    @Test fun editorKeyboardLayout(){
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            ready(scenario)
+            val safeTop=substituteSafeArea(scenario)
+            eval(scenario,"document.querySelector('.android-add').click();true")
+            runJs(scenario,"for(let i=0;i<100;i++){if(document.querySelector('#item-name'))return true;await new Promise(r=>setTimeout(r,50))}throw Error('Item editor did not open');")
+            eval(scenario,"document.activeElement?.blur();document.querySelector('#item-name').scrollIntoView({block:'center'});true")
+            Thread.sleep(700)
+            val initial=editorMetrics(scenario,"keyboard-before")
+            fun awaitKeyboard(visible:Boolean){
+                repeat(100){
+                    var showing=false
+                    scenario.onActivity { showing=androidx.core.view.ViewCompat.getRootWindowInsets(it.bridge.webView)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())==true }
+                    if(showing==visible){Thread.sleep(400);return}
+                    Thread.sleep(100)
+                }
+                throw AssertionError("Keyboard visibility did not become $visible")
+            }
+            for(cycle in 1..2){
+                eval(scenario,"document.querySelector('#item-name').scrollIntoView({block:'center'});true")
+                val point=JSONObject(eval(scenario,"(()=>{const r=document.querySelector('#item-name').getBoundingClientRect();return {x:(r.x+r.width/2)*devicePixelRatio,y:(r.y+r.height/2)*devicePixelRatio}})()"))
+                val origin=IntArray(2);scenario.onActivity { it.bridge.webView.getLocationOnScreen(origin) }
+                val down=SystemClock.uptimeMillis();val instrumentation=InstrumentationRegistry.getInstrumentation()
+                for(action in listOf(MotionEvent.ACTION_DOWN,MotionEvent.ACTION_UP)){
+                    val event=MotionEvent.obtain(down,SystemClock.uptimeMillis(),action,origin[0]+point.getDouble("x").toFloat(),origin[1]+point.getDouble("y").toFloat(),0)
+                    instrumentation.sendPointerSync(event);event.recycle()
+                }
+                awaitKeyboard(true)
+                val shown=editorMetrics(scenario,"keyboard-$cycle-shown")
+                assertEditorFrame(shown,safeTop,"keyboard shown")
+                assertTrue("Keyboard did not resize the visible viewport",shown.getDouble("viewportBottom")<initial.getDouble("viewportBottom")-100)
+                instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+                awaitKeyboard(false)
+                val hidden=editorMetrics(scenario,"keyboard-$cycle-hidden")
+                assertEditorFrame(hidden,safeTop,"keyboard hidden")
+                assertEquals("Closing the keyboard did not restore the viewport",initial.getDouble("viewportBottom"),hidden.getDouble("viewportBottom"),1.0)
+            }
+        }
+    }
     @Test fun modalViewportStability(){
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             ready(scenario,"en")
-            // WebView 124 reports zero safe-area insets on this emulator. Substitute
-            // device insets in the loaded CSS to cover edge-to-edge phone layouts.
-            val safeTop=InstrumentationRegistry.getArguments().getString("safeAreaTop","24")!!.toInt()
-            eval(scenario,"""
-                (()=>{const insets={top:$safeTop,right:${if(safeTop>0)8 else 0},bottom:${if(safeTop>0)16 else 0},left:${if(safeTop>0)8 else 0}};
-                const visit=rules=>{for(const rule of rules){if(rule.style)for(const property of Array.from(rule.style)){const value=rule.style.getPropertyValue(property);if(value.includes('env(safe-area-inset-'))rule.style.setProperty(property,value.replace(/env\(safe-area-inset-(top|right|bottom|left)(?:,[^)]*)?\)/g,(_,edge)=>insets[edge]+'px'),rule.style.getPropertyPriority(property));}if(rule.cssRules)visit(rule.cssRules)}};
-                for(const sheet of document.styleSheets)visit(sheet.cssRules);return true})()
-            """.trimIndent())
+            substituteSafeArea(scenario)
             val samples=mutableMapOf<String,JSONObject>()
             fun sample(label:String){
                 val result=eval(scenario,"""
