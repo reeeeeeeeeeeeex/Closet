@@ -1,6 +1,6 @@
 # Android 1.2.2 editor layout fix / 编辑页布局修复
 
-Validated on 2026-10-15. This signed APK is a local fix candidate and has not been published to GitHub Release.
+Validated on 2026-10-15. Release: [v1.2.2](https://github.com/reeeeeeeeeeeeex/Closet/releases/tag/v1.2.2).
 
 ## Reproduction and fix
 
@@ -24,7 +24,7 @@ Tests used an isolated Android 15 / API 35 emulator with WebView 124.0.6367.219.
 
 Logs and screenshots are kept locally in `.test-runtime/android-results/editor-*.txt` and `outputs/android-ui-fixes/1.2.2/`. No computer Closet service was needed. All Closet services and the isolated emulator are closed after testing. Physical-device confirmation remains pending.
 
-## Local artifact
+## Release artifact
 
 - APK: `outputs/android/new-closet-1.2.2.apk`, 10,694,800 bytes.
 - Application ID: `app.newcloset.android`; version 1.2.2 / versionCode 5.
@@ -37,4 +37,4 @@ Logs and screenshots are kept locally in `.test-runtime/android-results/editor-*
 
 现在单品与搭配编辑页都只滚动中间表单；标题、关闭按钮和保存栏保持在页面上下两端，并留出系统安全区。键盘弹出时保存栏位于键盘上方，收起后恢复底部。
 
-生产构建、代码检查、7 项针对性安卓回归及零安全区下的 3 项布局回归通过，已核对模拟器实际截图。安装包沿用原签名，可直接覆盖安装。本次为本地修复包，尚未发布，也尚未在用户的物理手机上验证。
+生产构建、代码检查、7 项针对性安卓回归及零安全区下的 3 项布局回归通过，已核对模拟器实际截图。安装包沿用原签名，可直接覆盖安装，随 v1.2.2 GitHub Release 提供。本次尚未在用户的物理手机上验证。
