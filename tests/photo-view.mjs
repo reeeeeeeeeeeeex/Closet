@@ -34,7 +34,7 @@ const cropped = appendCroppedPhoto(original, file, a);
 assert.deepEqual(original, before); assert.deepEqual(cropped.photos.slice(0, 2), original.photos);
 assert.equal(cropped.photos.length, 3); assert.equal(cropped.cover, cropped.photos[2].key); assert.equal(cropped.photos[2].file, file);
 assert.equal(appendCroppedPhoto(original, file, b).cover, a);
-assert.throws(() => appendCroppedPhoto(original, file, 'removed'), /原照片/);
+assert.throws(() => appendCroppedPhoto(original, file, 'removed'), /original photo has changed/);
 assert.throws(() => appendCroppedPhoto({ photos: Array(20).fill(original.photos[0]), cover: a }, file, a), /20/);
 assert.deepEqual(original, before);
 console.log('PASS: anchored zoom/pinch, bounded pan/crop, aspect ratios, pixel boundaries, separate crop copies, cover choice and photo limits.');

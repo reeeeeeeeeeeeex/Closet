@@ -3,6 +3,8 @@ import { validateArchive, type Asset } from "@/lib/domain";
 import { saveClosetMutation } from "@/lib/closet-service";
 import { rememberColors } from "@/lib/color-library";
 import { itemColorStyle } from "@/lib/colors";
+import { importedWardrobeName } from "@/lib/i18n/core";
+import { requestLocale } from "@/lib/i18n/server";
 export async function GET(request: Request) {
   try { const { db, owner } = await context(request); return json(await getState(db, owner, new URL(request.url).searchParams.get("collection") || undefined)); }
   catch (e) { return failure(e); }
@@ -20,8 +22,9 @@ export async function PUT(request: Request) {
     const assets = db.prepare("SELECT hash,name,mime,size FROM assets WHERE owner=?").bind(owner).rows<Asset>(); const map = new Map(assets.map(a => [a.hash, a]));
     for (const a of archive.assets) { const stored = map.get(a.hash); if (!stored || stored.size !== a.size || stored.mime !== a.mime) throw new ApiError(400, "备份图片缺失或未通过校验，请重新上传"); }
     const collectionId = crypto.randomUUID(), now = new Date().toISOString();
+    const collectionName = importedWardrobeName(archive.collection.name, await requestLocale());
     db.transaction(() => {
-      db.prepare("INSERT INTO collections (owner,id,name,created_at) VALUES (?,?,?,?)").bind(owner, collectionId, archive.collection.name.slice(0, 94) + " · 导入", now).run();
+      db.prepare("INSERT INTO collections (owner,id,name,created_at) VALUES (?,?,?,?)").bind(owner, collectionId, collectionName, now).run();
       for (const record of archive.records) { insertRecord(db, owner, collectionId, record).run(); if (record.kind === "item") rememberColors(db, owner, itemColorStyle(record.data).values, record.updatedAt); }
       for (const color of archive.colorLibrary) rememberColors(db, owner, [color], color.usedAt);
     });

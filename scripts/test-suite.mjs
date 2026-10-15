@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-const tests = ['portability','item-details','subsets','photos','photo-view','brands','colors','color-sampling','color-filter','runtime','accounts','profile-client','colors-runtime','sync','sync-runtime','ai-mcp'];
+const tests = ['i18n','portability','item-details','subsets','photos','photo-view','brands','colors','color-sampling','color-filter','runtime','accounts','profile-client','colors-runtime','sync','sync-runtime','ai-mcp'];
 let child;
 const cleanup = () => process.platform === 'win32' ? spawnSync('powershell.exe', ['-NoProfile','-ExecutionPolicy','Bypass','-File','scripts/stop-services.ps1'], { stdio: 'inherit' }).status : 0;
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => {

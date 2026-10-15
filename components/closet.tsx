@@ -223,7 +223,7 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
     const subsetRoot = view === "wardrobe" ? category as Subset["root"] : "all";
     const activeSubset = state?.records.find((record): record is SubsetRecord => record.kind === "subset" && record.id === selectedSubsetId && record.data.scope === scope && record.data.root === subsetRoot);
     const subsetMembers = activeSubset ? subsetMemberIds(state!.records, activeSubset.id) : null;
-    const filteredItems = filterItems(items, { category, occasion, archived, search, colors: colorFilter, members: subsetMembers });
+    const filteredItems = filterItems(items, { category, occasion, archived, search, colors: colorFilter, members: subsetMembers }, t);
     const filteredOutfits = outfits.filter(o => (!subsetMembers || subsetMembers.has(o.id)) && o.data.archived === archived && (occasion === "all" || o.data.occasions.includes(occasion as Item["occasions"][number])) && [o.data.name, o.data.notes].join(" ").toLowerCase().includes(search.toLowerCase()));
     const goView = (v: View) => { setView(v); setDraftDirty(false); setSearch(""); setColorFilter([]); setCategory("all"); setSelectedSubsetId(null); setOccasion("all"); setArchived(false); };
     useEffect(() => {
@@ -425,8 +425,8 @@ function CalendarPanel({ entries, disabled, onAdd, onEdit, compact = false }: {
     };
     const validYear = /^\d{4}$/.test(jumpYear) && Number(jumpYear) >= 1900 && Number(jumpYear) <= 9999;
     return <div className="calendar-layout"><div className="calendar-board">
-    {compact ? <div className="android-month-header"><Button variant="ghost" size="icon" aria-label={t("上个月")} onClick={() => jump(month.getFullYear(), month.getMonth() - 1)}><ChevronLeft size={21}/></Button><button type="button" aria-label={t("选择年份和月份")} onClick={() => { setJumpYear(String(month.getFullYear())); setJumpOpen(true); }}>{t("{year} 年 {month} 月", { year: month.getFullYear(), month: month.getMonth() + 1 })}</button><Button variant="ghost" size="icon" aria-label={t("下个月")} onClick={() => jump(month.getFullYear(), month.getMonth() + 1)}><ChevronRight size={21}/></Button></div> : (<div className="calendar-heading">
-      <Button variant="ghost" className="calendar-month-title" aria-label={t("选择年份和月份")} onClick={() => { setJumpYear(String(month.getFullYear())); setJumpOpen(true); }}>{month.getFullYear()} <span>/</span> {String(month.getMonth() + 1).padStart(2, "0")}<ChevronDown size={18}/></Button>
+    {compact ? <div className="android-month-header"><Button variant="ghost" size="icon" aria-label={t("上个月")} onClick={() => jump(month.getFullYear(), month.getMonth() - 1)}><ChevronLeft size={21}/></Button><button type="button" aria-label={t("选择年份和月份")} onClick={() => { setJumpYear(String(month.getFullYear())); setJumpOpen(true); }}>{month.toLocaleDateString(locale, { year: "numeric", month: "long" })}</button><Button variant="ghost" size="icon" aria-label={t("下个月")} onClick={() => jump(month.getFullYear(), month.getMonth() + 1)}><ChevronRight size={21}/></Button></div> : (<div className="calendar-heading">
+      <Button variant="ghost" className="calendar-month-title" aria-label={t("选择年份和月份")} onClick={() => { setJumpYear(String(month.getFullYear())); setJumpOpen(true); }}>{month.toLocaleDateString(locale, { year: "numeric", month: "long" })}<ChevronDown size={18}/></Button>
       <div className="calendar-actions"><div className="calendar-navigation"><Button variant="ghost" size="icon" aria-label={t("上个月")} onClick={() => jump(month.getFullYear(), month.getMonth() - 1)}><ChevronLeft size={19}/></Button><Button variant="outline" size="sm" onClick={() => { setMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1)); setSelected(today); }}>{t("今天")}</Button><Button variant="ghost" size="icon" aria-label={t("下个月")} onClick={() => jump(month.getFullYear(), month.getMonth() + 1)}><ChevronRight size={19}/></Button></div><Button className="main-action" disabled={disabled} onClick={() => onAdd(today)}><Plus size={17}/>{t("添加穿搭")}</Button></div>
     </div>)}
     <div className="calendar-weekdays">{[t("一"), t("二"), t("三"), t("四"), t("五"), t("六"), t("日")].map(d => <span key={d}>{d}</span>)}</div>
@@ -435,7 +435,7 @@ function CalendarPanel({ entries, disabled, onAdd, onEdit, compact = false }: {
             const dayEntries = entries.filter(e => e.data.date === key);
             const preview = dayEntries[0]?.data.snapshot.asset || dayEntries[0]?.data.snapshot.items[0]?.data.asset;
             return <button key={key} className={`calendar-day ${date.getMonth() !== month.getMonth() ? "outside" : ""} ${key === today ? "today" : ""} ${key === selected ? "selected" : ""}`} onClick={() => { setSelected(key); if (date.getMonth() !== month.getMonth())
-                setMonth(new Date(date.getFullYear(), date.getMonth(), 1)); }} aria-label={t("{value1}，{value2} 套穿搭", { value1: key, value2: dayEntries.length })}>
+                setMonth(new Date(date.getFullYear(), date.getMonth(), 1)); }} aria-label={t("{value1}，{value2} 套穿搭", { value1: date.toLocaleDateString(locale), value2: dayEntries.length, count: dayEntries.length })}>
         <span className="day-number">{date.getDate()}</span>{dayEntries[0] && <><div className="day-preview">{preview ? <img src={assetUrl(preview)} alt="" loading="lazy"/> : <Shirt size={18}/>}</div><span className="day-label">{dayEntries[0].data.snapshot.name}</span><span className={`day-dot ${dayEntries.some(e => e.data.status === "worn") ? "worn" : ""}`}/></>}{dayEntries.length > 1 && <span className="day-more">+{dayEntries.length - 1}</span>}
       </button>;
         })}</div>
@@ -452,7 +452,7 @@ function CalendarPanel({ entries, disabled, onAdd, onEdit, compact = false }: {
   </aside>
   <Dialog open={jumpOpen} onOpenChange={setJumpOpen}><DialogContent className="closet-dialog month-jump-dialog"><DialogHeader><DialogTitle>{t("跳转到年月")}</DialogTitle><DialogDescription>{t("选择年份，再点击要查看的月份。")}</DialogDescription></DialogHeader>
     <div className="year-jump"><Button variant="ghost" size="icon" aria-label={t("上一年")} disabled={!validYear || Number(jumpYear) <= 1900} onClick={() => setJumpYear(String(Number(jumpYear) - 1))}><ChevronLeft size={18}/></Button><div className="field"><Label htmlFor="calendar-year">{t("年份")}</Label><Input id="calendar-year" type="number" min={1900} max={9999} step={1} value={jumpYear} onChange={event => setJumpYear(event.target.value)}/></div><Button variant="ghost" size="icon" aria-label={t("下一年")} disabled={!validYear || Number(jumpYear) >= 9999} onClick={() => setJumpYear(String(Number(jumpYear) + 1))}><ChevronRight size={18}/></Button></div>
-    <div className="month-jump-grid">{Array.from({ length: 12 }, (_, index) => <Button key={index} variant={Number(jumpYear) === month.getFullYear() && index === month.getMonth() ? "default" : "outline"} disabled={!validYear} onClick={() => jump(Number(jumpYear), index)}>{index + 1}{t("月")}</Button>)}</div>
+    <div className="month-jump-grid">{Array.from({ length: 12 }, (_, index) => <Button key={index} variant={Number(jumpYear) === month.getFullYear() && index === month.getMonth() ? "default" : "outline"} disabled={!validYear} onClick={() => jump(Number(jumpYear), index)}>{new Date(2000, index, 1).toLocaleDateString(locale, { month: "short" })}</Button>)}</div>
   </DialogContent></Dialog>
   </div>;
 }

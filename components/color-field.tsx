@@ -43,7 +43,7 @@ export function ColorField({ draft, onChange, library, sampling }: {
     onChange({ ...draft, all, primaryKey: draft.primaryKey === colorKey(color) ? all[0] ? colorKey(all[0]) : null : draft.primaryKey, needsChoice: false });
   }
   function chips(colors: ColorValue[]) {
-    return colors.map(color => <span className="color-chip selected" key={colorKey(color)} title={color.hex || color.name}><ColorSwatch color={color}/><ColorName color={color}/><button type="button" aria-label={t("移除颜色 {name}", { name: color.name })} onClick={() => remove(color)}><X size={14}/></button></span>);
+    return colors.map(color => <span className="color-chip selected" key={colorKey(color)} title={color.hex || color.name}><ColorSwatch color={color}/><ColorName color={color}/><button type="button" aria-label={t("移除颜色 {name}", { name: isCommonColor(color) ? t(color.name) : color.name })} onClick={() => remove(color)}><X size={14}/></button></span>);
   }
   return <section className="color-field" aria-label={t("颜色（选填）")}>
     <strong>{t("颜色（选填）")}</strong>

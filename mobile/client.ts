@@ -1,3 +1,4 @@
+import { importedWardrobeName } from "../lib/i18n/core";
 import { z } from "zod";
 import { Native } from "./native";
 import { read,write,locked,readDocument,updateDocument,documentKey,newDocument,localAssetUrl,type RootState } from "./store";
@@ -45,7 +46,7 @@ export const androidClient:ClosetClient={
         if(method==='PUT'){
           const archive=validateArchive(body),collectionId=crypto.randomUUID();
           for(const a of archive.assets)if(!doc.replica.assets.some(b=>b.hash===a.hash&&b.size===a.size&&b.mime===a.mime))throw Error('备份原图缺失');
-          doc.replica.collections.push({id:collectionId,name:archive.collection.name.slice(0,94)+' · 导入',createdAt:new Date().toISOString(),records:archive.records});
+          doc.replica.collections.push({id:collectionId,name:importedWardrobeName(archive.collection.name),createdAt:new Date().toISOString(),records:archive.records});
           doc.replica.colorLibrary=mergeColors(doc.replica.colorLibrary,archive.colorLibrary);return {ok:true,collectionId};
         }
         const c=doc.replica.collections.find(c=>c.id===body.collectionId);if(!c)throw new MutationError(404,'衣橱不存在');
@@ -70,7 +71,7 @@ export const androidClient:ClosetClient={
   async importArchive(handle,manifest,owner){
     const archive=validateArchive(manifest);await Native.importStaged({handle,owner});
     return updateDocument(owner,doc=>{for(const a of archive.assets)if(!doc.replica.assets.some(b=>b.hash===a.hash))doc.replica.assets.push(a);
-      const id=crypto.randomUUID();doc.replica.collections.push({id,name:archive.collection.name.slice(0,94)+' · 导入',createdAt:new Date().toISOString(),records:archive.records});
+      const id=crypto.randomUUID();doc.replica.collections.push({id,name:importedWardrobeName(archive.collection.name),createdAt:new Date().toISOString(),records:archive.records});
       doc.replica.colorLibrary=mergeColors(doc.replica.colorLibrary,[...archive.colorLibrary,...archive.records.flatMap(r=>r.kind==='item'?itemColorStyle(r.data).values.map(v=>({...v,usedAt:r.updatedAt})):[])]);return id;});
   },
   async saveAsset(hash,owner){const asset=(await readDocument(owner)).value.replica.assets.find(a=>a.hash===hash) as Asset;const result=await Native.saveAsset({owner,asset});if(!result.saved)throw Error('已取消保存原图');},

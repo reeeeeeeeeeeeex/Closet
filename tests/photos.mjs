@@ -23,7 +23,7 @@ draft=removeDraftPhoto(draft,b);assert.equal(draft.cover,a);assert.deepEqual(dra
 draft=removeDraftPhoto(draft,a);assert.equal(draft.cover,null);
 const file=new File(['bytes'],'one.png',{type:'image/png'});
 draft=appendPhotoFiles(draft,[file]);assert.equal(draft.cover,draft.photos[0].key);
-assert.throws(()=>appendPhotoFiles(draft,[new File(['bad'],'bad.txt',{type:'text/plain'})]),/图片/);
+assert.throws(()=>appendPhotoFiles(draft,[new File(['bad'],'bad.txt',{type:'text/plain'})]),/image/);
 assert.throws(()=>appendPhotoFiles(draft,Array(20).fill(file)),/20/);
 const originalFetch=globalThis.fetch;let uploads=0;
 globalThis.fetch=async(url,init)=>{assert.equal(url,'/api/assets');assert.equal(init.body.get('file').name,'one.png');uploads++;return Response.json({hash:c,name:'one.png',mime:'image/png',size:5});};
@@ -37,12 +37,12 @@ const calendar={...meta,id:crypto.randomUUID(),kind:'calendar',data:{date:'2026-
 assert.deepEqual([...referencedAssets([calendar])].sort(),[a,b,c]);
 assert.throws(()=>validateArchive({format:'new-closet',schemaVersion:6,exportedAt:meta.createdAt,collection:{name:'Gallery'},records:[record,{...meta,kind:'outfit',data:outfit,id:calendar.data.outfitId},calendar],assets:[{hash:b,name:'b.png',mime:'image/png',size:5},{hash:c,name:'c.png',mime:'image/png',size:5}]}),/缺少原图/);
 const html=renderToStaticMarkup(React.createElement(PhotoEditor,{draft:createPhotoDraft({asset:b,photos:[a,b]}),kind:'item',onChange:()=>{},onError:()=>{}}));
-assert.match(html,/multiple=""/);assert.match(html,/设为封面|当前封面/);assert.match(html,/查看照片 2/);
-const readOnly=renderToStaticMarkup(React.createElement(PhotoGallery,{data:{asset:b,photos:[a,b]},name:'Gallery item'}));assert.match(readOnly,/查看 Gallery item 的照片 2/);
+assert.match(html,/multiple=""/);assert.match(html,/Set as cover|Current cover/);assert.match(html,/View photo 2/);
+const readOnly=renderToStaticMarkup(React.createElement(PhotoGallery,{data:{asset:b,photos:[a,b]},name:'Gallery item'}));assert.match(readOnly,/View photo 2 of Gallery item/);
 const galleryRecord={...record,data:{...record.data,photos:[a,b]}};
 const card=renderToStaticMarkup(React.createElement(ItemCard,{item:galleryRecord,onOpen:()=>{}}));assert.match(card,new RegExp('/api/assets/'+b));assert.doesNotMatch(card,new RegExp('/api/assets/'+a));
 const collage=renderToStaticMarkup(React.createElement(OutfitCollage,{itemIds:[record.id],items:[galleryRecord]}));assert.match(collage,new RegExp('/api/assets/'+b));assert.doesNotMatch(collage,new RegExp('/api/assets/'+a));
 const prompt=wardrobePrompt({records:[galleryRecord]},'Help');assert.doesNotMatch(prompt,new RegExp(a+'|'+b));
 const fields=renderToStaticMarkup(React.createElement(OutfitFields,{data:outfit,onChange:()=>{},photos:createPhotoDraft({asset:c,photos:[a,c]}),onPhotos:()=>{},items:[record],onError:()=>{}}));
-assert.match(fields,/添加搭配照片/);assert.match(fields,/multiple=""/);assert.match(fields,/查看照片 2/);assert.match(fields,new RegExp('/api/assets/'+c));
+assert.match(fields,/Add outfit photos/);assert.match(fields,/multiple=""/);assert.match(fields,/View photo 2/);assert.match(fields,new RegExp('/api/assets/'+c));
 console.log('PASS: legacy single photos, gallery/cover validation, cover removal fallback, multi-upload draft resolution, immutable gallery snapshots, non-cover references and cover-only cards/collages.');

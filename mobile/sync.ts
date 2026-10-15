@@ -1,3 +1,4 @@
+import { tr } from "../lib/i18n/core";
 import { Native } from "./native";
 import { read,readDocument,updateDocument,currentReplica,type RootState } from "./store";
 import { canonical,emptyReplica,mergeReplicas,normalizeReplica,recordEqual,validateReplica,type Replica,type MergeResult,type Resolution } from "../lib/sync-model";
@@ -16,7 +17,7 @@ export async function pair(owner:string,address:string,code:string){
   if(!['http:','https:'].includes(parsed.protocol)||parsed.username||parsed.password||parsed.pathname!=='/'||parsed.search||parsed.hash)throw Error('请输入电脑服务地址，例如 http://192.168.1.10:4320');
   if((await readDocument(owner)).value.binding)throw Error('此账号已配对，请先解除配对');
   const root=(await read<RootState>('root')).value!;
-  const result=await remote<Omit<SyncBinding,'url'|'base'>>(parsed.origin,'/api/sync/pair','POST',undefined,{protocolVersion:1,code:code.trim(),deviceId:root.deviceId,name:`Android · ${root.profiles.find(p=>p.id===owner)?.name||'我'}`});
+  const result=await remote<Omit<SyncBinding,'url'|'base'>>(parsed.origin,'/api/sync/pair','POST',undefined,{protocolVersion:1,code:code.trim(),deviceId:root.deviceId,name:`Android · ${root.profiles.find(p=>p.id===owner)?.name||tr("我")}`});
   await updateDocument(owner,doc=>{doc.binding={...result,url:parsed.origin,base:emptyReplica()};});
 }
 export async function unpair(owner:string){await updateDocument(owner,doc=>{delete doc.binding;});}
@@ -50,12 +51,12 @@ async function syncWork(owner:string,progress:(message:string)=>void,resolutions
   for(let attempt=0;attempt<3;attempt++){
     let document=(await readDocument(owner)).value;const binding=document.binding;if(!binding)throw Error('请先与电脑配对');
     if(binding.pending){
-      progress('确认上次同步提交…');
+      progress(tr("确认上次同步提交…"));
       try{const ack=await remote<RemoteState>(binding.url,'/api/sync/commit','POST',binding.token,binding.pending.input);await finish(owner,binding,binding.pending,ack);}
       catch(e){if(e instanceof NetworkError&&e.status===409){await updateDocument(owner,d=>{if(d.binding?.id===binding.id)delete d.binding.pending;});}else throw e;}
       document=(await readDocument(owner)).value;
     }
-    progress('读取电脑衣橱…');
+    progress(tr("读取电脑衣橱…"));
     const state=await remote<RemoteState>(binding.url,'/api/sync/state','GET',binding.token);
     if(state.protocolVersion!==1||state.serverId!==binding.serverId)throw Error('电脑身份或同步协议已改变，请重新配对');
     state.replica=validateReplica(state.replica);
@@ -67,12 +68,12 @@ async function syncWork(owner:string,progress:(message:string)=>void,resolutions
     const source=normalizeReplica(document.replica),base=document.binding!.base,merge=mergeReplicas(base,source,state.replica,resolutions);
     const localAssets=new Set(document.replica.assets.map(a=>a.hash)),remoteAssets=new Set(state.replica.assets.map(a=>a.hash));
     // Download conflict photos too, so either version can be reviewed offline.
-    for(const [index,asset] of state.replica.assets.entries())if(!localAssets.has(asset.hash)){progress(`下载原图 ${index+1} / ${state.replica.assets.length}`);await Native.transfer({url:`${binding.url}/api/sync/assets/${asset.hash}`,token:binding.token,owner,asset,direction:'download'});}
+    for(const [index,asset] of state.replica.assets.entries())if(!localAssets.has(asset.hash)){progress(tr("下载原图 {current} / {total}", {current:index+1,total:state.replica.assets.length}));await Native.transfer({url:`${binding.url}/api/sync/assets/${asset.hash}`,token:binding.token,owner,asset,direction:'download'});}
     await updateDocument(owner,doc=>{doc.replica.assets=[...new Map([...doc.replica.assets,...state.replica.assets].map(a=>[a.hash,a])).values()];});
-    for(const [index,asset] of merge.remote.assets.entries())if(!remoteAssets.has(asset.hash)){progress(`上传原图 ${index+1} / ${merge.remote.assets.length}`);await Native.transfer({url:`${binding.url}/api/sync/assets/${asset.hash}`,token:binding.token,owner,asset,direction:'upload'});}
+    for(const [index,asset] of merge.remote.assets.entries())if(!remoteAssets.has(asset.hash)){progress(tr("上传原图 {current} / {total}", {current:index+1,total:merge.remote.assets.length}));await Native.transfer({url:`${binding.url}/api/sync/assets/${asset.hash}`,token:binding.token,owner,asset,direction:'upload'});}
     const pending:Pending={source,previousBase:base,merge,input:{protocolVersion:1,serverId:binding.serverId,requestId:crypto.randomUUID(),expectedRevision:state.revision,replica:merge.remote}};
     await updateDocument(owner,doc=>{if(doc.binding?.id!==binding.id)throw Error('同步配对已改变');doc.binding.pending=pending;});
-    try{progress('提交并确认同步…');const ack=await remote<RemoteState>(binding.url,'/api/sync/commit','POST',binding.token,pending.input);await finish(owner,binding,pending,ack);progress('');return;}
+    try{progress(tr("提交并确认同步…"));const ack=await remote<RemoteState>(binding.url,'/api/sync/commit','POST',binding.token,pending.input);await finish(owner,binding,pending,ack);progress('');return;}
     catch(e){if(e instanceof NetworkError&&e.status===409){await updateDocument(owner,d=>{if(d.binding?.id===binding.id)delete d.binding.pending;});continue;}throw e;}
   }
   throw Error('电脑资料持续变化，本地数据已保留，请稍后再次同步');

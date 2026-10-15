@@ -161,7 +161,7 @@ function PhotoViewerContent({ photo, name, index, count, onNavigate, onClose, on
         <span className="photo-crop-grid"/>{['nw','ne','sw','se'].map(corner => <button type="button" key={corner} className={`photo-crop-handle ${corner}`} data-crop-handle={corner} aria-label={t("调整裁剪角 {corner}", { corner })}
           onKeyDown={event => { const directions: Record<string, Point> = { ArrowLeft: { x: -10, y: 0 }, ArrowRight: { x: 10, y: 0 }, ArrowUp: { x: 0, y: -10 }, ArrowDown: { x: 0, y: 10 } }; if (directions[event.key] && crop) { event.preventDefault(); event.stopPropagation(); setCrop(resizeCrop(crop, corner, directions[event.key], natural, ratio)); } }}/>)}</div>}
     </div>
-    <footer className="photo-viewer-footer">{error && <p role="alert">{error}</p>}
+    <footer className="photo-viewer-footer">{error && <p role="alert">{t(error)}</p>}
       {crop ? <><p>{t("拖动选框和四角调整裁剪范围，原图会保留。")}</p><div className="photo-viewer-tools">
         <select aria-label={t("裁剪比例")} value={ratio || ''} disabled={busy} onChange={event => { const next = Number(event.target.value) || undefined; setRatio(next); setCrop(initialCrop(natural, next)); }}><option value="">{t("自由裁剪")}</option><option value="1">1:1</option><option value={3 / 4}>3:4</option><option value={4 / 3}>4:3</option></select>
         <button type="button" disabled={busy} onClick={() => setCrop(null)}>{t("取消裁剪")}</button><button type="button" className="photo-viewer-primary" disabled={busy} onClick={() => void saveCrop()}>{busy && <Loader2 className="animate-spin"/>}{t("保存为新照片")}</button>

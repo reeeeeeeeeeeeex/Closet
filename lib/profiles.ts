@@ -23,7 +23,7 @@ export function ensureProfiles() {
       while (db.prepare("SELECT id FROM accounts WHERE username_key=?").bind(profileNameKey(name)).rows().length) name = `原衣橱 ${suffix++}`;
       db.prepare("INSERT INTO accounts (id,username,username_key,secret) VALUES (?,?,?,?)").bind("local-owner", name, profileNameKey(name), secret).run();
     }
-    if (!db.prepare("SELECT id FROM accounts LIMIT 1").rows().length) db.prepare("INSERT INTO accounts (id,username,username_key,secret) VALUES (?,?,?,?)").bind(randomUUID(), "我", "我", randomBytes(48).toString("hex")).run();
+    if (!db.prepare("SELECT id FROM accounts LIMIT 1").rows().length) db.prepare("INSERT INTO accounts (id,username,username_key,secret) VALUES (?,?,?,?)").bind(randomUUID(), "Me", "me", randomBytes(48).toString("hex")).run();
   });
 }
 export function listStoredProfiles(): StoredProfile[] {

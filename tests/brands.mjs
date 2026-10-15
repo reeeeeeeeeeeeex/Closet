@@ -26,5 +26,5 @@ const snapshot=makeSnapshot({name:'Look',itemIds:[records[0].id],asset:null,occa
 records[0].data.brand='Changed';assert.equal(snapshot.items[0].data.brand,'Nike');
 const cover=renderToStaticMarkup(React.createElement(ItemCard,{item:records[0],onOpen:()=>{}}));assert.doesNotMatch(cover,/Changed/);
 const selected=renderToStaticMarkup(React.createElement(ItemCard,{item:records[0],onOpen:()=>{},selection:{selected:false,label:'Choose item'}}));assert.doesNotMatch(selected,/Changed/);
-const field=renderToStaticMarkup(React.createElement(BrandField,{value:'',brands:itemBrands(records),onChange:()=>{}}));assert.match(field,/role="combobox"/);assert.match(field,/品牌/);assert.doesNotMatch(field,/required/);
+const field=renderToStaticMarkup(React.createElement(BrandField,{value:'',brands:itemBrands(records),onChange:()=>{}}));assert.match(field,/role="combobox"/);assert.match(field,/Brand/);assert.doesNotMatch(field,/required/);
 console.log('PASS: optional brands across all item categories, legacy compatibility, trimmed/case-normalized suggestions including archived items, wardrobe isolation, immutable snapshots and no brand on item cards.');

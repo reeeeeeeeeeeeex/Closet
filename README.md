@@ -1,143 +1,199 @@
-# Closet / New Closet
+# New Closet
 
-独立实现的私人数字衣橱，现已从云端 Sites 环境转换为本地服务。Libre Closet 只作为功能参考，没有复制它的实现代码。
+A personal wardrobe app with original photos, outfit planning, offline Android support, local sync, and portable backups.
 
-## 本地启动
+[English](#english) · [简体中文](#简体中文)
 
-需要 Node.js 24 或更新版本、pnpm 11.25.0。
+## English
 
-```powershell
-cd 'D:\New Closet'
+### Your wardrobe, on your own devices
+
+New Closet helps you organize the clothes you own, put together outfits, and keep a calendar of what you plan to wear or have worn. Your original photos stay intact, your data lives on your computer or Android device, and a ZIP backup lets you take it with you.
+
+The desktop app runs as a local web service. The Android app stores its interface and data on the phone, works offline, and can sync manually with your computer over a local network. English is the default interface language; switch to Simplified Chinese from the profile menu.
+
+### Features
+
+- **Wardrobe catalog:** tops, bottoms, dresses and one-pieces, outerwear, shoes, bags, and accessories, with brands, colors, seasons, occasions, fit, measurements, and notes.
+- **Original photos:** up to 20 photos per item or outfit, with a cover, zoom, and cropping saved as a new photo. Originals are never recompressed.
+- **Flexible organization:** nested groups, search, filters, and archived items. An item or outfit can belong to multiple groups.
+- **Outfits and calendar:** combine items, save outfit photos, or use both. Calendar entries keep independent snapshots, so later edits don't rewrite what you wore.
+- **Personal measurements:** optional body measurements and separate EU and Chinese shoe sizes for each wardrobe.
+- **AI and MCP:** connect an OpenAI-compatible or Anthropic model, or an external MCP client. Choose whether it can view photos, read measurements, or save outfits and calendar plans.
+- **Portable data:** export records and original photos together, restore into a new wardrobe, or sync between Android and your computer. Separate profiles keep their own wardrobes and color libraries.
+
+### Quick start
+
+Requires **Node.js 24 or later** and **pnpm 11.25.0**.
+
+```sh
+git clone https://github.com/reeeeeeeeeeeeex/Closet.git
+cd Closet
 pnpm install --frozen-lockfile
 pnpm build
 pnpm start
 ```
 
-打开 http://127.0.0.1:4320 即可使用，无需账号密码。点击侧栏左下角头像可以新增、切换账号或修改名称；新账号只需名称，最多 100 个字符，去除首尾空白并忽略大小写判重。已有账号自动迁移，原名称、数据归属 ID 和照片保持不变；未绑定的旧衣橱显示为“原衣橱”，全新数据库默认创建“我”。Windows 也可以双击 `启动Closet.cmd`；首次运行自动安装依赖、构建，后续直接启动。源码修改后先执行 `pnpm build`。
+Open [localhost:4320](http://127.0.0.1:4320). No sign-up or password is needed. Use the profile menu to add, switch, or rename profiles, or change the interface language. A fresh installation creates a profile named **Me**. Existing names and personal content are preserved.
 
-开发模式使用 `pnpm dev`。服务默认仅监听本机，不需要 ChatGPT 登录、Cloudflare、D1 或 R2。
+On Windows, you can also double-click [`Start-Closet.cmd`](Start-Closet.cmd). It installs dependencies and builds the app on first use. Run `pnpm build` again after changing source files. `pnpm dev` is available for development; use production builds for acceptance testing.
 
-## 在手机或其他电脑上使用
+### Local network access
 
-在 PowerShell 中启动局域网服务：
+The server listens only on your computer by default. To let devices on the same trusted network connect, start it from PowerShell with:
 
 ```powershell
 $env:CLOSET_HOST = '0.0.0.0'
 pnpm start
 ```
 
-同一局域网内的设备打开 `http://电脑的局域网IP:4320`，从头像菜单选择账号，不需要密码。同一服务的访问者可自由切换所有账号；账号用于分开整理资料，各账号的照片、单品、分组、搭配、日历、尺码和颜色库按稳定 ID 分开保存。不同设备分别记住选择，重命名不改变资料归属。电脑需保持运行，Windows 防火墙需允许该端口；本次没有修改防火墙。页面回到前台或每 45 秒刷新，记录冲突返回 409。数据请求携带当前账号 ID，其他标签页切换后旧页面不能向新账号写入，未保存草稿保留并提示重新载入。切换前有草稿会确认，保存或处理备份期间禁止切换。备份仍为 v9，导入至当前账号；旧登录地址跳转首页，密码接口已停用。
+Open `http://YOUR_COMPUTER_LAN_IP:4320` on another device. Your computer must stay on, and its firewall must allow the port. **Everyone who can reach the web app can switch between all profiles.** Profiles organize data; they do not provide password-protected access. Keep the web service on a trusted computer or local network.
 
-可用 `CLOSET_PORT` 更换端口，用 `CLOSET_DATA_DIR` 指定数据目录，例如：
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CLOSET_HOST` | `127.0.0.1` | Listening address |
+| `CLOSET_PORT` | `4320` | Server port |
+| `CLOSET_DATA_DIR` | `./data` | Database and original photo storage |
 
-```powershell
-$env:CLOSET_PORT = '4325'
-$env:CLOSET_DATA_DIR = 'D:\ClosetData'
+Set these variables in the startup command's environment. Setting them only in `.env.local` is insufficient: the launcher reads them before Next.js starts.
+
+### Android
+
+The Android app supports offline editing and manual, two-way local network sync. Generate a pairing code in **Data and backups → Local network sync** on your computer, then enter its address and the code in the phone app. Pairing grants access to one profile. If a record changes on both devices, you choose which version to keep.
+
+Requires Android 10 or later and Android System WebView 124 or later. To build an APK on Windows, install JDK 21 and Android SDK platform 36 / build-tools 36.0.0, set `CLOSET_JAVA_HOME` and `ANDROID_HOME` as needed, then run `pnpm android:apk`.
+
+The build script produces a signed APK under `outputs/android/`. Back up `.local/android-signing/`: future updates need the same signing key. Export your wardrobe before uninstalling. See the [Android guide](docs/android.md) and [1.1.0 validation notes](docs/android-1.1-validation.md); these documents are currently in Chinese.
+
+### Storage and backups
+
+Desktop data lives in `data/` by default. `closet.sqlite` stores records, profiles, settings, and migration history. `assets/<owner-hash>/<image-sha256>` stores original image bytes, deduplicated by SHA-256. A legacy `auth.json` is used only to preserve the session-signing key during migration; password sign-in has been retired.
+
+In **Data and backups**, export a ZIP containing `manifest.json`, `README.txt`, and `assets/`. Import checks record relationships and photo checksums, then creates a **new wardrobe** in the current profile without overwriting existing wardrobes. The current format is `new-closet`, schema version **9**, with import support for versions **1–8**.
+
+You can also stop the server and copy the entire data directory. Copying only the SQLite file while the server is running may miss changes in its WAL files. A complete directory copy includes local settings and credentials; the portable wardrobe ZIP excludes model keys and sync or MCP tokens.
+
+Limits: 20 MB per photo, 20 photos per item or outfit, 2,000 records per wardrobe, 2 GB per backup, and 3 MB per manifest. Supported image formats are JPG, PNG, WebP, GIF, and AVIF; convert HEIC first. Background removal and automatic outfit recommendations are not included. Optional AI features send authorized content to your chosen model service.
+
+Personal data, keys, logs, dependencies, build output, and test data are excluded from Git. No cloud account, Cloudflare, D1, or R2 is required.
+
+### Development and translation
+
+```sh
+pnpm build
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm mobile:build
+```
+
+Build before running `pnpm test` or browser acceptance checks. Tests use isolated `.test-runtime/` data and separate local ports. After testing, stop **all** Closet services, including the regular service on port 4320, and confirm their ports are closed. Do not restart them automatically.
+
+English and Simplified Chinese catalogs live in [`lib/i18n/messages/`](lib/i18n/messages/). Keys remain stable; user-written names and notes are not translated. See the [translation guide](lib/i18n/README.md) for persistence, plural forms, and adding languages. Run `pnpm i18n:extract` after adding messages; it preserves existing translations.
+
+Tests cover backup round trips, original image bytes, snapshots, profiles, conflicts, sync, and AI/MCP permissions. AI tests use mock providers to verify protocol behavior, not real model suggestion quality. Database migrations in `drizzle/` run automatically. `legacy/cloud/` preserves earlier cloud reference material and is excluded from local builds.
+
+### Documentation and licensing
+
+- [AI and MCP](docs/ai-mcp.md), [Android AI](docs/android-ai.md) — Chinese
+- [Photo viewer and cropping](docs/photo-viewer.md) — Chinese
+- [Detailed wardrobe features and data conventions](docs/wardrobe-guide.zh-CN.md) — Chinese
+
+New Closet is an independent implementation. Libre Closet served as a feature reference; its implementation code was not copied. An open-source license has not been selected yet. Third-party notices remain with their bundled files.
+
+## 简体中文
+
+### 衣橱留在自己的设备里
+
+New Closet 帮你整理已有衣物、组合搭配，并记录计划穿着和实际穿过的造型。原始照片完整保留，资料存放在自己的电脑或 Android 手机中，也能通过 ZIP 备份随时带走。
+
+电脑端以本地网页服务运行；Android App 将界面和资料保存在手机，支持离线使用，并可通过局域网与电脑手动同步。界面默认英文，可在账号菜单中切换为简体中文。
+
+### 主要功能
+
+- **衣橱整理：**支持上装、下装、连体与裙装、外套、鞋履、包袋和配饰，记录品牌、颜色、季节、场合、版型、尺寸与备注。
+- **原图保存：**每件单品或搭配最多 20 张原图，可选封面、放大查看、将裁剪结果另存为新照片，原图不重新压缩。
+- **灵活分组：**支持嵌套分组、搜索和筛选，同一内容可加入多个分组，暂时不穿的衣物可以收起。
+- **搭配与日历：**可关联单品、保存搭配照片，或同时使用。日历保存独立快照，后续修改不会改变历史穿搭。
+- **个人尺码：**每个衣橱单独记录身体尺寸、欧码和中国毫米鞋码，各项均可留空。
+- **AI 与 MCP：**连接 OpenAI 兼容或 Anthropic 模型，也可使用外部 MCP 客户端。照片、身体尺码以及保存搭配和日历的权限由你选择。
+- **数据迁移：**记录与原图一并导出，可恢复为新衣橱，或在 Android 与电脑间同步。不同账号分别保存衣橱和颜色库。
+
+### 快速开始
+
+需要 **Node.js 24 或更新版本**、**pnpm 11.25.0**。
+
+```sh
+git clone https://github.com/reeeeeeeeeeeeex/Closet.git
+cd Closet
+pnpm install --frozen-lockfile
+pnpm build
 pnpm start
 ```
 
-这些配置传给启动命令的环境变量；不要把它们仅写入 `.env.local`，启动器需要在 Next.js 启动前读取。
+打开 [localhost:4320](http://127.0.0.1:4320)，无需注册或密码。在账号菜单中新增、切换、重命名账号或调整语言。全新安装创建名为 **Me** 的账号；已有名称和个人内容保持不变。
 
-## 数据保存与备份
+Windows 也可双击 [`Start-Closet.cmd`](Start-Closet.cmd) 或 [`启动Closet.cmd`](启动Closet.cmd)。首次运行安装依赖并构建，修改源码后请重新执行 `pnpm build`。开发时可用 `pnpm dev`，验收使用生产构建产物。
 
-默认数据位于项目的 `data/`：
+### 局域网访问
 
-- `closet.sqlite`：单品、搭配、日历、分组、我的尺码、原图元数据与迁移记录。
-- `assets/<owner-hash>/<image-sha256>`：未压缩、未重新编码的原始图片。
-- `auth.json`：旧版本遗留文件，迁移时仅复用旧会话签名密钥；不再校验其中的密码。新账号名称和选择信息保存在 SQLite 中。
-
-`data/`、运行日志、依赖和构建产物都被 Git 忽略，上传源码不会上传照片或登录密钥。应用使用 HttpOnly 签名会话，客户端伪造原平台身份 header 无法登录。
-
-在“数据与备份”中可完整导出 ZIP，并导入为一个新衣橱，不覆盖原数据。原云端版本导出的 `new-closet` v1 ZIP 可直接导入，新导出使用 v9。下载源码本身不包含云端账号里的个人记录；已有记录通过该 ZIP 流程迁移。
-
-也可以停止服务后复制整个 `data/`，保留全部衣橱与登录状态。SQLite 运行中有 WAL 文件，直接复制单个数据库文件不能保证完整备份。
-
-## 保留的功能与格式
-
-- 原始图片按 SHA-256 去重；上装、下装、鞋包、配饰分类，场合、季节和备注。
-- 搭配支持原始照片和可选的单品关联；可以只有照片，也可以只有单品。日历中拍照或导入照片会原子创建搭配和当天记录，随后可在我的搭配中补选单品。点击日历顶部年月可快速跳转。历史快照独立保存当时的照片与单品。
-- ZIP 中有 `manifest.json`、`README.txt` 和 `assets/<sha256>.<extension>`。
-- 数据格式为 `format: "new-closet"`、`schemaVersion: 9`（仍可导入 v1 / v2 / v3 / v4 / v5 / v6 / v7 / v8），不包含平台用户 ID、物理路径或凭据。
-- 导入先检查版本、唯一 ID、关联、图片大小和 SHA-256；数据库事务建立新衣橱，失败回滚。
-- AI 页面支持 OpenAI 兼容和 Anthropic 原生接口，内置 AI 与外部 MCP 共用衣橱工具，可按授权读取照片、查询资料、保存搭配和安排日历，也保留文字上下文。配置见 [AI 与 MCP](docs/ai-mcp.md)。
-
-电脑端使用本地 Web 服务；Android 1.1.0 将界面和资料保存在手机，支持离线编辑与手动局域网双向同步。安装、配对、构建和签名保管见 [Android 说明](docs/android.md)，实际验证范围见 [1.1.0 验证记录](docs/android-1.1-validation.md)。不包含自动抠图或自动 AI 推荐。单张照片最多 20 MB，支持 JPG / PNG / WebP / GIF / AVIF；HEIC 需转换。每个衣橱最多 2000 条记录，导入包最多 2 GB，清单最多 3 MB。
-
-## 开发与验证
+默认仅本机可访问。在 PowerShell 中执行以下命令，即可让同一可信局域网内的设备连接：
 
 ```powershell
-pnpm lint
-pnpm typecheck
-pnpm build
-pnpm test
+$env:CLOSET_HOST = '0.0.0.0'
+pnpm start
 ```
 
-`pnpm test` 需要先完成生产构建。测试使用随机本地端口和隔离的 `.test-runtime/`，不会写入个人 `data/`。浏览器验收同样使用生产构建产物，结束后关闭 Closet 的全部服务及端口，包括正式服务和临时测试服务；不要自动重启正式服务。
+其他设备打开 `http://电脑的局域网IP:4320`。电脑需保持运行，防火墙需允许该端口。**能访问网页的人都可以切换所有账号。**账号用于整理资料，不提供密码保护，请将服务用于可信本机或局域网。
 
-- `tests/portability.mjs`：原图 ZIP 字节往返、快照独立性与损坏备份拒绝。
-- `tests/ai-mcp.mjs`：生产 MCP HTTP/stdio、账号隔离、照片内容、两种模型工具循环、权限、写入重试、密钥和取消检查；模拟供应商验证请求格式，真实模型效果需另行验证。
-- `tests/runtime.mjs`：真实生产 Node 服务的密码登录、授权、SQLite CRUD、冲突、事务回滚、重启持久化和实际 ZIP 导入导出。
-- `drizzle/`：SQLite 迁移，首次使用数据库时自动按文件顺序执行并记录。
-- `lib/local-storage.ts` / `lib/local-auth.ts`：本地磁盘、数据库与认证适配层。
-- `legacy/cloud/`：原云端构建和连接器模板，仅作参考，不进入本地运行、构建或检查。
+| 环境变量 | 默认值 | 用途 |
+| --- | --- | --- |
+| `CLOSET_HOST` | `127.0.0.1` | 监听地址 |
+| `CLOSET_PORT` | `4320` | 服务端口 |
+| `CLOSET_DATA_DIR` | `./data` | 数据库与原图目录 |
 
-源码上传到私人 GitHub 仓库；目前没有指定对外开源许可证。
+这些变量应设置在启动命令的环境中，仅写入 `.env.local` 不足以生效：启动器需要在 Next.js 启动前读取。
 
-## 版型、鞋码和尺寸
+### Android
 
-上装、下装、连体／裙装、外套可选紧身、修身、常规、宽松；鞋履可选合脚、偏大、偏小。单品卡片、分组选品和搭配选品显示场合、服装版型、鞋履合脚程度与鞋码标签。衣物实测尺寸在单品编辑及日历详情中显示，日历快照保存当时的数值。
+Android App 支持离线编辑与手动双向同步。在电脑的“数据与备份 → 局域网同步”生成配对码，再在手机上填写电脑地址和配对码。配对只授权一个账号；同一记录在两端都被修改时，由你选择保留哪个版本。
 
-- 上装／外套：肩宽、胸围、衣长、袖长、下摆围。
-- 下装：腰围、臀围、大腿围、裤脚围、裤长／裙长、前裆长。
-- 连体／裙装：肩宽、胸围、腰围、臀围、裙长／连体衣长、袖长。
-- 鞋履：欧码 EU（支持半码等数值），中国码使用 235／240／245 等毫米标法，两者独立记录，不自动换算。
+需要 Android 10 或更新版本，以及 Android System WebView 124 或更新版本。在 Windows 构建 APK 时，安装 JDK 21、Android SDK platform 36 / build-tools 36.0.0，按需设置 `CLOSET_JAVA_HOME`、`ANDROID_HOME`，然后执行 `pnpm android:apk`。
 
-衣物尺寸统一保存为厘米；胸围、腰围等围度填写完整一圈，不是平铺的半围。字段可以留空。切换品类时只保留新分类适用的字段。旧单品新增字段默认为未填写；v4 备份包含版型、鞋码、尺寸和分组，v1 / v2 / v3 备份仍可导入。
+签名 APK 生成于 `outputs/android/`。请另行妥善备份 `.local/android-signing/`，后续覆盖升级需要同一签名。卸载前请导出备份。详见 [Android 说明](docs/android.md) 和 [1.1.0 验证记录](docs/android-1.1-validation.md)。
 
-## 前端语言包
+### 数据与备份
 
-当前启用中文，完整前端文案集中到 `lib/i18n/messages/zh-CN.json`，空白模板为 `locale.template.json`。没有用自动翻译填充其他语言。原生翻译的接入方式、插值／复数、语言 Cookie、缺失译文回退和系统选择器边界见 `lib/i18n/README.md`。新增文案后运行 `pnpm i18n:extract`，已有人工语言包不会被覆盖。
-## 嵌套分组
+电脑端默认使用 `data/`。`closet.sqlite` 保存记录、账号、设置和迁移记录；`assets/<owner-hash>/<image-sha256>` 保存原始图片字节，按 SHA-256 去重。旧版 `auth.json` 仅用于迁移时保留会话签名密钥，密码登录已停用。
 
-衣橱的“全部”、上装／下装等每个分类，以及我的搭配都能新建分组；进入分组后可以继续建立下级分组。允许先建立空分组，再编辑名称和成员。同一单品或搭配可以同时加入多个分组，上级分组汇总全部下级内容并按记录 ID 去重。
+在“数据与备份”导出完整 ZIP，包含 `manifest.json`、`README.txt` 和 `assets/`。导入先检查记录关联和照片校验值，再在当前账号下创建一个**新衣橱**，不覆盖原衣橱。当前格式为 `new-closet`、版本 **9**，支持导入 **1–8** 版备份。
 
-在当前分组中新增单品或搭配，会在同一个 SQLite 事务中写入记录并更新成员关系；并行新增不会覆盖已有成员。分类分组只接收对应分类的单品，搭配分组只接收搭配；修改单品分类前，需要先移出原分类的分组。
+也可停止服务后复制整个数据目录。运行时仅复制 SQLite 文件可能遗漏 WAL 中的数据。整个目录包含本地设置和凭据；可移植的衣橱 ZIP 不包含模型密钥、同步令牌或 MCP 令牌。
 
-分组是备份中的 `kind: "subset"` 记录，包含 `name`、`scope`、`root`、`parentId`、`memberIds`。备份 v4 保存整个层级和多重归属，导入时检查父节点、循环、记录类型和分类一致性。分组与单品／搭配／日历／我的尺码共享每衣橱 2000 条记录上限。父节点和所属分类创建后固定，当前支持编辑名称与直接成员。
-## 分组图片展示与我的尺码
+限制：单张照片最多 20 MB，每件单品或搭配最多 20 张照片，每衣橱最多 2,000 条记录，备份包最多 2 GB，清单最多 3 MB。支持 JPG、PNG、WebP、GIF、AVIF，HEIC 需先转换。暂不提供自动抠图和自动搭配推荐。使用可选 AI 功能时，已授权内容会发送给你配置的模型服务。
 
-当前页面的分组默认递归展开，可临时折叠；再进入页面恢复展开。下级内容在下级分区显示，上级分组数量汇总并去重，同一内容加入并列分组时分别展示。“未分组”内容放在底部；“全部”只展示在“全部”下建立的分组，分类页面展示自己的分组。搜索、场合和收起筛选对所有分区生效。
+个人资料、密钥、日志、依赖、构建产物和测试资料被 Git 忽略。运行不需要云端账号、Cloudflare、D1 或 R2。
 
-分组编辑使用图片卡片多选，支持搜索、查看已选、单品分类或搭配场合筛选；切换筛选保留选择。分组选品、搭配选品复用普通列表的单品／搭配卡片及响应式网格，卡片统一等高，选品区域整体滚动。下级已有的成员标注为继承内容，取消直接加入不会修改下级成员。每个分区可以添加已有内容、新建内容或建立下级分组。
+### 开发与翻译
 
-侧栏“我的尺码”记录每个衣橱独立的身体资料：身高、肩宽、胸围、腰围、臀围、大腿围、膝围、臂长、内腿长、外腿长、脚长、欧码及中国毫米码。所有项目选填，身体尺寸以厘米记录，围度填写完整一圈；膝围绕膝盖中部测量。内腿长从裆部到脚底，外腿长从自然腰线到脚底；欧码和中国码独立记录。清空输入后保存即可移除对应数值。
+```sh
+pnpm build
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm mobile:build
+```
 
-数据使用 `kind: "personalSizes"`、`data: { measurements, shoeSize }` 的记录，通过现有 `/api/closet` 读写，在事务内保证每个衣橱最多一份。版本冲突保留草稿，载入最新尺码前会提示替换草稿。备份 v5 包含个人尺码，导入创建新衣橱；v1–v4 没有尺码的备份仍可恢复，原衣橱保留。个人尺码与衣物实测尺寸分别保存，均计入每衣橱 2000 条记录上限。
+测试和浏览器验收前先完成生产构建。测试使用独立端口及隔离的 `.test-runtime/` 数据目录。结束后关闭 **全部** Closet 服务，包括默认端口 4320 的正式服务，并确认端口不再监听，不自动重启。
 
-## 多照片与封面
+中英文语言包位于 [`lib/i18n/messages/`](lib/i18n/messages/)。翻译键保持稳定，用户填写的名称和备注不自动翻译。语言保存、复数和新增语言见 [翻译说明](lib/i18n/README.md)。新增文案后执行 `pnpm i18n:extract`，已有译文不会被覆盖。
 
-单品和搭配均可添加最多 20 张照片，单张最多 20 MB，原图不压缩。详情中可浏览照片、设封面和移除照片；移除封面后，第一张剩余照片自动成为封面。列表、分组选品和搭配中的单品拼图使用单品封面。旧记录的单张照片继续作为封面。
+测试覆盖备份往返、原图字节、快照、账号、冲突、同步和 AI/MCP 权限。AI 测试使用模拟供应商验证协议，不代表真实模型的建议质量。`drizzle/` 中的数据库迁移自动执行；`legacy/cloud/` 保留原云端参考，不参与本地构建。
 
-`asset` 保留为封面哈希，`photos` 保存照片哈希列表。备份 v9 和日历快照包含全部照片及封面；v1–v8 备份仍可导入，历史照片不随之后的移除或换封面改变。
+### 文档与许可
 
-### 单品品牌
+- [AI 与 MCP](docs/ai-mcp.md)、[Android 本地 AI](docs/android-ai.md)
+- [照片查看与裁剪](docs/photo-viewer.md)
+- [衣橱功能与数据约定](docs/wardrobe-guide.zh-CN.md)
 
-所有分类的单品均可选填品牌。点击品牌输入框可选择当前衣橱已填写的品牌，也可输入新品牌；空白和大小写重复的名称会统一到已有品牌，已收起单品的品牌同样可选。品牌可用于单品搜索，封面卡片不显示品牌。品牌跟随记录、日历快照及 v9 完整备份保存；旧数据无需补填。
-
-下装可选填膝围，单位为 cm，填写衣物膝部的一整圈围度。留空或清空都可保存；膝围仅在单品编辑和日历详情显示，封面卡片不显示尺寸标签。
-
-## 紧凑页面布局
-
-已登录页面共用精简页眉，保留同步、刷新、退出及手机导航。页面名称由侧栏和屏幕阅读器标题提供。衣橱的单品、搭配与已穿记录数量及添加单品按钮并入页眉；手机上页眉分为同步导航和统计操作两行。根级分组不再单独显示“全部”路径行，新建分组与搜索、场合和收起筛选并排。进入分组后保留可返回上一级的路径。搭配创建入口位于筛选栏，日历创建入口位于年月功能栏，沿用原有分类、分组和日期上下文。
-
-其余主页面直接进入功能内容：尺码展示说明和测量卡片，备份展示导出／导入卡片与默认折叠的使用说明，AI 页面使用单栏需求与上下文卡片。空状态保留添加、清空筛选及导入入口；已登录页面的弹窗使用统一圆角、边框和间距，原有字段和确认步骤保留。登录页维持原有布局。
-
-分组编辑窗口提供删除入口：仅删除当前分组，下级分组上移一级，直接归属内容合并到父分组；根分组的内容回到当前分类／全部范围，仍属于其他分组的内容保留原归属。单品、搭配和照片不删除。删除和归属调整在同一事务中完成，旧版本删除会提示刷新。
-
-### 单品颜色
-
-颜色可选填，支持纯色、主色加辅色、拼色。常见色可直接选择，自定义名称可带色块；颜色库随单品成功保存，在同一账号的所有衣橱共用。不同账号隔离，取消编辑不新增历史。模式切换的隐藏颜色只保留在本次草稿中，保存仅保留当前模式。v9 完整备份附带账号自定义颜色库，恢复时合并且不覆盖已有颜色，旧颜色文字整体保留。
-
-在颜色选择器中可从单品封面或其他照片取色，也支持尚未保存的本地照片。取色只读取图片像素，确认后才填入色块；名称可自填或使用色值。支持的浏览器在安全上下文中提供屏幕取色，不可用时仍可照片取色及手动选色。
-
-衣橱工具栏的颜色筛选支持多选（任一颜色命中），同时与分类、分组、场合、收起及文本搜索取交集。主色、辅色与拼色均参与搜索和筛选；自定义名称和色值一起确定具体颜色，不自动归并到基础色系。
+New Closet 为独立实现，Libre Closet 仅作为功能参考，没有复制其实现代码。目前尚未选定开源许可证，第三方声明保留在相应文件中。

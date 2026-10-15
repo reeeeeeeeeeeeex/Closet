@@ -6,6 +6,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { useI18n } from "@/lib/i18n/provider";
+import { tr } from "@/lib/i18n/core";
 import { api } from "@/lib/portable";
 import { announceProfileChange, profileFetch, withProfileActivity } from "@/lib/profile-client";
 import { wardrobePrompt, type ClosetState } from "@/lib/domain";
@@ -31,9 +32,9 @@ export function AiAssistant({ state, onDraftChange, onBusyChange, onRefresh, nat
     void Promise.all([api<{ settings: ModelSettings | null }>("/api/ai/settings"), api<{ connections: McpConnection[]; activity: ToolActivity[] }>("/api/mcp/connections")]).then(([model, external]) => {
       if (!active) return;
       setSettings(model.settings || initialSettings); setConfigured(!!model.settings); setConnections(external.connections); setActivity(external.activity); setLoaded(true);
-    }).catch(e => { if (active) { setError(e instanceof Error ? e.message : t("无法载入 AI 配置")); setLoaded(true); } });
+    }).catch(e => { if (active) { setError(e instanceof Error ? e.message : tr("无法载入 AI 配置")); setLoaded(true); } });
     return () => { active = false; abort.current?.abort(); };
-  }, [t]);
+  }, []);
   useEffect(() => { transcript.current?.scrollTo({ top: transcript.current.scrollHeight, behavior: "smooth" }); }, [messages, events]);
   const update = (value: Partial<ModelSettings>) => { setSettings(s => ({ ...s, ...value })); setDirty(true); onDraftChange(true); };
   const work = async (fn: () => Promise<void>) => {
@@ -116,9 +117,9 @@ export function AiAssistant({ state, onDraftChange, onBusyChange, onRefresh, nat
       {newToken && <div className="ai-token"><p>{t("令牌仅显示这一次，请保存到客户端配置。")}</p><Input aria-label={t("新连接令牌")} readOnly value={newToken}/><Button variant="outline" onClick={() => void copy(newToken)}><Copy size={16}/>{t("复制令牌")}</Button><Button variant="ghost" onClick={() => setNewToken("")}>{t("我已保存")}</Button></div>}
       <p className="field-hint">{t("HTTP 地址：当前 Closet 服务地址后加 /mcp；认证头为 Authorization: Bearer 加连接令牌。本机也可使用项目附带的 stdio 入口。")}</p>
       <ul className="ai-connections">{connections.map(c => <li key={c.id}><div><strong>{c.name}</strong><small>{state.collections.find(v => v.id === c.collectionId)?.name || c.collectionId} · {c.scopes.join(" / ")}</small></div><Button variant="outline" disabled={busy} onClick={() => void work(async () => { await api("/api/mcp/connections", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: c.id }) }); setNewToken(""); await reloadExternal(); })}>{t("撤销连接")}</Button></li>)}</ul>
-      <details><summary>{t("最近的衣橱操作")}</summary><Button variant="ghost" disabled={busy} onClick={() => void work(reloadExternal)}>{t("刷新操作记录")}</Button>{activity.map(a => <p className="ai-activity" key={a.id}>{a.source} · {labels[a.tool] || a.tool} · {a.ok ? t("已完成") : t("未完成")} · {new Date(a.createdAt).toLocaleString(locale)}</p>)}</details>
+      <details><summary>{t("最近的衣橱操作")}</summary><Button variant="ghost" disabled={busy} onClick={() => void work(reloadExternal)}>{t("刷新操作记录")}</Button>{activity.map(a => <p className="ai-activity" key={a.id}>{["内置 AI", "手机内置 AI"].includes(a.source) ? t(a.source) : a.source} · {labels[a.tool] || a.tool} · {a.ok ? t("已完成") : t("未完成")} · {new Date(a.createdAt).toLocaleString(locale)}</p>)}</details>
     </details>}
     <details className="ai-card"><summary>{t("可复制的衣橱上下文")}</summary><Textarea aria-label={t("可复制的衣橱上下文")} readOnly rows={8} value={wardrobePrompt(state, prompt, locale)}/><Button variant="outline" onClick={() => void copy(wardrobePrompt(state, prompt, locale))}><Copy size={16}/>{t("复制文字上下文")}</Button><p className="field-hint">{t("复制的文字不含照片；连接模型后可通过工具查看照片。")}</p></details>
-    {error && <p className="form-error" role="alert">{error}</p>}
+    {error && <p className="form-error" role="alert">{t(error)}</p>}
   </section>;
 }

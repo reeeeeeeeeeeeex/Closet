@@ -60,7 +60,7 @@ assert.deepEqual(files[`assets/${photoHash}.png`], outfitPhoto);
 const corrupt = { ...files, [`assets/${hash}.png`]: strToU8('changed bytes') };
 await assert.rejects(() => inspectArchive(new File([zipSync(corrupt)], 'bad.zip'), () => {}), /SHA-256/);
 const missing = { ...files }; delete missing[`assets/${hash}.png`];
-await assert.rejects(() => inspectArchive(new File([zipSync(missing)], 'missing.zip'), () => {}), /原图缺失/);
+await assert.rejects(() => inspectArchive(new File([zipSync(missing)], 'missing.zip'), () => {}), /original photo is missing/);
 assert.throws(() => validateArchive({ ...manifest, schemaVersion: 10 }));
 assert.throws(() => validateArchive({ ...manifest, assets: [state.assets[0]] }), /缺少原图/);
 const legacy = { ...manifest, schemaVersion: 1, records: structuredClone([item, outfit, entry]), assets: [state.assets[0]] };

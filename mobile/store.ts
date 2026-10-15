@@ -1,4 +1,5 @@
 import { Capacitor } from "@capacitor/core";
+import { tr } from "../lib/i18n/core";
 import { Native } from "./native";
 import { type Replica, emptyReplica, normalizeReplica } from "../lib/sync-model";
 import type { Profile } from "../lib/profile-types";
@@ -13,13 +14,13 @@ export async function write<T>(key:string,expected:number,value:T){return Native
 export const documentKey=(owner:string)=>`profile:${owner}`;
 export async function readDocument(owner:string){const data=await read<LocalDocument>(documentKey(owner));if(!data.value)throw Error("账号资料不存在");if(data.value.version!==1)throw Error('此资料需要更新版本的 App，请先升级');return {...data,value:data.value};}
 export async function updateDocument<T>(owner:string,work:(doc:LocalDocument)=>T|Promise<T>):Promise<T>{return locked(async()=>{const current=await readDocument(owner);const result=await work(current.value);await write(documentKey(owner),current.revision,current.value);window.dispatchEvent(new Event("closet-local-change"));return result;});}
-export function newDocument():LocalDocument{return {version:1,replica:{...emptyReplica(),collections:[{id:crypto.randomUUID(),name:"我的衣橱",createdAt:new Date().toISOString(),records:[]}]}};}
+export function newDocument():LocalDocument{return {version:1,replica:{...emptyReplica(),collections:[{id:crypto.randomUUID(),name:tr("我的衣橱"),createdAt:new Date().toISOString(),records:[]}]}};}
 export let filesRoot="";
 export const localAssetUrl=(hash:string,owner:string)=>Capacitor.convertFileSrc(`${filesRoot}/media/${owner}/${hash}`);
 export async function bootstrap(){return locked(async()=>{
   const current=await read<RootState>("root");filesRoot=current.filesRoot;
   if(current.value){if(current.value.version!==1)throw Error('此资料需要更新版本的 App，请先升级');return current.value;}
-  const profile={id:crypto.randomUUID(),name:"我"},root:RootState={version:1,deviceId:crypto.randomUUID(),profiles:[profile],current:profile.id};
+  const profile={id:crypto.randomUUID(),name:tr("我")},root:RootState={version:1,deviceId:crypto.randomUUID(),profiles:[profile],current:profile.id};
   await write(documentKey(profile.id),0,newDocument());await write("root",current.revision,root);return root;
 });}
 export async function currentReplica(owner:string){return normalizeReplica((await readDocument(owner)).value.replica);}

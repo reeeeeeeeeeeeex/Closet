@@ -8,7 +8,7 @@ import type { LocalDatabase } from "./local-storage";
 import { createHash } from "node:crypto";
 
 export function ensureCloset(db: LocalDatabase, owner: string, collectionId: string) {
-  if (collectionId === "main") db.prepare("INSERT OR IGNORE INTO collections (owner,id,name,created_at) VALUES (?,?,?,?)").bind(owner, "main", "我的衣橱", new Date().toISOString()).run();
+  if (collectionId === "main") db.prepare("INSERT OR IGNORE INTO collections (owner,id,name,created_at) VALUES (?,?,?,?)").bind(owner, "main", "My wardrobe", new Date().toISOString()).run();
   if (!db.prepare("SELECT id FROM collections WHERE owner=? AND id=?").bind(owner, collectionId).rows().length) throw new ApiError(404, "衣橱不存在");
 }
 

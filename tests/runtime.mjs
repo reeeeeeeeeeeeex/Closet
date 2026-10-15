@@ -214,7 +214,13 @@ try {
   res = await post({ kind: 'calendar', id: entry.id, version: entry.version, op: 'deleteCalendar' }); assert.equal(res.status, 200);
   assert.equal((await (await request('/api/closet?collection=main')).json()).records.some(r => r.id === entry.id), false);
   assert.equal((await (await request('/api/closet?collection=' + restoredId)).json()).records.some(r => r.id === entry.id), true);
-  assert.match(await (await request('/')).text(), /我的衣橱/);
+  const englishPage = await (await request('/')).text();
+  assert.match(englishPage, /<html lang="en"/);
+  assert.match(englishPage, /My wardrobe/);
+  assert.match(englishPage, /New Closet · Your personal wardrobe/);
+  const chinesePage = await (await request('/', { headers: { Cookie: cookie + '; closet_locale=zh-CN' } })).text();
+  assert.match(chinesePage, /<html lang="zh-CN"/);
+  assert.match(chinesePage, /New Closet · 我的衣橱/);
   const persisted = new DatabaseSync(path.join(directory, 'closet.sqlite'), { readOnly: true });
   const stored = persisted.prepare('SELECT storage_key FROM assets WHERE hash=?').get(asset.hash);
   assert.deepEqual(await readFile(path.join(directory, 'assets', stored.storage_key)), png); persisted.close();

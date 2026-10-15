@@ -1,5 +1,6 @@
 {
   "name": "closet",
+  "description": "A personal wardrobe app with original photos, outfit planning, offline Android support, local sync, and portable backups.",
   "version": "1.1.0",
   "private": true,
   "engines": {

@@ -8,7 +8,7 @@ const keys = new Set();
 function scanDirectory(directory) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const file = path.join(directory, entry.name);
-    if (entry.isDirectory()) { if (file !== path.join('lib', 'i18n')) scanDirectory(file); continue; }
+    if (entry.isDirectory()) { scanDirectory(file); continue; }
     if (!/\.(ts|tsx|mts)$/.test(entry.name)) continue;
     const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, entry.name.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
     function visit(node) {
@@ -18,13 +18,20 @@ function scanDirectory(directory) {
         if (argument && ts.isStringLiteral(argument)) keys.add(argument.text);
       }
       // Domain constants and validation messages also appear in translated UI.
-      if ((file === path.join('lib','colors.ts') || file === path.join('lib','domain.ts') || file === path.join('lib','item-details.ts') || file === path.join('lib','personal-sizes.ts') || file === path.join('lib','subsets.ts') || file.startsWith(path.join('app','api')) || file === path.join('lib','server.ts') || file === path.join('lib','profiles.ts')) && ts.isStringLiteral(node) && /[\u3400-\u9fff]/.test(node.text)) keys.add(node.text);
+      if ((file.startsWith('lib' + path.sep) || file.startsWith('mobile' + path.sep) || file.startsWith(path.join('app','api'))) && ts.isStringLiteral(node) && /[\u3400-\u9fff]/.test(node.text)) keys.add(node.text);
       ts.forEachChild(node, visit);
     }
     visit(source);
   }
 }
-for (const directory of ['app','components','lib']) scanDirectory(directory);
+for (const directory of ['app','components','lib','mobile']) scanDirectory(directory);
+// Native Android errors are surfaced by the shared frontend as well.
+for (const file of ['ClosetStoragePlugin.kt', 'ClosetAi.kt']) {
+  const source = readFileSync(path.join('android/app/src/main/java/app/newcloset/android', file), 'utf8');
+  for (const match of source.matchAll(/"([^"\r\n]*[\u3400-\u9fff][^"\r\n]*)"/g)) {
+    if (!match[1].includes('$')) keys.add(match[1]);
+  }
+}
 const ordered = [...keys].sort((a,b) => a.localeCompare(b));
 const next = Object.fromEntries(ordered.map(key => [key, existing[key] || key]));
 writeFileSync(catalogPath, JSON.stringify(next, null, 2) + '\n');
