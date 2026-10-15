@@ -10,7 +10,7 @@ A personal wardrobe app with original photos, outfit planning, offline Android s
 
 New Closet helps you organize the clothes you own, put together outfits, and keep a calendar of what you plan to wear or have worn. Your original photos stay intact, your data lives on your computer or Android device, and a ZIP backup lets you take it with you.
 
-The desktop app runs as a local web service. The Android app stores its interface and data on the phone, works offline, and can sync manually with your computer over a local network. English is the default interface language; switch to Simplified Chinese from the profile menu.
+The desktop app runs as a local web service. The Android app stores its interface and data on the phone, works offline, and can sync manually with your computer over a local network. English is the default interface language; switch to Simplified Chinese from the profile menu on desktop or **You → Language** on Android. The phone remembers your choice across restarts.
 
 ### Features
 
@@ -63,7 +63,7 @@ The Android app supports offline editing and manual, two-way local network sync.
 
 Requires Android 10 or later and Android System WebView 124 or later. To build an APK on Windows, install JDK 21 and Android SDK platform 36 / build-tools 36.0.0, set `CLOSET_JAVA_HOME` and `ANDROID_HOME` as needed, then run `pnpm android:apk`.
 
-The build script produces a signed APK under `outputs/android/`. Back up `.local/android-signing/`: future updates need the same signing key. Export your wardrobe before uninstalling. See the [Android guide](docs/android.md) and [1.1.0 validation notes](docs/android-1.1-validation.md); these documents are currently in Chinese.
+Download the signed Android 1.2.0 APK from [GitHub Releases](https://github.com/reeeeeeeeeeeeex/Closet/releases/latest), or build it yourself. The build script produces a signed APK under `outputs/android/`. Back up `.local/android-signing/`: future updates need the same signing key. Export your wardrobe before uninstalling. See the [Android guide](docs/android.md) and [1.2.0 validation notes](docs/android-1.2-validation.md).
 
 ### Storage and backups
 
@@ -99,7 +99,7 @@ Tests cover backup round trips, original image bytes, snapshots, profiles, confl
 - [Photo viewer and cropping](docs/photo-viewer.md) — Chinese
 - [Detailed wardrobe features and data conventions](docs/wardrobe-guide.zh-CN.md) — Chinese
 
-New Closet is an independent implementation. Libre Closet served as a feature reference; its implementation code was not copied. An open-source license has not been selected yet. Third-party notices remain with their bundled files.
+New Closet is available under the [MIT License](LICENSE). You may use, modify, and redistribute it, including commercially, while keeping the copyright and license notice. See [third-party notices](THIRD_PARTY_NOTICES.md) for bundled components. Libre Closet served as a feature reference for this independent implementation; its implementation code was not copied.
 
 ## 简体中文
 
@@ -107,7 +107,7 @@ New Closet is an independent implementation. Libre Closet served as a feature re
 
 New Closet 帮你整理已有衣物、组合搭配，并记录计划穿着和实际穿过的造型。原始照片完整保留，资料存放在自己的电脑或 Android 手机中，也能通过 ZIP 备份随时带走。
 
-电脑端以本地网页服务运行；Android App 将界面和资料保存在手机，支持离线使用，并可通过局域网与电脑手动同步。界面默认英文，可在账号菜单中切换为简体中文。
+电脑端以本地网页服务运行；Android App 将界面和资料保存在手机，支持离线使用，并可通过局域网与电脑手动同步。界面默认英文，电脑端在账号菜单、Android 端在“我的 / You → 语言 / Language”切换为简体中文。手机重启后保留语言选择。
 
 ### 主要功能
 
@@ -160,7 +160,7 @@ Android App 支持离线编辑与手动双向同步。在电脑的“数据与�
 
 需要 Android 10 或更新版本，以及 Android System WebView 124 或更新版本。在 Windows 构建 APK 时，安装 JDK 21、Android SDK platform 36 / build-tools 36.0.0，按需设置 `CLOSET_JAVA_HOME`、`ANDROID_HOME`，然后执行 `pnpm android:apk`。
 
-签名 APK 生成于 `outputs/android/`。请另行妥善备份 `.local/android-signing/`，后续覆盖升级需要同一签名。卸载前请导出备份。详见 [Android 说明](docs/android.md) 和 [1.1.0 验证记录](docs/android-1.1-validation.md)。
+可从 [GitHub Releases](https://github.com/reeeeeeeeeeeeex/Closet/releases/latest) 下载 Android 1.2.0 签名 APK，也可自行构建。构建产物生成于 `outputs/android/`。在“我的 / You → 语言 / Language”切换简体中文与英文，重启后保留选择。请另行妥善备份 `.local/android-signing/`，后续覆盖升级需要同一签名。卸载前请导出备份。详见 [Android 说明](docs/android.md) 和 [1.2.0 验证记录](docs/android-1.2-validation.md)。
 
 ### 数据与备份
 
@@ -196,4 +196,4 @@ pnpm mobile:build
 - [照片查看与裁剪](docs/photo-viewer.md)
 - [衣橱功能与数据约定](docs/wardrobe-guide.zh-CN.md)
 
-New Closet 为独立实现，Libre Closet 仅作为功能参考，没有复制其实现代码。目前尚未选定开源许可证，第三方声明保留在相应文件中。
+New Closet 使用 [MIT 许可证](LICENSE)，允许使用、修改和分发，包括商业用途；分发时须保留版权和许可声明。随附组件的许可见[第三方声明](THIRD_PARTY_NOTICES.md)。本项目为独立实现，Libre Closet 仅作为功能参考，没有复制其实现代码。

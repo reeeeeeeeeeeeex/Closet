@@ -2,6 +2,7 @@
   "name": "closet",
   "description": "A personal wardrobe app with original photos, outfit planning, offline Android support, local sync, and portable backups.",
   "version": "1.2.0",
+  "license": "MIT",
   "private": true,
   "engines": {
     "node": ">=24.0.0"

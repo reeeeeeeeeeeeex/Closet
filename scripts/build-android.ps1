@@ -18,6 +18,10 @@ $taskSdkProperty = $taskSdk.Replace('\','/')
 if (-not $SkipWebBuild) { Invoke-Checked 'pnpm.cmd' @('build') }
 Invoke-Checked 'node' @('node_modules/vite/bin/vite.js','build','--config','mobile/vite.config.ts')
 Invoke-Checked 'node' @('node_modules/@capacitor/cli/bin/capacitor','sync','android')
+$taskNoticesDir = Join-Path (Get-Location) 'android/app/src/main/assets/public/licenses'
+New-Item -ItemType Directory -Force -Path $taskNoticesDir | Out-Null
+Copy-Item -LiteralPath 'LICENSE','THIRD_PARTY_NOTICES.md','vendor/shadcn-tailwind-4.13.0.LICENSE.md','vendor/Apache-2.0.txt' -Destination $taskNoticesDir
+Copy-Item -LiteralPath 'node_modules/@capacitor/android/LICENSE' -Destination (Join-Path $taskNoticesDir 'Capacitor-LICENSE.txt')
 $signingDir = Join-Path (Get-Location) '.local/android-signing'
 $keyFile = Join-Path $signingDir 'closet-release.jks'
 $propertyFile = Join-Path $signingDir 'release.properties'
