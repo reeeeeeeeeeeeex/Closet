@@ -2,11 +2,13 @@
 
 ## 安装
 
-当前发布为 New Closet 1.1.0，包名 `app.newcloset.android`，支持 Android 10（API 29）及以上，需要系统 Android System WebView 124 或更新版本。老系统如仍使用出厂 WebView，请先在系统应用商店更新；App 会显示更新提示。将 `outputs/android/new-closet-1.1.0.apk` 复制到手机并打开，允许此次使用的文件管理器安装应用。SHA-256 在同目录的 `.apk.sha256` 文件中。沿用原签名，可直接覆盖安装；本次验证见 [1.1.0 发布验证](android-1.1-validation.md)。
+当前发布为 New Closet 1.2.0，包名 `app.newcloset.android`，支持 Android 10（API 29）及以上，需要系统 Android System WebView 124 或更新版本。老系统如仍使用出厂 WebView，请先在系统应用商店更新；App 会显示更新提示。从 [GitHub Releases](https://github.com/reeeeeeeeeeeeex/Closet/releases/latest) 下载签名 APK，或将自行构建的 `outputs/android/new-closet-1.2.0.apk` 复制到手机并打开，允许此次使用的文件管理器安装应用。SHA-256 在同目录的 `.apk.sha256` 文件中。沿用原签名，可直接覆盖安装；本次验证见 [1.2.0 发布验证](android-1.2-validation.md)。
 
 安装包内含完整界面。账号、单品、分组、搭配、日历快照、尺码、颜色库和原图都保存在 App 的私有目录，不依赖电脑运行。覆盖安装同签名更新会保留资料。卸载会删除私有资料，卸载前请在“数据与备份”导出 ZIP。
 
 安卓 UI 使用底部“衣橱、搭配、日历、我的”导航；尺码和数据与备份位于“我的”。主页面直接从搜索或月份开始，账号以文字显示，测量说明和灵感上下文按需展开。本版设计参考、实际截图和测试见 [Android UI v2](android-ui-v2.md)。
+
+首次打开默认英文，在底部 **You → Language** 选择“简体中文”即可切换；中文界面入口为“我的 → 语言”。语言选择保存在手机，离线使用和重启后都保留，不修改衣物、账号或衣橱名称。界面、校验提示、同步进度及 WebView 更新提示均支持中英双语。系统相机、相册和文件选择器使用 Android 自身的语言设置。
 
 ## 照片查看与裁剪
 

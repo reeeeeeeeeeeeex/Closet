@@ -35,9 +35,45 @@ class ClosetInstrumentedTest {
         repeat(300){val result=eval(scenario,"window.__closetTestResult");if(result!="null"){val parsed=JSONObject(result);assertTrue(parsed.optString("error"),parsed.getBoolean("ok"));return parsed};Thread.sleep(100)}
         throw AssertionError("Native call timed out")
     }
-    private fun ready(scenario:ActivityScenario<MainActivity>){
-        repeat(150){if(eval(scenario,"!!(window.Capacitor && window.Capacitor.Plugins.ClosetStorage && document.querySelector('.topbar')?.innerText.includes('已保存到手机'))")=="true")return;Thread.sleep(100)}
+    private fun ready(scenario:ActivityScenario<MainActivity>,locale:String?="zh-CN"){
+        repeat(150){
+            if(eval(scenario,"!!(window.Capacitor && window.Capacitor.Plugins.ClosetStorage && document.querySelector('.android-bottom-nav button:not(:disabled)') && !document.querySelector('.loading-grid'))")=="true"){
+                if(locale==null||eval(scenario,"document.documentElement.lang")==JSONObject.quote(locale))return
+                eval(scenario,"localStorage.setItem('closet_locale',${JSONObject.quote(locale)});location.reload();true")
+            }
+            Thread.sleep(100)
+        }
         throw AssertionError("App did not open offline: "+eval(scenario,"document.body.innerText"))
+    }
+    @Test fun languageSwitchPersistsOffline(){
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            ready(scenario,null)
+            eval(scenario,"localStorage.removeItem('closet_locale');location.reload();true")
+            scenario.recreate();ready(scenario,null)
+            assertEquals("Default language",JSONObject.quote("en"),eval(scenario,"document.documentElement.lang"))
+            runJs(scenario,"""
+                const wait=async(test)=>{for(let i=0;i<100;i++){if(test())return;await new Promise(r=>setTimeout(r,50))}throw Error('Language UI timed out')};
+                const nav=()=>[...document.querySelectorAll('.android-bottom-nav button')];
+                if(nav().map(b=>b.textContent.trim()).join('|')!=='Wardrobe|Outfits|Calendar|You')throw Error('English navigation missing');
+                nav().find(b=>b.textContent==='You').click();await wait(()=>document.querySelector('.android-my > .language-select select'));
+                const n=window.Capacitor.Plugins.ClosetStorage,root=JSON.parse((await n.read({key:'root'})).value),before=(await n.read({key:'profile:'+root.current})).value;
+                const select=document.querySelector('.android-my > .language-select select');select.value='zh-CN';select.dispatchEvent(new Event('change',{bubbles:true}));
+                await wait(()=>document.documentElement.lang==='zh-CN'&&nav().at(-1).textContent==='我的');
+                if(localStorage.getItem('closet_locale')!=='zh-CN'||!document.body.innerText.includes('数据与备份'))throw Error('Chinese preference not saved');
+                if((await n.read({key:'profile:'+root.current})).value!==before)throw Error('Language switch rewrote wardrobe data');return true;
+            """.trimIndent())
+            scenario.recreate();ready(scenario,null)
+            assertEquals("Chinese survives restart",JSONObject.quote("zh-CN"),eval(scenario,"document.documentElement.lang"))
+            runJs(scenario,"""
+                [...document.querySelectorAll('.android-bottom-nav button')].find(b=>b.textContent==='我的').click();
+                for(let i=0;i<100&&!document.querySelector('.android-my > .language-select select');i++)await new Promise(r=>setTimeout(r,50));
+                const select=document.querySelector('.android-my > .language-select select');select.value='en';select.dispatchEvent(new Event('change',{bubbles:true}));
+                for(let i=0;i<100&&document.documentElement.lang!=='en';i++)await new Promise(r=>setTimeout(r,50));
+                if(localStorage.getItem('closet_locale')!=='en'||!document.body.innerText.includes('Data and backups'))throw Error('English switch failed');return true;
+            """.trimIndent())
+            scenario.recreate();ready(scenario,null)
+            assertEquals("English survives restart",JSONObject.quote("en"),eval(scenario,"document.documentElement.lang"))
+        }
     }
     private fun loadClient(scenario:ActivityScenario<MainActivity>){
         val source=InstrumentationRegistry.getInstrumentation().context.assets.open("client-test.js").bufferedReader().use { it.readText() }
@@ -240,7 +276,11 @@ class ClosetInstrumentedTest {
     }
     @Test fun verifyPreviouslySavedItem(){
         if(InstrumentationRegistry.getArguments().getString("checkUpgrade")!="true")return
-        ActivityScenario.launch(MainActivity::class.java).use { scenario -> ready(scenario);runJs(scenario,"const n=window.Capacitor.Plugins.ClosetStorage;const root=JSON.parse((await n.read({key:'root'})).value);const doc=JSON.parse((await n.read({key:'profile:'+root.current})).value);if(!doc.replica.collections.flatMap(c=>c.records).some(r=>r.data.name?.startsWith('手机离线验收-')))throw Error('Upgrade lost previously saved item');return true;") }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            ready(scenario,null)
+            InstrumentationRegistry.getArguments().getString("expectedLocale")?.let { locale -> assertEquals("Upgrade lost language preference",JSONObject.quote(locale),eval(scenario,"document.documentElement.lang")) }
+            runJs(scenario,"const n=window.Capacitor.Plugins.ClosetStorage;const root=JSON.parse((await n.read({key:'root'})).value);const doc=JSON.parse((await n.read({key:'profile:'+root.current})).value);if(!doc.replica.collections.flatMap(c=>c.records).some(r=>r.data.name?.startsWith('手机离线验收-')))throw Error('Upgrade lost previously saved item');return true;")
+        }
     }
     @Test fun phoneAiUpgradeKeepsCredentialsAndRecords() {
         if (InstrumentationRegistry.getArguments().getString("checkAiUpgrade") != "true") return

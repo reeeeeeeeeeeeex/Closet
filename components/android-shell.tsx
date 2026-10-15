@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarDays, ChevronRight, Database, Lightbulb, Plus, Ruler
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useI18n } from "@/lib/i18n/provider";
+import { LanguageSelect } from "@/components/language-select";
 import "./android-shell.css";
 
 export type ClosetView = "personalSizes" | "wardrobe" | "outfits" | "calendar" | "backup" | "assistant" | "account";
@@ -46,5 +47,5 @@ export function AndroidSearch({ value, onChange, placeholder, count, onReset, ch
 export function AndroidAccount({ profileMenu, status, onView }: { profileMenu: ReactNode; status: ReactNode; onView: (view: ClosetView) => void }) {
   const { t } = useI18n();
   const rows = [{ id: 'personalSizes', title: t('我的尺码'), icon: Ruler }, { id: 'backup', title: t('数据与备份'), icon: Database }, { id: 'assistant', title: t('穿搭灵感'), icon: Lightbulb }] as const;
-  return <div className="android-my"><section className="android-my-profile">{profileMenu}<div className="android-my-status">{status}</div></section><div className="android-my-links">{rows.map(row => <button type="button" key={row.id} onClick={() => onView(row.id)}><row.icon size={21} strokeWidth={1.4}/><span><strong>{row.title}</strong></span><ChevronRight size={18}/></button>)}</div></div>;
+  return <div className="android-my"><section className="android-my-profile">{profileMenu}<div className="android-my-status">{status}</div></section><div className="android-my-links">{rows.map(row => <button type="button" key={row.id} onClick={() => onView(row.id)}><row.icon size={21} strokeWidth={1.4}/><span><strong>{row.title}</strong></span><ChevronRight size={18}/></button>)}</div><LanguageSelect/></div>;
 }
