@@ -65,7 +65,7 @@ The Android app supports offline editing and manual, two-way local network sync.
 
 Requires Android 10 or later and Android System WebView 124 or later. To build an APK on Windows, install JDK 21 and Android SDK platform 36 / build-tools 36.0.0, set `CLOSET_JAVA_HOME` and `ANDROID_HOME` as needed, then run `pnpm android:apk`.
 
-Download the signed Android 1.2.0 APK from [GitHub Releases](https://github.com/reeeeeeeeeeeeex/Closet/releases/latest), or build it yourself. The build script produces a signed APK under `outputs/android/`. Back up `.local/android-signing/`: future updates need the same signing key. Export your wardrobe before uninstalling. See the [Android guide](docs/android.md) and [1.2.0 validation notes](docs/android-1.2-validation.md).
+Download the signed Android 1.3.0 APK from [GitHub Releases](https://github.com/reeeeeeeeeeeeex/Closet/releases/latest), or build it yourself. The build script produces a signed APK under `outputs/android/`. Back up `.local/android-signing/`: future updates need the same signing key. Export your wardrobe before uninstalling. See the [Android guide](docs/android.md) and [1.3.0 validation notes](docs/free-text-details-validation.md).
 
 ### Storage and backups
 
@@ -164,7 +164,7 @@ Android App 支持离线编辑与手动双向同步。在电脑的“数据与�
 
 需要 Android 10 或更新版本，以及 Android System WebView 124 或更新版本。在 Windows 构建 APK 时，安装 JDK 21、Android SDK platform 36 / build-tools 36.0.0，按需设置 `CLOSET_JAVA_HOME`、`ANDROID_HOME`，然后执行 `pnpm android:apk`。
 
-可从 [GitHub Releases](https://github.com/reeeeeeeeeeeeex/Closet/releases/latest) 下载 Android 1.2.0 签名 APK，也可自行构建。构建产物生成于 `outputs/android/`。在“我的 / You → 语言 / Language”切换简体中文与英文，重启后保留选择。请另行妥善备份 `.local/android-signing/`，后续覆盖升级需要同一签名。卸载前请导出备份。详见 [Android 说明](docs/android.md) 和 [1.2.0 验证记录](docs/android-1.2-validation.md)。
+可从 [GitHub Releases](https://github.com/reeeeeeeeeeeeex/Closet/releases/latest) 下载 Android 1.3.0 签名 APK，也可自行构建。构建产物生成于 `outputs/android/`。在“我的 / You → 语言 / Language”切换简体中文与英文，重启后保留选择。请另行妥善备份 `.local/android-signing/`，后续覆盖升级需要同一签名。卸载前请导出备份。详见 [Android 说明](docs/android.md) 和 [1.3.0 验证记录](docs/free-text-details-validation.md)。
 
 ### 数据与备份
 

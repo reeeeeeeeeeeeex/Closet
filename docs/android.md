@@ -2,7 +2,7 @@
 
 ## 安装
 
-当前发布为 New Closet 1.2.0，包名 `app.newcloset.android`，支持 Android 10（API 29）及以上，需要系统 Android System WebView 124 或更新版本。老系统如仍使用出厂 WebView，请先在系统应用商店更新；App 会显示更新提示。从 [GitHub Releases](https://github.com/reeeeeeeeeeeeex/Closet/releases/latest) 下载签名 APK，或将自行构建的 `outputs/android/new-closet-1.2.0.apk` 复制到手机并打开，允许此次使用的文件管理器安装应用。SHA-256 在同目录的 `.apk.sha256` 文件中。沿用原签名，可直接覆盖安装；本次验证见 [1.2.0 发布验证](android-1.2-validation.md)。
+当前发布为 New Closet 1.3.0，包名 `app.newcloset.android`，支持 Android 10（API 29）及以上，需要系统 Android System WebView 124 或更新版本。老系统如仍使用出厂 WebView，请先在系统应用商店更新；App 会显示更新提示。从 [GitHub Releases](https://github.com/reeeeeeeeeeeeex/Closet/releases/latest) 下载签名 APK，或将自行构建的 `outputs/android/new-closet-1.3.0.apk` 复制到手机并打开，允许此次使用的文件管理器安装应用。SHA-256 在同目录的 `.apk.sha256` 文件中。沿用原签名，可直接覆盖安装；本次验证见 [1.3.0 发布验证](free-text-details-validation.md)。
 
 安装包内含完整界面。账号、单品、分组、搭配、日历快照、尺码、颜色库和原图都保存在 App 的私有目录，不依赖电脑运行。覆盖安装同签名更新会保留资料。卸载会删除私有资料，卸载前请在“数据与备份”导出 ZIP。
 
