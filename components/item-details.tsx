@@ -18,14 +18,14 @@ export function ItemDetailsFields({ item, onChange }: {
     {item.category === "shoes" && <>
       <div className="field"><Label>{t("合脚程度")}</Label><div className="chip-row">{[["", t("未填写")], ...Object.entries(SHOE_FITS)].map(([value, name]) => <button type="button" key={value} className={`chip ${(item.shoeFit || "") === value ? "selected" : ""}`} aria-pressed={(item.shoeFit || "") === value} onClick={() => onChange({ ...item, shoeFit: (value || null) as Item["shoeFit"] })}>{t(name)}</button>)}</div></div>
       <ShoeSizeFields value={item.shoeSize} onChange={shoeSize => onChange({ ...item, shoeSize })}/>
-      <p className="field-hint">{t("按鞋标分别填写欧码和中国码，不自动换算；任意一项可留空。")}</p>
+      <p className="field-hint">{t("鞋码可自由填写，如“38/39”或“约240”。两种尺码不自动换算，可留空。")}</p>
     </>}
-    {!!measurements.length && <section className="measurement-fields"><h3>{t("衣物实测尺寸（cm）")}</h3><p className="field-hint">{t("填写衣物尺寸；胸围、腰围等围度填写一整圈，不是平铺的半围。不确定的尺寸可留空。")}</p><div className="measurement-grid">{measurements.map(key => <div className="field" key={key}><Label htmlFor={`${id}-${key}`}>{t(measurementName(item.category, key))}</Label><Input id={`${id}-${key}`} type="number" min={0.1} max={500} step="any" inputMode="decimal" placeholder={t("未填写")} value={item.measurements[key] ?? ""} onChange={event => {
+    {!!measurements.length && <section className="measurement-fields"><h3>{t("衣物实测尺寸（cm）")}</h3><p className="field-hint">{t("尺寸可自由填写，如“约70”或“68–72”。默认单位为 cm，也可注明其他单位；围度填写一整圈，可留空。")}</p><div className="measurement-grid">{measurements.map(key => <div className="field" key={key}><Label htmlFor={`${id}-${key}`}>{t(measurementName(item.category, key))}</Label><Input id={`${id}-${key}`} type="text" maxLength={100} placeholder={t("未填写")} value={item.measurements[key] ?? ""} onChange={event => {
                     const values = { ...item.measurements };
                     if (event.target.value === "")
                         delete values[key];
                     else
-                        values[key] = Number(event.target.value);
+                        values[key] = event.target.value;
                     onChange({ ...item, measurements: values });
                 }}/></div>)}</div></section>}
   </div>;
@@ -35,22 +35,27 @@ export function ItemLabels({ item, showMeasurements = true }: {
     showMeasurements?: boolean;
 }) {
     const { t, locale } = useI18n();
-    const number = (value: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(value);
+    const display = (value: number | string) => typeof value === "number" ? new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(value) : value;
+    const numeric = (value: number | string) => typeof value === "number" || /^\d+(?:[.,]\d+)?$/.test(value);
     const tags: string[] = [];
     if (garmentCategory(item.category) && item.fit)
         tags.push(t(FITS[item.fit]));
     if (item.category === "shoes") {
         if (item.shoeFit)
             tags.push(t(SHOE_FITS[item.shoeFit]));
-        if (item.shoeSize.eu !== null)
-            tags.push(t("欧码 {size}", { size: number(item.shoeSize.eu) }));
-        if (item.shoeSize.cn !== null)
-            tags.push(t("中国码 {size} mm", { size: number(item.shoeSize.cn) }));
+        if (item.shoeSize.eu !== null && item.shoeSize.eu !== "")
+            tags.push(t("欧码 {size}", { size: display(item.shoeSize.eu) }));
+        if (item.shoeSize.cn !== null && item.shoeSize.cn !== "") {
+            const params = { size: display(item.shoeSize.cn) };
+            tags.push(numeric(item.shoeSize.cn) ? t("中国码 {size} mm", params) : t("中国码 {size}", params));
+        }
     }
     for (const key of showMeasurements ? CATEGORY_MEASUREMENTS[item.category] || [] : []) {
         const value = item.measurements[key];
-        if (value !== undefined)
-            tags.push(t("{label} {value} cm", { label: t(measurementName(item.category, key)), value: number(value) }));
+        if (value !== undefined && value !== "") {
+            const params = { label: t(measurementName(item.category, key)), value: display(value) };
+            tags.push(numeric(value) ? t("{label} {value} cm", params) : t("{label} {value}", params));
+        }
     }
     return tags.length ? <div className="item-attribute-tags">{tags.map(tag => <span key={tag}>{tag}</span>)}</div> : null;
 }

@@ -394,6 +394,76 @@ class ClosetInstrumentedTest {
         }
         } finally { Intents.release() }
     }
+    @Test fun freeTextPricesAndSizes(){
+        val prefix="Text fields "+System.currentTimeMillis()
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            ready(scenario,"en");loadClient(scenario)
+            runJs(scenario,"""
+                const c=ClosetTest,root=await c.bootstrap();c.setProfileContext(root.current);
+                const state=await (await c.androidClient.request('/api/closet')).json();
+                for(const category of ['top','shoes']){
+                    const data={name:${JSONObject.quote(prefix)}+' '+category,category,color:'',asset:null,seasons:[],occasions:[],notes:'',archived:false,...(category==='top'?{measurements:{length:68}}:{shoeSize:{eu:38.5,cn:240}})};
+                    const response=await c.androidClient.request('/api/closet',{method:'POST',body:JSON.stringify({op:'save',kind:'item',collectionId:state.collectionId,data})});
+                    if(!response.ok)throw Error(await response.text());
+                }return true;
+            """.trimIndent())
+            scenario.recreate();ready(scenario,"en")
+            for(category in listOf("top","shoes")){
+                runJs(scenario,"""
+                    const wait=async(test)=>{for(let i=0;i<100;i++){if(test())return;await new Promise(r=>setTimeout(r,50))}throw Error('Text fields UI timed out')};
+                    const name=${JSONObject.quote(prefix+" "+category)};
+                    await wait(()=>[...document.querySelectorAll('.item-card-body')].some(b=>b.textContent.includes(name)));
+                    [...document.querySelectorAll('.item-card-body')].find(b=>b.textContent.includes(name)).click();await wait(()=>document.querySelector('.purchase-price-field input'));
+                    const details=document.querySelector('.item-details-fields').closest('details');details.open=true;
+                    window.setText=async(input,value)=>{if(!input||input.type!=='text'||input.hasAttribute('list'))throw Error('Field is not free text');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));await new Promise(r=>setTimeout(r,80))};
+                    await setText(document.querySelector('.purchase-price-field input'),'约200元 / gift');
+                    const isShoe=${category=="shoes"},field=document.querySelector(isShoe?'.item-details-fields input[id$="-eu"]':'.measurement-fields input[id$="-length"]');
+                    if(field.value!==(isShoe?'38.5':'68'))throw Error('Legacy numeric value was lost');
+                    await setText(field,isShoe?'':'约68–72 cm');
+                    if(isShoe){field.scrollIntoView({block:'center'});field.focus()}return true;
+                """.trimIndent())
+                if(category=="shoes")InstrumentationRegistry.getInstrumentation().sendStringSync("38/39")
+                runJs(scenario,"""
+                    if(${category=="shoes"}){
+                        if(document.querySelector('.item-details-fields input[id$="-eu"]').value!=='38/39')throw Error('Typing a shoe size failed');
+                        await setText(document.querySelector('.item-details-fields input[id$="-cn"]'),'约240 mm');
+                    }
+                    document.activeElement?.blur();document.querySelector('.item-dialog form').requestSubmit();
+                    for(let i=0;i<100;i++){if(!document.querySelector('.item-dialog'))return true;await new Promise(r=>setTimeout(r,50))}throw Error('Could not save text fields: '+document.body.innerText);
+                """.trimIndent())
+            }
+            runJs(scenario,"""
+                if(document.querySelector('.closet-grid')?.innerText.includes('约200元 / gift')||[...document.querySelectorAll('.item-card')].some(c=>c.textContent.includes('约200元 / gift')))throw Error('Price leaked onto a wardrobe card');
+                document.querySelector('.android-bottom-nav button:last-child').click();
+                for(let i=0;i<100&&!document.querySelector('.android-my-links button');i++)await new Promise(r=>setTimeout(r,50));
+                document.querySelector('.android-my-links button').click();
+                for(let i=0;i<100&&!document.querySelector('.personal-sizes-panel');i++)await new Promise(r=>setTimeout(r,50));
+                await setText(document.querySelector('.personal-sizes-panel input[id$="-waist"]'),'约70');
+                await setText(document.querySelector('.personal-sizes-panel input[id$="-eu"]'),'38/39');
+                document.querySelector('.personal-sizes-panel').requestSubmit();
+                for(let i=0;i<100;i++){if(document.querySelector('.personal-sizes-actions [role=status]'))return true;await new Promise(r=>setTimeout(r,50))}throw Error('Personal sizes did not save');
+            """.trimIndent())
+            scenario.recreate();ready(scenario,"zh-CN");loadClient(scenario)
+            runJs(scenario,"""
+                const c=ClosetTest,root=await c.bootstrap();c.setProfileContext(root.current);
+                const state=await (await c.androidClient.request('/api/closet')).json(),manifest=c.manifestFromState(state);
+                for(const category of ['top','shoes']){
+                    const item=manifest.records.find(r=>r.data.name===${JSONObject.quote(prefix)}+' '+category);
+                    if(item?.data.purchasePrice!=='约200元 / gift')throw Error('Price lost after restart or export');
+                    if(category==='top'&&item.data.measurements.length!=='约68–72 cm')throw Error('Length lost');
+                    if(category==='shoes'&&(item.data.shoeSize.eu!=='38/39'||item.data.shoeSize.cn!=='约240 mm'))throw Error('Shoe sizes lost');
+                }
+                const sizes=manifest.records.find(r=>r.kind==='personalSizes');if(sizes?.data.measurements.waist!=='约70'||sizes.data.shoeSize.eu!=='38/39')throw Error('Body sizes lost');
+                [...document.querySelectorAll('.item-card-body')].find(b=>b.textContent.includes(${JSONObject.quote(prefix+" shoes")})).click();
+                for(let i=0;i<100&&!document.querySelector('.purchase-price-field input');i++)await new Promise(r=>setTimeout(r,50));
+                if(document.querySelector('.purchase-price-field label').textContent!=='购买价格'||document.querySelector('.purchase-price-field input').value!=='约200元 / gift')throw Error('Chinese price field missing');
+                for(const selector of ['.purchase-price-field input','.item-details-fields input[id$="-eu"]','.item-details-fields input[id$="-cn"]']){const input=document.querySelector(selector);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'');input.dispatchEvent(new Event('input',{bubbles:true}));await new Promise(r=>setTimeout(r,80))}
+                document.querySelector('.item-dialog form').requestSubmit();for(let i=0;i<100&&document.querySelector('.item-dialog');i++)await new Promise(r=>setTimeout(r,50));
+                const cleared=(await (await c.androidClient.request('/api/closet')).json()).records.find(r=>r.data.name===${JSONObject.quote(prefix+" shoes")});
+                if(cleared.data.purchasePrice!==''||cleared.data.shoeSize.eu!==null||cleared.data.shoeSize.cn!==null)throw Error('Clearing free text did not persist');return true;
+            """.trimIndent())
+        }
+    }
     @Test fun androidNavigationAndDraftProtection(){
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             ready(scenario)
@@ -402,11 +472,11 @@ class ClosetInstrumentedTest {
                 const clickTab=async(name,title)=>{[...document.querySelectorAll('.android-bottom-nav button')].find(b=>b.textContent.includes(name)).click();for(let i=0;i<50;i++){if(document.querySelector('.android-page-heading h1')?.textContent===title)return;await new Promise(r=>setTimeout(r,50))}throw Error('Tab failed: '+name)};
                 await clickTab('搭配','我的搭配');await clickTab('日历','穿搭日历');await clickTab('我的','我的');
                 [...document.querySelectorAll('.android-my-links button')].find(b=>b.textContent.includes('我的尺码')).click();await new Promise(r=>setTimeout(r,200));
-                const input=document.querySelector('.personal-sizes-panel input[type=number]');if(!input)throw Error('Sizes page unavailable');const nextHeight=input.value==='123'?'124':'123';Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,nextHeight);input.dispatchEvent(new Event('input',{bubbles:true}));await new Promise(r=>setTimeout(r,200));
+                const input=document.querySelector('.personal-sizes-panel .measurement-grid input');if(!input)throw Error('Sizes page unavailable');const nextHeight=input.value==='123'?'124':'123';Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,nextHeight);input.dispatchEvent(new Event('input',{bubbles:true}));await new Promise(r=>setTimeout(r,200));
                 [...document.querySelectorAll('.android-bottom-nav button')].find(b=>b.textContent.includes('衣橱')).click();await new Promise(r=>setTimeout(r,150));
                 if(!document.querySelector('[role=alertdialog]')?.innerText.includes('切换页面前放弃草稿'))throw Error('Draft navigation was not guarded');
                 [...document.querySelectorAll('[role=alertdialog] button')].find(b=>b.textContent==='保留草稿').click();await new Promise(r=>setTimeout(r,100));
-                if(document.querySelector('.personal-sizes-panel input[type=number]').value!==nextHeight)throw Error('Keep draft lost edits');
+                if(document.querySelector('.personal-sizes-panel .measurement-grid input').value!==nextHeight)throw Error('Keep draft lost edits');
                 [...document.querySelectorAll('.android-bottom-nav button')].find(b=>b.textContent.includes('衣橱')).click();await new Promise(r=>setTimeout(r,100));
                 [...document.querySelectorAll('[role=alertdialog] button')].find(b=>b.textContent==='放弃草稿并切换').click();await new Promise(r=>setTimeout(r,100));
                 if(document.querySelector('.android-page-heading h1').textContent!=='我的衣橱')throw Error('Discard navigation failed');return true;

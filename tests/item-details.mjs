@@ -9,7 +9,7 @@ import ts from 'typescript';
 const require = createRequire(import.meta.url);
 await build({ entryPoints: ['components/item-details.tsx','components/closet-cards.tsx','components/outfit-fields.tsx','components/personal-sizes.tsx','lib/domain.ts','lib/i18n/core.ts'], outdir: '.test-runtime/item-details-build', outExtension: { '.js': '.cjs' }, bundle: true, platform: 'node', format: 'cjs', external: ['react','react-dom','react/jsx-runtime'], logLevel: 'error' });
 const root = process.cwd() + '/.test-runtime/item-details-build/';
-const { itemSchema, makeSnapshot } = require(root + 'lib/domain.cjs');
+const { itemSchema, personalSizesSchema, makeSnapshot } = require(root + 'lib/domain.cjs');
 const { ItemLabels, ItemDetailsFields } = require(root + 'components/item-details.cjs');
 const { ItemCard, OutfitCard } = require(root + 'components/closet-cards.cjs');
 const { OutfitFields } = require(root + 'components/outfit-fields.cjs');
@@ -20,6 +20,25 @@ for (const category of ['top','bottom','dress','outerwear']) for (const fit of [
 const shirt = itemSchema.parse({ ...base, fit: 'fitted', measurements: { shoulderWidth: 42.5, chest: 96, length: 68 } });
 const shoe = itemSchema.parse({ ...base, category: 'shoes', shoeFit: 'large', shoeSize: { eu: 38.5, cn: 240 } });
 const render = (component, props) => renderToStaticMarkup(React.createElement(component, props));
+const textShirt = itemSchema.parse({...base,measurements:{length:'约70 cm',chest:'90–96',shoulderWidth:'42.5'}});
+const textShoe = itemSchema.parse({...base,category:'shoes',shoeSize:{eu:'38/39',cn:'约240 mm'}});
+assert.deepEqual(textShirt.measurements,{length:'约70 cm',chest:'90–96',shoulderWidth:'42.5'});
+assert.deepEqual(textShoe.shoeSize,{eu:'38/39',cn:'约240 mm'});
+const textLabels=render(ItemLabels,{item:textShirt})+render(ItemLabels,{item:textShoe});
+for(const text of ['约70 cm','90–96','42.5 cm','38/39','约240 mm'])assert(textLabels.includes(text));
+assert.doesNotMatch(textLabels,/NaN|cm cm|mm mm/);
+for(const item of [textShirt,textShoe]) {
+  const html=render(ItemDetailsFields,{item,onChange:()=>{}});
+  assert.match(html,/type="text"/);assert.doesNotMatch(html,/type="number"|inputMode="decimal"|<datalist| list=/);
+}
+assert.equal(itemSchema.parse({...base,measurements:{length:'  约70  '}}).measurements.length,'约70');
+assert.throws(()=>itemSchema.parse({...base,measurements:{length:'x'.repeat(101)}}),/尺码与尺寸/);
+assert.throws(()=>personalSizesSchema.parse({shoeSize:{eu:'x'.repeat(101)}}),/尺码与尺寸/);
+const freePersonal=personalSizesSchema.parse({measurements:{height:168,waist:'约70',footLength:'24–25 cm'},shoeSize:{eu:'38/39',cn:'约240'}});
+assert.equal(freePersonal.measurements.height,168);assert.equal(freePersonal.measurements.waist,'约70');
+const freeRecord={id:crypto.randomUUID(),data:textShirt};
+const freeSnapshot=makeSnapshot({name:'Text look',asset:null,itemIds:[freeRecord.id],occasions:[],notes:'',archived:false},[freeRecord]);
+textShirt.measurements.length='Changed';assert.equal(freeSnapshot.items[0].data.measurements.length,'约70 cm');
 assert.match(render(ItemLabels, { item: shirt }), /Slim fit/); assert.match(render(ItemLabels, { item: shirt }), /Shoulder width 42.5 cm/);
 assert.match(render(ItemLabels, { item: shoe }), /Runs large/); assert.match(render(ItemLabels, { item: shoe }), /EU 38.5/); assert.match(render(ItemLabels, { item: shoe }), /CN 240 mm/);
 const compactShirt = render(ItemLabels, { item: shirt, showMeasurements: false });
@@ -73,6 +92,7 @@ assert.equal(messageForLocale('en','未填写'), '未填写'); assert.equal(reso
 assert.equal(messageForLocale('en','constructor'), 'constructor'); assert.equal(messageForLocale('en','__proto__'), '__proto__');
 catalogs.en = actualEnglish;
 const personalHtml = render(PersonalSizesPanel,{collectionName:'Main',disabled:false,onSave:async()=>{},onRefresh:async()=>undefined});
+assert.doesNotMatch(personalHtml,/type="number"|<datalist| list=/);
 for(const label of ['Height','Shoulder width','Chest','Waist','Hips','Thigh circumference','Knee circumference','Arm length','Inseam','Outseam','Foot length','European size','Chinese size','Save measurements']) assert.match(personalHtml,new RegExp(label));
 assert.match(personalHtml,/from your crotch to the floor/);
 assert.match(personalHtml,/from your natural waist to the floor/);

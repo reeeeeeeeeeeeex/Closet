@@ -16,7 +16,7 @@ const { unzipSync, zipSync, strToU8 } = require('fflate');
 const png = new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jrWQAAAAASUVORK5CYII=', 'base64'));
 const hash = await hashBytes(png);
 const metadata = () => ({ id: crypto.randomUUID(), version: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
-const item = { ...metadata(), kind: 'item', data: itemSchema.parse({ name: 'Original jacket', category: 'outerwear', brand: 'Brand A', purchasePrice: '¥299 / gift', color: 'pink', occasions: ['casual'], seasons: ['spring'], asset: hash, notes: 'Keep original bytes', archived: false, fit: 'fitted', measurements: { shoulderWidth: 42.5, chest: 96, length: 68 } }) };
+const item = { ...metadata(), kind: 'item', data: itemSchema.parse({ name: 'Original jacket', category: 'outerwear', brand: 'Brand A', purchasePrice: '¥299 / gift', color: 'pink', occasions: ['casual'], seasons: ['spring'], asset: hash, notes: 'Keep original bytes', archived: false, fit: 'fitted', measurements: { shoulderWidth: 42.5, chest: 96, length: "约68–72 cm" } }) };
 const outfit = { ...metadata(), kind: 'outfit', data: { name: 'Original outfit', itemIds: [item.id], asset: null, occasions: ['casual'], notes: '', archived: false } };
 const entry = { ...metadata(), kind: 'calendar', data: { date: '2026-10-09', status: 'worn', outfitId: outfit.id, notes: '', snapshot: makeSnapshot(outfit.data, [item]) } };
 item.data.purchasePrice = 'about $40'; item.data.brand = 'Brand B'; item.data.name = 'Changed jacket'; item.data.measurements.chest = 100; outfit.data.name = 'Changed outfit';
@@ -30,7 +30,7 @@ assert.equal(photoEntry.data.snapshot.asset, photoHash); assert.equal(photoEntry
 assert(referencedAssets([photoOnly, photoEntry]).has(photoHash));
 assert.throws(() => outfitSchema.parse({ ...photoOnly.data, itemIds: [], asset: null }), /照片/);
 const state = { collections: [{ id: 'main', name: 'Round trip', createdAt: item.createdAt }], collectionId: 'main', records: [item, outfit, entry, photoOnly, photoEntry], assets: [{ hash, name: '原始照片.png', mime: 'image/png', size: png.length }, { hash: photoHash, name: '穿搭原图.png', mime: 'image/png', size: outfitPhoto.length }] };
-const personal = {...metadata(),kind:'personalSizes',data:personalSizesSchema.parse({measurements:{height:168,waist:68,knee:36.5,inseam:77,outseam:103},shoeSize:{eu:38.5,cn:240}})};
+const personal = {...metadata(),kind:'personalSizes',data:personalSizesSchema.parse({measurements:{height:168,waist:"约68",knee:36.5,inseam:77,outseam:103},shoeSize:{eu:"38/39",cn:"240–245 mm"}})};
 state.records.push(personal);
 state.records.push({...metadata(),kind:'item',data:itemSchema.parse({...item.data,name:'Trousers',category:'bottom',measurements:{waist:72,knee:42.5}})});
 assert.throws(()=>personalSizesSchema.parse({measurements:{waist:0}}));
@@ -74,4 +74,4 @@ assert.throws(() => validateArchive({ ...manifest, records: [outfit] }), /不存
 assert.throws(() => validateArchive({ ...manifest, records: [...manifest.records, item] }), /重复/);
 assert.throws(()=>validateArchive({...manifest,records:[...manifest.records,{...personal,id:crypto.randomUUID()}]}),/一份我的尺码/);
 await rm('.test-build', { recursive: true, force: true });
-console.log('PASS: exact item/outfit original bytes + all records round trip; immutable photo-only snapshots; legacy v1-v9 backup upgrades and purchase prices v10 round trip; leap-year month jumps; corrupt/missing media, future version, duplicate IDs and broken references rejected.');
+console.log('PASS: exact item/outfit original bytes + all records round trip; immutable photo-only snapshots; legacy v1-v9 backup upgrades and free-text prices/measurements v10 round trip; leap-year month jumps; corrupt/missing media, future version, duplicate IDs and broken references rejected.');

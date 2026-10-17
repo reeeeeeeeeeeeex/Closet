@@ -66,11 +66,12 @@ try {
   assert.equal((await post({ kind: 'outfit', data: { ...photoData, asset: null } })).status, 400);
   assert.equal((await post({ kind: 'calendar', data: { date: '2026-10-11', status: 'worn', notes: '', newOutfit: { ...photoData, asset: 'f'.repeat(64) } } })).status, 400);
   assert.equal((await (await request('/api/closet')).json()).records.length, 2);
-  const itemData = { name: 'Pink jacket', brand: 'Runtime brand', purchasePrice: '¥299 / gift', category: 'outerwear', color: 'pink', occasions: ['casual'], seasons: ['spring'], asset: asset.hash, photos:[asset.hash,secondAsset.hash], notes: 'Original', archived: false, fit: 'fitted', measurements: { shoulderWidth: 42.5, chest: 96, length: 68 } };
+  const itemData = { name: 'Pink jacket', brand: 'Runtime brand', purchasePrice: '¥299 / gift', category: 'outerwear', color: 'pink', occasions: ['casual'], seasons: ['spring'], asset: asset.hash, photos:[asset.hash,secondAsset.hash], notes: 'Original', archived: false, fit: 'fitted', measurements: { shoulderWidth: 42.5, chest: 96, length: "约68–72 cm" } };
   assert.equal((await post({kind:'item',data:{...itemData,photos:[asset.hash,'f'.repeat(64)]}})).status,400);
   assert.equal((await post({kind:'item',data:{...itemData,asset:'f'.repeat(64)}})).status,400);
   res = await post({ kind: 'item', data: itemData }); assert.equal(res.status, 200, await res.clone().text());
   let state = await (await request('/api/closet')).json(); const item = state.records.find(r => r.kind === 'item');
+  assert.equal(item.data.measurements.length, '约68–72 cm');
   const shoes = { ...itemData, name: 'Daily shoes', category: 'shoes', fit: null, measurements: {}, shoeFit: 'small', shoeSize: { eu: 38.5, cn: 240 } };
   assert.equal((await post({ kind: 'item', data: shoes })).status, 200);
   assert.equal((await post({ kind: 'item', data: { ...shoes, shoeSize: { eu: 38.5, cn: 242 } } })).status, 400);
@@ -87,6 +88,7 @@ try {
   const photoHistory = state.records.find(r => r.id === photoCalendar.id);
   assert.equal(photoHistory.data.snapshot.items.length, 0); assert.equal(photoHistory.data.snapshot.asset, asset.hash);
   assert.equal(entry.data.snapshot.name, 'First outfit'); assert.equal(entry.data.snapshot.items[0].data.name, 'Pink jacket');
+  assert.equal(entry.data.snapshot.items[0].data.measurements.length, '约68–72 cm');
   assert.equal(entry.data.snapshot.items[0].data.fit, 'fitted'); assert.equal(entry.data.snapshot.items[0].data.measurements.shoulderWidth, 42.5);
   assert.deepEqual(entry.data.snapshot.items[0].data.photos,[asset.hash,secondAsset.hash]);
   assert.equal(entry.data.snapshot.items[0].data.asset,asset.hash); assert.equal(entry.data.snapshot.items[0].data.brand,'Runtime brand');
@@ -94,9 +96,10 @@ try {
   const savedShoes = state.records.find(r => r.kind === 'item' && r.data.category === 'shoes');
   assert.equal(savedShoes.data.purchasePrice, '¥299 / gift'); assert.equal(entry.data.snapshot.items[0].data.purchasePrice, '¥299 / gift');
   assert.equal(savedShoes.data.shoeFit, 'small'); assert.deepEqual(savedShoes.data.shoeSize, { eu: 38.5, cn: 240 });
-  assert.equal((await post({kind:'item',id:savedShoes.id,version:savedShoes.version,data:{...savedShoes.data,brand:'',purchasePrice:''}})).status,200);
+  assert.equal((await post({kind:'item',id:savedShoes.id,version:savedShoes.version,data:{...savedShoes.data,brand:'',purchasePrice:'',shoeSize:{eu:'38/39',cn:'约240'}}})).status,200);
   assert.equal((await (await request('/api/closet')).json()).records.find(record=>record.id===savedShoes.id).data.brand,'');
   assert.equal((await (await request('/api/closet')).json()).records.find(record=>record.id===savedShoes.id).data.purchasePrice,'');
+  assert.deepEqual((await (await request('/api/closet')).json()).records.find(record=>record.id===savedShoes.id).data.shoeSize,{eu:'38/39',cn:'约240'});
   assert.equal((await post({kind:'item',data:{...itemData,brand:'x'.repeat(101)}})).status,400);
   const trousersData={...itemData,name:'Trousers',category:'bottom',measurements:{knee:42.5}};
   const trousersResponse=await post({kind:'item',data:trousersData}); assert.equal(trousersResponse.status,200); const trousersId=(await trousersResponse.json()).id;
@@ -133,7 +136,7 @@ try {
   const nestedPhoto = await post({ kind: 'calendar', subsetId: outfitSubsetId, data: { date: '2026-10-12', status: 'worn', notes: '', newOutfit: photoData } });
   assert.equal(nestedPhoto.status,200,await nestedPhoto.clone().text()); const nestedPhotoId = (await nestedPhoto.json()).outfitId;
   subsetState = await (await request('/api/closet')).json(); assert(subsetState.records.find(record => record.id === outfitSubsetId).data.memberIds.includes(nestedPhotoId));
-  const personalData = { measurements: { height: 168.5, shoulderWidth: 39, chest: 88, waist: 68, hips: 92, thigh: 51, knee: 36.5, armLength: 55, inseam: 77, outseam: 103, footLength: 24 }, shoeSize: { eu: 38.5, cn: 240 } };
+  const personalData = { measurements: { height: 168.5, shoulderWidth: 39, chest: 88, waist: '约68', hips: 92, thigh: 51, knee: 36.5, armLength: 55, inseam: '76–78 cm', outseam: 103, footLength: 24 }, shoeSize: { eu: '38/39', cn: '约240' } };
   const competingProfiles = await Promise.all([personalData,{...personalData,measurements:{...personalData.measurements,waist:70}}].map(data=>post({kind:'personalSizes',data})));
   assert.deepEqual(competingProfiles.map(result=>result.status).sort(),[200,409]);
   const winningProfile = (await competingProfiles.find(result=>result.status===200).json()).record;
