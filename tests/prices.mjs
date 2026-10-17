@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import { createRequire } from 'node:module';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+
+await build({entryPoints:['lib/domain.ts','lib/sync-model.ts','components/purchase-price-field.tsx','components/closet-cards.tsx'],outdir:'.test-runtime/prices-build',outExtension:{'.js':'.cjs'},bundle:true,platform:'node',format:'cjs',external:['react','react-dom','react/jsx-runtime'],logLevel:'error'});
+const require=createRequire(import.meta.url),root=process.cwd()+'/.test-runtime/prices-build/';
+const {itemSchema,CATEGORIES,makeSnapshot}=require(root+'lib/domain.cjs');
+const {validateReplica}=require(root+'lib/sync-model.cjs');
+const {PurchasePriceField}=require(root+'components/purchase-price-field.cjs');
+const {ItemCard}=require(root+'components/closet-cards.cjs');
+const base={name:'Sample item',category:'top',color:'',seasons:[],occasions:[],notes:'',asset:null,archived:false};
+assert.equal(itemSchema.parse(base).purchasePrice,undefined);
+for(const category of Object.keys(CATEGORIES))for(const price of ['¥299.50','about $30','赠品','199 + shipping',''])assert.equal(itemSchema.parse({...base,category,purchasePrice:price}).purchasePrice,price);
+assert.equal(itemSchema.parse({...base,purchasePrice:'  ¥299  '}).purchasePrice,'¥299');
+assert.throws(()=>itemSchema.parse({...base,purchasePrice:'x'.repeat(101)}),/购买价格/);
+const now=new Date().toISOString();
+const record={id:crypto.randomUUID(),kind:'item',version:1,createdAt:now,updatedAt:now,data:itemSchema.parse({...base,purchasePrice:'PRIVATE_PRICE_299'})};
+const snapshot=makeSnapshot({name:'Look',itemIds:[record.id],asset:null,occasions:[],notes:'',archived:false},[record]);
+record.data.purchasePrice='Changed price';assert.equal(snapshot.items[0].data.purchasePrice,'PRIVATE_PRICE_299');
+const replica=validateReplica({collections:[{id:crypto.randomUUID(),name:'Main',createdAt:now,records:[record]}],assets:[],colorLibrary:[],tombstones:[]});
+assert.equal(replica.collections[0].records[0].data.purchasePrice,'Changed price');
+for(const compact of [false,true])for(const selection of [undefined,{selected:false,label:'Choose item'}])assert.doesNotMatch(renderToStaticMarkup(React.createElement(ItemCard,{item:record,onOpen:()=>{},selection,compact})),/Changed price|PRIVATE_PRICE_299|Purchase price/);
+const field=renderToStaticMarkup(React.createElement(PurchasePriceField,{value:'赠品 / ¥0',onChange:()=>{}}));
+assert.match(field,/Purchase price/);assert.match(field,/type="text"/);assert.doesNotMatch(field,/required/);
+console.log('PASS: free-text purchase prices, legacy records, immutable snapshots, sync serialization, and prices absent from item cards.');

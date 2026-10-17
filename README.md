@@ -15,6 +15,7 @@ The desktop app runs as a local web service. The Android app stores its interfac
 ### Features
 
 - **Wardrobe catalog:** tops, bottoms, dresses and one-pieces, outerwear, shoes, bags, and accessories, with brands, colors, seasons, occasions, fit, measurements, and notes.
+- **Purchase prices:** optional free-text prices in item details, such as `¥299`, `about $30`, or `gift`. Prices stay off the wardrobe cards.
 - **Original photos:** up to 20 photos per item or outfit, with a cover, zoom, and cropping saved as a new photo. Originals are never recompressed.
 - **Flexible organization:** nested groups, search, filters, and archived items. An item or outfit can belong to multiple groups.
 - **Outfits and calendar:** combine items, save outfit photos, or use both. Calendar entries keep independent snapshots, so later edits don't rewrite what you wore.
@@ -69,7 +70,7 @@ Download the signed Android 1.2.0 APK from [GitHub Releases](https://github.com/
 
 Desktop data lives in `data/` by default. `closet.sqlite` stores records, profiles, settings, and migration history. `assets/<owner-hash>/<image-sha256>` stores original image bytes, deduplicated by SHA-256. A legacy `auth.json` is used only to preserve the session-signing key during migration; password sign-in has been retired.
 
-In **Data and backups**, export a ZIP containing `manifest.json`, `README.txt`, and `assets/`. Import checks record relationships and photo checksums, then creates a **new wardrobe** in the current profile without overwriting existing wardrobes. The current format is `new-closet`, schema version **9**, with import support for versions **1–8**.
+In **Data and backups**, export a ZIP containing `manifest.json`, `README.txt`, and `assets/`. Import checks record relationships and photo checksums, then creates a **new wardrobe** in the current profile without overwriting existing wardrobes. The current format is `new-closet`, schema version **10**, with import support for versions **1–9**.
 
 You can also stop the server and copy the entire data directory. Copying only the SQLite file while the server is running may miss changes in its WAL files. A complete directory copy includes local settings and credentials; the portable wardrobe ZIP excludes model keys and sync or MCP tokens.
 
@@ -112,6 +113,7 @@ New Closet 帮你整理已有衣物、组合搭配，并记录计划穿着和实
 ### 主要功能
 
 - **衣橱整理：**支持上装、下装、连体与裙装、外套、鞋履、包袋和配饰，记录品牌、颜色、季节、场合、版型、尺寸与备注。
+- **购买价格：**在单品详情自由填写，例如 `¥299`、`约200元` 或 `赠品`，可留空，主页面卡片不显示。
 - **原图保存：**每件单品或搭配最多 20 张原图，可选封面、放大查看、将裁剪结果另存为新照片，原图不重新压缩。
 - **灵活分组：**支持嵌套分组、搜索和筛选，同一内容可加入多个分组，暂时不穿的衣物可以收起。
 - **搭配与日历：**可关联单品、保存搭配照片，或同时使用。日历保存独立快照，后续修改不会改变历史穿搭。
@@ -166,7 +168,7 @@ Android App 支持离线编辑与手动双向同步。在电脑的“数据与�
 
 电脑端默认使用 `data/`。`closet.sqlite` 保存记录、账号、设置和迁移记录；`assets/<owner-hash>/<image-sha256>` 保存原始图片字节，按 SHA-256 去重。旧版 `auth.json` 仅用于迁移时保留会话签名密钥，密码登录已停用。
 
-在“数据与备份”导出完整 ZIP，包含 `manifest.json`、`README.txt` 和 `assets/`。导入先检查记录关联和照片校验值，再在当前账号下创建一个**新衣橱**，不覆盖原衣橱。当前格式为 `new-closet`、版本 **9**，支持导入 **1–8** 版备份。
+在“数据与备份”导出完整 ZIP，包含 `manifest.json`、`README.txt` 和 `assets/`。导入先检查记录关联和照片校验值，再在当前账号下创建一个**新衣橱**，不覆盖原衣橱。当前格式为 `new-closet`、版本 **10**，支持导入 **1–9** 版备份。
 
 也可停止服务后复制整个数据目录。运行时仅复制 SQLite 文件可能遗漏 WAL 中的数据。整个目录包含本地设置和凭据；可移植的衣橱 ZIP 不包含模型密钥、同步令牌或 MCP 令牌。
 

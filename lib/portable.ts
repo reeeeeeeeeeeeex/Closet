@@ -3,7 +3,7 @@ import { getProfileContext } from "./profile-client";
 import { getClosetClient } from "./closet-client";
 import { tr } from "./i18n/core";
 import { Zip, ZipPassThrough, Unzip, UnzipInflate, strToU8, strFromU8 } from "fflate";
-import { validateArchive, type ClosetArchive, type ClosetState, type Asset } from "./domain";
+import { ARCHIVE_SCHEMA_VERSION, validateArchive, type ClosetArchive, type ClosetState, type Asset } from "./domain";
 export class ApiClientError extends Error { constructor(public status: number, message: string, public code?: string) { super(message); } }
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const work = async () => {
@@ -29,7 +29,7 @@ export async function uploadAsset(file: File): Promise<Asset> {
 }
 export const hashBytes = async (bytes: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as BufferSource))).map(b => b.toString(16).padStart(2, "0")).join("");
 const imagePath = (a: Asset) => `assets/${a.hash}.${a.mime.split("/")[1]}`;
-export const manifestFromState = (state: ClosetState): ClosetArchive => validateArchive({ format: "new-closet", schemaVersion: 9, exportedAt: new Date().toISOString(), collection: { name: state.collections.find(c => c.id === state.collectionId)?.name || tr("我的衣橱") }, records: state.records, assets: state.assets, colorLibrary: state.colorLibrary || [] });
+export const manifestFromState = (state: ClosetState): ClosetArchive => validateArchive({ format: "new-closet", schemaVersion: ARCHIVE_SCHEMA_VERSION, exportedAt: new Date().toISOString(), collection: { name: state.collections.find(c => c.id === state.collectionId)?.name || tr("我的衣橱") }, records: state.records, assets: state.assets, colorLibrary: state.colorLibrary || [] });
 async function exportArchiveWork(state: ClosetState, progress: (message: string) => void): Promise<Blob> {
     const manifest = manifestFromState(state);
     const blobs: Blob[] = [];
@@ -41,7 +41,7 @@ async function exportArchiveWork(state: ClosetState, progress: (message: string)
     const add = (name: string, bytes: Uint8Array) => { const f = new ZipPassThrough(name); zip.add(f); f.push(bytes, true); if (zipError)
         throw zipError; };
     add("manifest.json", strToU8(JSON.stringify(manifest, null, 2)));
-    add("README.txt", strToU8("New Closet backup v9\nmanifest.json contains account custom colors, structured item colors, all records, item brands, nested groups and memberships, clothing fits/measurements, personal body measurements including knee circumference, shoe sizes, item/outfit photo galleries and covers, relationships, snapshots and original filenames.\nassets/ contains exact original bytes, named by SHA-256.\nImages and JSON can be opened independently of this app.\n"));
+    add("README.txt", strToU8("New Closet backup v10\nmanifest.json contains account custom colors, structured item colors, all records, item brands and purchase prices, nested groups and memberships, clothing fits/measurements, personal body measurements including knee circumference, shoe sizes, item/outfit photo galleries and covers, relationships, snapshots and original filenames.\nassets/ contains exact original bytes, named by SHA-256.\nImages and JSON can be opened independently of this app.\n"));
     for (const [index, asset] of manifest.assets.entries()) {
         progress(tr("正在打包原图 {value1} / {value2}", { value1: index + 1, value2: manifest.assets.length }));
         const response = await profileFetch(assetUrl(asset.hash, state.profile?.id), { cache: "no-store" });

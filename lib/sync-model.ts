@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { assetSchema, recordSchema, validateArchive, referencedAssets, type ClosetRecord } from "./domain";
+import { ARCHIVE_SCHEMA_VERSION, assetSchema, recordSchema, validateArchive, referencedAssets, type ClosetRecord } from "./domain";
 import { colorKey, libraryColorSchema } from "./colors";
 
 export const syncCollectionSchema = z.object({ id: z.string().uuid(), name: z.string().min(1).max(100), createdAt: z.string().datetime(), records: z.array(recordSchema).max(2000) }).strict();
@@ -24,7 +24,7 @@ export function validateReplica(input: unknown): Replica {
   if (new Set(replica.collections.map(c => c.id)).size !== replica.collections.length || new Set(replica.assets.map(a => a.hash)).size !== replica.assets.length) throw new Error("同步清单中存在重复标识");
   for (const c of replica.collections) {
     const hashes = referencedAssets(c.records);
-    validateArchive({ format: "new-closet", schemaVersion: 9, exportedAt: c.createdAt, collection: { name: c.name }, records: c.records, assets: replica.assets.filter(a => hashes.has(a.hash)), colorLibrary: [] });
+    validateArchive({ format: "new-closet", schemaVersion: ARCHIVE_SCHEMA_VERSION, exportedAt: c.createdAt, collection: { name: c.name }, records: c.records, assets: replica.assets.filter(a => hashes.has(a.hash)), colorLibrary: [] });
   }
   for(const deleted of replica.tombstones)if(replica.collections.find(c=>c.id===deleted.collectionId)?.records.some(r=>r.id===deleted.id))throw new Error('记录同时存在于资料和删除清单');
   return normalizeReplica(replica);
@@ -63,7 +63,7 @@ export function mergeReplicas(base: Replica, local: Replica, remote: Replica, re
       if (!conflict) {
         const candidate = group.flatMap(id => { const l=lm.get(id),r=rm.get(id),b=bm.get(id);const chosen=recordEqual(l,r)?r||l:recordEqual(l,b)?r:l;return chosen?[chosen]:[]; });
         const hashes = referencedAssets(candidate);
-        try { validateArchive({format:'new-closet',schemaVersion:9,exportedAt:template.createdAt,collection:{name:template.name},records:candidate,assets:[...new Map([...local.assets,...remote.assets].map(a=>[a.hash,a])).values()].filter(a=>hashes.has(a.hash)),colorLibrary:[]}); }
+        try { validateArchive({format:'new-closet',schemaVersion:ARCHIVE_SCHEMA_VERSION,exportedAt:template.createdAt,collection:{name:template.name},records:candidate,assets:[...new Map([...local.assets,...remote.assets].map(a=>[a.hash,a])).values()].filter(a=>hashes.has(a.hash)),colorLibrary:[]}); }
         catch { conflict=true; }
       }
       const key = `${collectionId}:${group[0]}`;

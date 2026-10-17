@@ -34,8 +34,8 @@ const now=new Date().toISOString();const record={id:crypto.randomUUID(),kind:'it
 const snapshot=makeSnapshot({name:'Look',asset:null,itemIds:[record.id],occasions:[],notes:'',archived:false},[record]);
 record.data.colorStyle.values[0].name='Changed';assert.equal(snapshot.items[0].data.colorStyle.values[0].name,'海蓝');
 const card=renderToStaticMarkup(React.createElement(ItemCard,{item:record,onOpen:()=>{}}));assert.match(card,/Changed \+ 2 accent colors/);
-for(let version=1;version<=9;version++){
- const archive=validateArchive({format:'new-closet',schemaVersion:version,exportedAt:now,collection:{name:'Test'},records:[],assets:[]});assert.equal(archive.schemaVersion,9);assert.deepEqual(archive.colorLibrary,[]);
+for(let version=1;version<=10;version++){
+ const archive=validateArchive({format:'new-closet',schemaVersion:version,exportedAt:now,collection:{name:'Test'},records:[],assets:[]});assert.equal(archive.schemaVersion,10);assert.deepEqual(archive.colorLibrary,[]);
 }
 const dir=await mkdtemp(path.resolve('.test-runtime/colors-db-'));
 let db=new LocalDatabase(dir);

@@ -150,7 +150,7 @@ class ClosetStoragePlugin : Plugin() {
         try {
             FileOutputStream(file).use { stream -> ZipOutputStream(BufferedOutputStream(stream)).use { zip ->
                 fun entry(name:String,bytes:ByteArray){zip.putNextEntry(ZipEntry(name));zip.write(bytes);zip.closeEntry()}
-                entry("manifest.json",manifest.toString().toByteArray());entry("README.txt","New Closet backup v9. Original images retain exact bytes. No pairing credentials included.\n".toByteArray())
+                entry("manifest.json",manifest.toString().toByteArray());entry("README.txt","New Closet backup v10. Original images retain exact bytes. No pairing credentials included.\n".toByteArray())
                 var total=0L
                 for(i in 0 until assets.length()){val a=assets.getJSONObject(i);val hash=a.getString("hash");val source=media(owner,hash);require(source.length()==a.getLong("size") && digest(source)==hash){"原图校验失败，备份已停止"};zip.putNextEntry(ZipEntry("assets/$hash.${a.getString("mime").substringAfter('/')}"));source.inputStream().use{total+=copyLimited(it,zip,imageLimit)};require(total<=archiveLimit){"首版支持 2 GB 以内的备份包"};zip.closeEntry()}
             } }

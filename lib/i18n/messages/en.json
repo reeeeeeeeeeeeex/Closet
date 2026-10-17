@@ -1,4 +1,7 @@
 {
+  "购买价格": "Purchase price",
+  "例如：¥299、约200元或赠品": "e.g. ¥299, about $30, or a gift",
+  "购买价格不能超过 100 个字符": "Purchase price cannot exceed 100 characters.",
   " · 导入": " · Imported",
   "{count} / 20 张照片 · 单张最多 20 MB，不压缩原图": "{count} / 20 photos · Up to 20 MB each, originals preserved",
   "{count} 张原图": {

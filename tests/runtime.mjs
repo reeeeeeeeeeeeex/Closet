@@ -66,7 +66,7 @@ try {
   assert.equal((await post({ kind: 'outfit', data: { ...photoData, asset: null } })).status, 400);
   assert.equal((await post({ kind: 'calendar', data: { date: '2026-10-11', status: 'worn', notes: '', newOutfit: { ...photoData, asset: 'f'.repeat(64) } } })).status, 400);
   assert.equal((await (await request('/api/closet')).json()).records.length, 2);
-  const itemData = { name: 'Pink jacket', brand: 'Runtime brand', category: 'outerwear', color: 'pink', occasions: ['casual'], seasons: ['spring'], asset: asset.hash, photos:[asset.hash,secondAsset.hash], notes: 'Original', archived: false, fit: 'fitted', measurements: { shoulderWidth: 42.5, chest: 96, length: 68 } };
+  const itemData = { name: 'Pink jacket', brand: 'Runtime brand', purchasePrice: '¥299 / gift', category: 'outerwear', color: 'pink', occasions: ['casual'], seasons: ['spring'], asset: asset.hash, photos:[asset.hash,secondAsset.hash], notes: 'Original', archived: false, fit: 'fitted', measurements: { shoulderWidth: 42.5, chest: 96, length: 68 } };
   assert.equal((await post({kind:'item',data:{...itemData,photos:[asset.hash,'f'.repeat(64)]}})).status,400);
   assert.equal((await post({kind:'item',data:{...itemData,asset:'f'.repeat(64)}})).status,400);
   res = await post({ kind: 'item', data: itemData }); assert.equal(res.status, 200, await res.clone().text());
@@ -92,9 +92,11 @@ try {
   assert.equal(entry.data.snapshot.items[0].data.asset,asset.hash); assert.equal(entry.data.snapshot.items[0].data.brand,'Runtime brand');
   assert.equal(state.records.find(record=>record.id===item.id).data.asset,secondAsset.hash); assert.equal(state.records.find(record=>record.id===item.id).data.brand,'Changed brand');
   const savedShoes = state.records.find(r => r.kind === 'item' && r.data.category === 'shoes');
+  assert.equal(savedShoes.data.purchasePrice, '¥299 / gift'); assert.equal(entry.data.snapshot.items[0].data.purchasePrice, '¥299 / gift');
   assert.equal(savedShoes.data.shoeFit, 'small'); assert.deepEqual(savedShoes.data.shoeSize, { eu: 38.5, cn: 240 });
-  assert.equal((await post({kind:'item',id:savedShoes.id,version:savedShoes.version,data:{...savedShoes.data,brand:''}})).status,200);
+  assert.equal((await post({kind:'item',id:savedShoes.id,version:savedShoes.version,data:{...savedShoes.data,brand:'',purchasePrice:''}})).status,200);
   assert.equal((await (await request('/api/closet')).json()).records.find(record=>record.id===savedShoes.id).data.brand,'');
+  assert.equal((await (await request('/api/closet')).json()).records.find(record=>record.id===savedShoes.id).data.purchasePrice,'');
   assert.equal((await post({kind:'item',data:{...itemData,brand:'x'.repeat(101)}})).status,400);
   const trousersData={...itemData,name:'Trousers',category:'bottom',measurements:{knee:42.5}};
   const trousersResponse=await post({kind:'item',data:trousersData}); assert.equal(trousersResponse.status,200); const trousersId=(await trousersResponse.json()).id;
@@ -156,7 +158,7 @@ try {
   globalThis.fetch = (url, init = {}) => request(url, init);
   const backup = new File([await exportArchive(state, () => {})], 'wardrobe.zip');
   const manifest = await inspectArchive(backup, () => {});
-  assert.equal(manifest.schemaVersion,9); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
+  assert.equal(manifest.schemaVersion,10); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
   const restoredId = await importArchive(backup, manifest, () => {});
   const restored = await (await request('/api/closet?collection=' + restoredId)).json(); assert.deepEqual(restored.records, state.records); assert.equal(restored.collections.length, 2);
   assert.deepEqual((await (await request('/api/closet?collection=main')).json()).records, state.records);
@@ -169,11 +171,12 @@ try {
   assert.equal(await local.prepare("SELECT id FROM collections WHERE owner='rollback'").first(), null);
   local.prepare("UPDATE records SET data=json_remove(data, '$.asset') WHERE id=?").bind(outfit.id).run();
   local.prepare("UPDATE records SET data=json_remove(data, '$.snapshot.asset', '$.snapshot.photos') WHERE id=?").bind(entry.id).run();
-  local.prepare("UPDATE records SET data=json_remove(data, '$.brand', '$.fit', '$.shoeFit', '$.shoeSize', '$.measurements') WHERE id=?").bind(item.id).run();
+  local.prepare("UPDATE records SET data=json_remove(data, '$.brand', '$.purchasePrice', '$.fit', '$.shoeFit', '$.shoeSize', '$.measurements') WHERE id=?").bind(item.id).run();
   const legacyRead = await (await request('/api/closet?collection=main')).json();
   assert.equal(legacyRead.records.find(r => r.id === outfit.id).data.asset, null);
   assert.equal(legacyRead.records.find(r => r.id === entry.id).data.snapshot.asset, null);
   assert.equal(legacyRead.records.find(r => r.id === item.id).data.brand, undefined); assert.equal(legacyRead.records.find(r => r.id === item.id).data.fit, null);
+  assert.equal(legacyRead.records.find(r => r.id === item.id).data.purchasePrice, undefined);
   assert.deepEqual(legacyRead.records.find(r => r.id === item.id).data.measurements, {});
   const cyclic = structuredClone(manifest); cyclic.records.find(record => record.id === parentId).data.parentId = childId;
   assert.equal((await request('/api/closet', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cyclic) })).status,400);
