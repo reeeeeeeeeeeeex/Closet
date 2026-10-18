@@ -16,6 +16,12 @@ export function constrainPhoto(value: PhotoTransform, image: Size, viewport: Siz
   const dy = Math.max(0, (image.height * scale - viewport.height) / 2);
   return { scale, x: clamp(value.x, -dx, dx), y: clamp(value.y, -dy, dy) };
 }
+/** A clearly horizontal one-finger drag switches photos; short or vertical drags do not. */
+export function photoSwipeStep(dx: number, dy: number, viewportWidth: number): -1 | 0 | 1 {
+  const threshold = Math.max(48, viewportWidth * 0.12);
+  if (Math.abs(dx) < threshold || Math.abs(dx) < Math.abs(dy) * 1.2) return 0;
+  return dx < 0 ? 1 : -1;
+}
 /** Keep the photo point under the gesture anchor while zooming or moving a pinch. */
 export function zoomPhoto(value: PhotoTransform, scale: number, anchor: Point, nextAnchor = anchor): PhotoTransform {
   const nextScale = clamp(scale, 1, 8), ratio = nextScale / value.scale;

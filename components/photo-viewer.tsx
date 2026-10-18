@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useI18n } from "@/lib/i18n/provider";
 import { getClosetClient } from "@/lib/closet-client";
 import { getProfileContext, withProfileActivity } from "@/lib/profile-client";
-import { constrainPhoto, cropPixels, fitPhoto, INITIAL_TRANSFORM, initialCrop, moveCrop, resizeCrop, zoomPhoto, type CropRect, type PhotoTransform, type Point, type Size } from "@/lib/photo-view";
+import { constrainPhoto, cropPixels, fitPhoto, INITIAL_TRANSFORM, initialCrop, moveCrop, photoSwipeStep, resizeCrop, zoomPhoto, type CropRect, type PhotoTransform, type Point, type Size } from "@/lib/photo-view";
 
 export type ViewerPhoto = { key: string; src: string; asset?: string | null };
 export type CropPhoto = (file: File, photo: ViewerPhoto) => Promise<void> | void;
@@ -46,12 +46,14 @@ function PhotoViewerContent({ photo, name, index, count, onNavigate, onClose, on
   const [crop, setCrop] = useState<CropRect | null>(null);
   const [ratio, setRatio] = useState<number | undefined>();
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const [swipeOffset, setSwipeOffset] = useState(0);
   const pointers = useRef(new Map<number, Point>());
   const cropGesture = useRef<{ id: number; start: Point; rect: CropRect; corner: string } | null>(null);
+  const swipe = useRef<{ id: number; start: Point; dx: number; dy: number } | null>(null);
   const fitted = fitPhoto(natural, viewport);
   const display = constrainPhoto(transform, fitted, viewport);
   function update(value: PhotoTransform) { currentTransform.current = value; setTransform(value); }
-  function reset() { pointers.current.clear(); update(INITIAL_TRANSFORM); }
+  function reset() { pointers.current.clear(); swipe.current = null; setSwipeOffset(0); update(INITIAL_TRANSFORM); }
   function zoom(scale: number, anchor: Point = { x: 0, y: 0 }) {
     update(constrainPhoto(zoomPhoto(currentTransform.current, scale, anchor), fitted, viewport));
   }
@@ -80,7 +82,10 @@ function PhotoViewerContent({ photo, name, index, count, onNavigate, onClose, on
       return;
     }
     currentTransform.current = display;
-    pointers.current.set(event.pointerId, point(event));
+    const start = point(event);
+    pointers.current.set(event.pointerId, start);
+    if (pointers.current.size > 1) { swipe.current = null; setSwipeOffset(0); }
+    else if (event.pointerType !== 'mouse' && display.scale === 1 && count > 1) swipe.current = { id: event.pointerId, start, dx: 0, dy: 0 };
   }
   function pointerMove(event: ReactPointerEvent<HTMLDivElement>) {
     const gesture = cropGesture.current;
@@ -94,6 +99,17 @@ function PhotoViewerContent({ photo, name, index, count, onNavigate, onClose, on
     const before = [...pointers.current.values()];
     pointers.current.set(event.pointerId, point(event));
     const after = [...pointers.current.values()];
+    const swipeState = swipe.current;
+    if (swipeState?.id === event.pointerId && after.length === 1) {
+      const dx = after[0].x - swipeState.start.x, dy = after[0].y - swipeState.start.y;
+      swipeState.dx = dx; swipeState.dy = dy;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        const limit = viewport.width * .7;
+        setSwipeOffset(Math.max(-limit, Math.min(limit, dx)));
+        return;
+      }
+      if (Math.abs(dy) > 8) { swipe.current = null; setSwipeOffset(0); }
+    }
     if (after.length === 1) update(constrainPhoto({ ...currentTransform.current, x: currentTransform.current.x + after[0].x - before[0].x, y: currentTransform.current.y + after[0].y - before[0].y }, fitted, viewport));
     else {
       const midpoint = (points: Point[]) => ({ x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 });
@@ -105,8 +121,18 @@ function PhotoViewerContent({ photo, name, index, count, onNavigate, onClose, on
     }
   }
   function pointerEnd(event: ReactPointerEvent) {
+    const swipeState = swipe.current?.id === event.pointerId ? swipe.current : null;
     pointers.current.delete(event.pointerId);
     if (cropGesture.current?.id === event.pointerId) cropGesture.current = null;
+    if (!swipeState) return;
+    swipe.current = null;
+    setSwipeOffset(0);
+    const step = photoSwipeStep(swipeState.dx, swipeState.dy, viewport.width);
+    if (step) onNavigate(step);
+  }
+  function pointerCancel(event: ReactPointerEvent) {
+    if (swipe.current?.id === event.pointerId) { swipe.current = null; setSwipeOffset(0); }
+    pointerEnd(event);
   }
   async function saveCrop() {
     if (!crop || !image.current || !onCrop || busy) return;
@@ -150,10 +176,10 @@ function PhotoViewerContent({ photo, name, index, count, onNavigate, onClose, on
     }}>
     <header className="photo-viewer-heading"><div><DialogTitle>{name}</DialogTitle><DialogDescription>{t("照片 {number} / {count}", { number: index + 1, count })}</DialogDescription></div><button type="button" aria-label={t("关闭大图")} disabled={busy} onClick={onClose}><X/></button></header>
     <div ref={attachStage} className={`photo-viewer-stage ${crop ? 'is-cropping' : ''}`} tabIndex={0} aria-label={t("照片缩放区域")}
-      onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd}
+      onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerCancel} onLostPointerCapture={pointerEnd}
       onDoubleClick={() => { if (!crop && !busy) zoom(display.scale === 1 ? 2 : 1); }}>
       <img ref={image} src={photo.src} alt={name} draggable={false} className="photo-viewer-image"
-        style={{ width: fitted.width || undefined, height: fitted.height || undefined, visibility: natural.width ? 'visible' : 'hidden', transform: `translate(-50%, -50%) translate(${display.x}px, ${display.y}px) scale(${display.scale})` }}
+        style={{ width: fitted.width || undefined, height: fitted.height || undefined, visibility: natural.width ? 'visible' : 'hidden', transform: `translate(-50%, -50%) translate(${display.x + swipeOffset}px, ${display.y}px) scale(${display.scale})` }}
         onLoad={event => { setNatural({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight }); setError(""); }}
         onError={() => setError(t("照片无法读取，请关闭后重试。"))}/>
       {!natural.width && !error && <Loader2 className="photo-viewer-loading animate-spin"/>}

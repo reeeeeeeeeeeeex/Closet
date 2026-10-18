@@ -3,7 +3,7 @@ import { build } from 'esbuild';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 await build({ entryPoints: ['lib/photo-view.ts', 'lib/photo-draft.ts'], outdir: '.test-runtime/photo-view-build', bundle: true, platform: 'node', format: 'cjs', outExtension: { '.js': '.cjs' }, logLevel: 'error' });
-const { fitPhoto, constrainPhoto, zoomPhoto, initialCrop, moveCrop, resizeCrop, cropPixels } = require('../.test-runtime/photo-view-build/photo-view.cjs');
+const { fitPhoto, constrainPhoto, zoomPhoto, initialCrop, moveCrop, resizeCrop, cropPixels, photoSwipeStep } = require('../.test-runtime/photo-view-build/photo-view.cjs');
 const { createPhotoDraft, appendCroppedPhoto } = require('../.test-runtime/photo-view-build/photo-draft.cjs');
 const image = { width: 1200, height: 800 }, viewport = { width: 360, height: 500 };
 const fit = fitPhoto(image, viewport); assert.deepEqual(fit, { width: 360, height: 240 });
@@ -15,6 +15,13 @@ const zoomed = zoomPhoto(view, 3, anchor, moved);
 assert.equal((moved.x - zoomed.x) / zoomed.scale, (anchor.x - view.x) / view.scale);
 assert.equal((moved.y - zoomed.y) / zoomed.scale, (anchor.y - view.y) / view.scale);
 assert.equal(zoomPhoto(view, 100, anchor).scale, 8);
+// One-finger horizontal swipes: left goes to the next photo, right to the previous.
+assert.equal(photoSwipeStep(-120, 20, 360), 1);
+assert.equal(photoSwipeStep(120, 20, 360), -1);
+assert.equal(photoSwipeStep(-40, 0, 360), 0);
+assert.equal(photoSwipeStep(-100, 120, 360), 0);
+assert.equal(photoSwipeStep(-100, 0, 1280), 0);
+assert.equal(photoSwipeStep(-200, 0, 1280), 1);
 for (const ratio of [undefined, 1, 3 / 4, 4 / 3]) {
   const crop = initialCrop(image, ratio);
   if (ratio) assert.ok(Math.abs(crop.width / crop.height - ratio) < 1e-9);
