@@ -4,7 +4,8 @@ import { CATEGORY_MEASUREMENTS, garmentCategory, type Measurement } from "./item
 import { DEFAULT_LOCALE, messageForLocale } from "./i18n/core";
 import { validateSubsets } from "./subsets";
 import { colorStyleSchema, libraryColorSchema, type LibraryColor } from "./colors";
-export const CATEGORIES = { top: "上装", bottom: "下装", dress: "连体 / 裙装", outerwear: "外套", shoes: "鞋履", bag: "包袋", accessory: "配饰" } as const;
+// Key order is the default wardrobe order: everyday garments first, then bags and accessories, one-pieces last.
+export const CATEGORIES = { top: "上装", bottom: "下装", outerwear: "外套", shoes: "鞋履", bag: "包袋", accessory: "配饰", dress: "连体 / 裙装" } as const;
 export const OCCASIONS = { work: "通勤", casual: "日常", party: "聚会", formal: "正式", vacation: "旅行", sport: "运动" } as const;
 export const SEASONS = { spring: "春", summer: "夏", autumn: "秋", winter: "冬" } as const;
 export const hashSchema = z.string().regex(/^[a-f0-9]{64}$/);
