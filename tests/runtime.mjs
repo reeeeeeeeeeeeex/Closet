@@ -66,7 +66,7 @@ try {
   assert.equal((await post({ kind: 'outfit', data: { ...photoData, asset: null } })).status, 400);
   assert.equal((await post({ kind: 'calendar', data: { date: '2026-10-11', status: 'worn', notes: '', newOutfit: { ...photoData, asset: 'f'.repeat(64) } } })).status, 400);
   assert.equal((await (await request('/api/closet')).json()).records.length, 2);
-  const itemData = { name: 'Pink jacket', brand: 'Runtime brand', purchasePrice: '¥299 / gift', category: 'outerwear', color: 'pink', occasions: ['casual'], seasons: ['spring'], asset: asset.hash, photos:[asset.hash,secondAsset.hash], notes: 'Original', archived: false, fit: 'fitted', measurements: { shoulderWidth: 42.5, chest: 96, length: "约68–72 cm" } };
+  const itemData = { name: 'Pink jacket', brand: 'Runtime brand', purchasePrice: '¥299 / gift', fabric: '100% 羊毛混纺', category: 'outerwear', color: 'pink', occasions: ['casual'], seasons: ['spring'], asset: asset.hash, photos:[asset.hash,secondAsset.hash], notes: 'Original', archived: false, fit: 'fitted', measurements: { shoulderWidth: 42.5, chest: 96, length: "约68–72 cm" } };
   assert.equal((await post({kind:'item',data:{...itemData,photos:[asset.hash,'f'.repeat(64)]}})).status,400);
   assert.equal((await post({kind:'item',data:{...itemData,asset:'f'.repeat(64)}})).status,400);
   res = await post({ kind: 'item', data: itemData }); assert.equal(res.status, 200, await res.clone().text());
@@ -91,8 +91,8 @@ try {
   assert.equal(entry.data.snapshot.items[0].data.measurements.length, '约68–72 cm');
   assert.equal(entry.data.snapshot.items[0].data.fit, 'fitted'); assert.equal(entry.data.snapshot.items[0].data.measurements.shoulderWidth, 42.5);
   assert.deepEqual(entry.data.snapshot.items[0].data.photos,[asset.hash,secondAsset.hash]);
-  assert.equal(entry.data.snapshot.items[0].data.asset,asset.hash); assert.equal(entry.data.snapshot.items[0].data.brand,'Runtime brand');
-  assert.equal(state.records.find(record=>record.id===item.id).data.asset,secondAsset.hash); assert.equal(state.records.find(record=>record.id===item.id).data.brand,'Changed brand');
+  assert.equal(entry.data.snapshot.items[0].data.asset,asset.hash); assert.equal(entry.data.snapshot.items[0].data.brand,'Runtime brand'); assert.equal(entry.data.snapshot.items[0].data.fabric,'100% 羊毛混纺');
+  assert.equal(state.records.find(record=>record.id===item.id).data.asset,secondAsset.hash); assert.equal(state.records.find(record=>record.id===item.id).data.brand,'Changed brand'); assert.equal(state.records.find(record=>record.id===item.id).data.fabric,'100% 羊毛混纺');
   const savedShoes = state.records.find(r => r.kind === 'item' && r.data.category === 'shoes');
   assert.equal(savedShoes.data.purchasePrice, '¥299 / gift'); assert.equal(entry.data.snapshot.items[0].data.purchasePrice, '¥299 / gift');
   assert.equal(savedShoes.data.shoeFit, 'small'); assert.deepEqual(savedShoes.data.shoeSize, { eu: 38.5, cn: 240 });
@@ -161,7 +161,7 @@ try {
   globalThis.fetch = (url, init = {}) => request(url, init);
   const backup = new File([await exportArchive(state, () => {})], 'wardrobe.zip');
   const manifest = await inspectArchive(backup, () => {});
-  assert.equal(manifest.schemaVersion,10); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
+  assert.equal(manifest.schemaVersion,11); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
   const restoredId = await importArchive(backup, manifest, () => {});
   const restored = await (await request('/api/closet?collection=' + restoredId)).json(); assert.deepEqual(restored.records, state.records); assert.equal(restored.collections.length, 2);
   assert.deepEqual((await (await request('/api/closet?collection=main')).json()).records, state.records);
@@ -174,12 +174,12 @@ try {
   assert.equal(await local.prepare("SELECT id FROM collections WHERE owner='rollback'").first(), null);
   local.prepare("UPDATE records SET data=json_remove(data, '$.asset') WHERE id=?").bind(outfit.id).run();
   local.prepare("UPDATE records SET data=json_remove(data, '$.snapshot.asset', '$.snapshot.photos') WHERE id=?").bind(entry.id).run();
-  local.prepare("UPDATE records SET data=json_remove(data, '$.brand', '$.purchasePrice', '$.fit', '$.shoeFit', '$.shoeSize', '$.measurements') WHERE id=?").bind(item.id).run();
+  local.prepare("UPDATE records SET data=json_remove(data, '$.brand', '$.purchasePrice', '$.fabric', '$.fit', '$.shoeFit', '$.shoeSize', '$.measurements') WHERE id=?").bind(item.id).run();
   const legacyRead = await (await request('/api/closet?collection=main')).json();
   assert.equal(legacyRead.records.find(r => r.id === outfit.id).data.asset, null);
   assert.equal(legacyRead.records.find(r => r.id === entry.id).data.snapshot.asset, null);
   assert.equal(legacyRead.records.find(r => r.id === item.id).data.brand, undefined); assert.equal(legacyRead.records.find(r => r.id === item.id).data.fit, null);
-  assert.equal(legacyRead.records.find(r => r.id === item.id).data.purchasePrice, undefined);
+  assert.equal(legacyRead.records.find(r => r.id === item.id).data.purchasePrice, undefined); assert.equal(legacyRead.records.find(r => r.id === item.id).data.fabric, undefined);
   assert.deepEqual(legacyRead.records.find(r => r.id === item.id).data.measurements, {});
   const cyclic = structuredClone(manifest); cyclic.records.find(record => record.id === parentId).data.parentId = childId;
   assert.equal((await request('/api/closet', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cyclic) })).status,400);
@@ -258,7 +258,7 @@ try {
   assert.ok(persisted.prepare('SELECT record_id FROM sync_tombstones WHERE owner=? AND record_id=?').get(profileId, retiredOutfitId), 'Outfits removed with the item leave a sync tombstone');
   persisted.close();
   assert.equal((await request('/api/auth', { method: 'DELETE' })).status, 410);
-  console.log('PASS: production Node server; personal sizes singleton under concurrent creation, optional field clearing, invalid inputs, stale edits, per-collection isolation and item brands and multi-photo v9 ZIP recovery; nested category/item/outfit subsets, multiple membership, concurrent auto-add without lost members, stale edits blocked, invalid parent/scope/category and cyclic imports rejected; item deletion that unlinks outfits/groups, drops emptied outfits, tombstones the record and keeps calendar snapshots editable; photo/calendar/subset transactions, original bytes, legacy records, restart persistence and complete ZIP recovery.');
+  console.log('PASS: production Node server; personal sizes singleton under concurrent creation, optional field clearing, invalid inputs, stale edits, per-collection isolation and item brands, purchase prices, fabric materials and multi-photo v9 ZIP recovery; nested category/item/outfit subsets, multiple membership, concurrent auto-add without lost members, stale edits blocked, invalid parent/scope/category and cyclic imports rejected; item deletion that unlinks outfits/groups, drops emptied outfits, tombstones the record and keeps calendar snapshots editable; photo/calendar/subset transactions, original bytes, legacy records, restart persistence and complete ZIP recovery.');
 } catch (error) { console.error(logs); throw error; }
 finally {
   globalThis.fetch = originalFetch; await stop();

@@ -9,6 +9,10 @@
   "购买价格": "Purchase price",
   "例如：¥299、约200元或赠品": "e.g. ¥299, about $30, or a gift",
   "购买价格不能超过 100 个字符": "Purchase price cannot exceed 100 characters.",
+  "面料材质": "Fabric material",
+  "例如：100% 棉、羊毛混纺或皮革": "e.g. 100% cotton, wool blend, or leather",
+  "可留空，自由填写面料、成分或材质说明。": "Optional. Enter the fabric, composition, or material in your own words.",
+  "面料材质不能超过 100 个字符": "Fabric material cannot exceed 100 characters.",
   " · 导入": " · Imported",
   "{count} / 20 张照片 · 单张最多 20 MB，不压缩原图": "{count} / 20 photos · Up to 20 MB each, originals preserved",
   "{count} 张原图": {

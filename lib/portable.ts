@@ -41,7 +41,7 @@ async function exportArchiveWork(state: ClosetState, progress: (message: string)
     const add = (name: string, bytes: Uint8Array) => { const f = new ZipPassThrough(name); zip.add(f); f.push(bytes, true); if (zipError)
         throw zipError; };
     add("manifest.json", strToU8(JSON.stringify(manifest, null, 2)));
-    add("README.txt", strToU8("New Closet backup v10\nmanifest.json contains account custom colors, structured item colors, all records, item brands and purchase prices, nested groups and memberships, clothing fits/measurements, personal body measurements including knee circumference, shoe sizes, item/outfit photo galleries and covers, relationships, snapshots and original filenames.\nassets/ contains exact original bytes, named by SHA-256.\nImages and JSON can be opened independently of this app.\n"));
+    add("README.txt", strToU8("New Closet backup v11\nmanifest.json contains account custom colors, structured item colors, all records, item brands, purchase prices and fabric materials, nested groups and memberships, clothing fits/measurements, personal body measurements including knee circumference, shoe sizes, item/outfit photo galleries and covers, relationships, snapshots and original filenames.\nassets/ contains exact original bytes, named by SHA-256.\nImages and JSON can be opened independently of this app.\n"));
     for (const [index, asset] of manifest.assets.entries()) {
         progress(tr("正在打包原图 {value1} / {value2}", { value1: index + 1, value2: manifest.assets.length }));
         const response = await profileFetch(assetUrl(asset.hash, state.profile?.id), { cache: "no-store" });

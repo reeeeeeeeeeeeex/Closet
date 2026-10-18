@@ -10,5 +10,5 @@ export function filterItems(items: ItemRecord[], filters: { category: string; oc
     && (filters.category === "all" || item.data.category === filters.category)
     && (filters.occasion === "all" || item.data.occasions.some(value => value === filters.occasion))
     && (!filters.colors.length || itemColorStyle(item.data).values.some(color => filters.colors.includes(colorKey(color))))
-    && [item.data.name, item.data.brand, itemColorText(item.data), item.data.notes, ...itemColorStyle(item.data).values.filter(isCommonColor).map(color => t?.(color.name) || "")].join(" ").toLocaleLowerCase().includes(query));
+    && [item.data.name, item.data.brand, item.data.fabric, itemColorText(item.data), item.data.notes, ...itemColorStyle(item.data).values.filter(isCommonColor).map(color => t?.(color.name) || "")].join(" ").toLocaleLowerCase().includes(query));
 }

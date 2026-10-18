@@ -36,6 +36,7 @@ export const itemSchema = z.object({
   name: title, category: z.enum(["top", "bottom", "dress", "outerwear", "shoes", "bag", "accessory"]),
   brand: z.string().trim().max(100, "品牌名称不能超过 100 个字符").optional(),
   purchasePrice: z.string().trim().max(100, "购买价格不能超过 100 个字符").optional(),
+  fabric: z.string().trim().max(100, "面料材质不能超过 100 个字符").optional(),
   color: z.string().max(50), colorStyle: colorStyleSchema.optional(), seasons: z.array(z.enum(["spring", "summer", "autumn", "winter"])).max(4),
   occasions, notes: note, asset: hashSchema.nullable(), photos: photosSchema, archived: z.boolean(),
   fit: z.enum(["tight", "fitted", "regular", "loose"]).nullable().default(null),
@@ -79,9 +80,9 @@ export type CalendarRecord = z.infer<typeof calendarRecordSchema>;
 export type ClosetRecord = z.infer<typeof recordSchema>;
 export const assetSchema = z.object({ hash: hashSchema, name: z.string().max(255), mime: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]), size: z.number().int().positive().max(20 * 1024 * 1024) }).strict();
 export type Asset = z.infer<typeof assetSchema>;
-export const ARCHIVE_SCHEMA_VERSION = 10;
+export const ARCHIVE_SCHEMA_VERSION = 11;
 export const archiveSchema = z.object({
-  format: z.literal("new-closet"), schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7), z.literal(8), z.literal(9), z.literal(10)]), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
+  format: z.literal("new-closet"), schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7), z.literal(8), z.literal(9), z.literal(10), z.literal(11)]), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
   colorLibrary: z.array(libraryColorSchema).default([]),
   records: z.array(recordSchema).max(2000), assets: z.array(assetSchema).max(2000),
 }).strict();
