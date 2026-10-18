@@ -7,7 +7,7 @@ const require = createRequire(import.meta.url);
 await build({entryPoints:['lib/domain.ts','lib/photo-draft.ts','components/photo-gallery.tsx','components/closet-cards.tsx','components/outfit-fields.tsx'],outdir:'.test-runtime/photos-build',outExtension:{'.js':'.cjs'},bundle:true,platform:'node',format:'cjs',external:['react','react-dom','react/jsx-runtime'],logLevel:'error'});
 const root=process.cwd()+'/.test-runtime/photos-build/';
 const {itemSchema,outfitSchema,photoAssets,makeSnapshot,referencedAssets,validateArchive,wardrobePrompt}=require(root+'lib/domain.cjs');
-const {createPhotoDraft,appendPhotoFiles,removeDraftPhoto,savePhotoDraft,materializePhotoFiles}=require(root+'lib/photo-draft.cjs');
+const {createPhotoDraft,appendPhotoFiles,appendDraftAssets,removeDraftPhoto,savePhotoDraft,validatePhotoFiles}=require(root+'lib/photo-draft.cjs');
 const {PhotoEditor,PhotoGallery}=require(root+'components/photo-gallery.cjs');
 const {ItemCard,OutfitCollage}=require(root+'components/closet-cards.cjs');
 const {OutfitFields}=require(root+'components/outfit-fields.cjs');
@@ -25,16 +25,14 @@ const file=new File(['bytes'],'one.png',{type:'image/png'});
 draft=appendPhotoFiles(draft,[file]);assert.equal(draft.cover,draft.photos[0].key);
 assert.throws(()=>appendPhotoFiles(draft,[new File(['bad'],'bad.txt',{type:'text/plain'})]),/image/);
 assert.throws(()=>appendPhotoFiles(draft,Array(20).fill(file)),/20/);
-// Android's picker hands out content:// files whose read grant a later camera session
-// can revoke. materializePhotoFiles copies the bytes while the grant is still valid.
-const pickedFile=new File(['stable bytes'],'picked.png',{type:'image/png'});
-const originalRead=File.prototype.arrayBuffer.bind(pickedFile);let pickerGrant=true;
-Object.defineProperty(pickedFile,'arrayBuffer',{value:()=>pickerGrant?originalRead():Promise.reject(new DOMException('The requested file could not be read','NotReadableError'))});
-const [stableFile]=await materializePhotoFiles([pickedFile]);pickerGrant=false;
-assert.notEqual(stableFile,pickedFile);assert.equal(stableFile.name,'picked.png');assert.equal(stableFile.type,'image/png');
-assert.equal(await stableFile.text(),'stable bytes');
-await assert.rejects(pickedFile.arrayBuffer(),error=>error.name==='NotReadableError');
-await assert.rejects(materializePhotoFiles([new File(['bad'],'bad.txt',{type:'text/plain'})]),/image/);
+// Android writes picked photos to app storage immediately; drafts keep asset hashes,
+// so a later camera session cannot invalidate the earlier picks.
+const assetA={hash:a,name:'a.png',mime:'image/png',size:5},assetB={hash:b,name:'b.png',mime:'image/png',size:5};
+let assetDraft=appendDraftAssets(createPhotoDraft({asset:null,photos:[]}),[assetA]);
+assert.equal(assetDraft.cover,assetDraft.photos[0].key);assert.equal(assetDraft.photos[0].asset,a);assert.equal(assetDraft.photos[0].file,null);
+assetDraft=appendDraftAssets(assetDraft,[assetB]);assert.deepEqual(assetDraft.photos.map(p=>p.asset),[a,b]);assert.equal(assetDraft.cover,assetDraft.photos[0].key);
+assert.throws(()=>appendDraftAssets(assetDraft,Array(20).fill(assetA)),/20/);
+assert.throws(()=>validatePhotoFiles([new File(['bad'],'bad.txt',{type:'text/plain'})]),/image/);
 const originalFetch=globalThis.fetch;let uploads=0;
 globalThis.fetch=async(url,init)=>{assert.equal(url,'/api/assets');assert.equal(init.body.get('file').name,'one.png');uploads++;return Response.json({hash:c,name:'one.png',mime:'image/png',size:5});};
 try{const resolved=await savePhotoDraft({...draft,photos:[...draft.photos,{...draft.photos[0],key:'duplicate'}],cover:'duplicate'});assert.deepEqual(resolved,{asset:c,photos:[c]});assert.equal(uploads,2);}finally{globalThis.fetch=originalFetch;}
