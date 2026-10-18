@@ -220,6 +220,30 @@ try {
   res = await post({ kind: 'calendar', id: entry.id, version: entry.version, op: 'deleteCalendar' }); assert.equal(res.status, 200);
   assert.equal((await (await request('/api/closet?collection=main')).json()).records.some(r => r.id === entry.id), false);
   assert.equal((await (await request('/api/closet?collection=' + restoredId)).json()).records.some(r => r.id === entry.id), true);
+  // Deleting an item unlinks it from outfits and groups while calendar snapshots stay readable.
+  const retired = await post({ kind: 'item', data: { ...itemData, name: 'Retired coat', brand: 'Retired brand', asset: null, photos: [] } });
+  assert.equal(retired.status, 200, await retired.clone().text()); const retiredId = (await retired.json()).id;
+  const retiredOutfit = await post({ kind: 'outfit', data: { name: 'Retired look', itemIds: [retiredId], asset: null, occasions: [], notes: '', archived: false } });
+  assert.equal(retiredOutfit.status, 200, await retiredOutfit.clone().text()); const retiredOutfitId = (await retiredOutfit.json()).id;
+  const retiredEntry = await post({ kind: 'calendar', data: { date: '2026-10-13', status: 'worn', outfitId: retiredOutfitId, notes: '' } });
+  assert.equal(retiredEntry.status, 200, await retiredEntry.clone().text()); const retiredEntryId = (await retiredEntry.json()).id;
+  const retiredGroup = await createSubset({ name: 'Retired group', scope: 'item', root: 'all', parentId: null, memberIds: [retiredId] });
+  const retiredVersion = (await (await request('/api/closet?collection=main')).json()).records.find(record => record.id === retiredId).version;
+  const deletion = await post({ op: 'deleteItem', kind: 'item', id: retiredId, version: retiredVersion });
+  assert.equal(deletion.status, 200, await deletion.clone().text());
+  assert.deepEqual((await deletion.json()).removedOutfits, [retiredOutfitId]);
+  const afterDeletion = (await (await request('/api/closet?collection=main')).json()).records;
+  assert.equal(afterDeletion.some(record => record.id === retiredId), false);
+  assert.equal(afterDeletion.some(record => record.id === retiredOutfitId), false);
+  assert.deepEqual(afterDeletion.find(record => record.id === retiredGroup).data.memberIds, []);
+  const keptEntry = afterDeletion.find(record => record.id === retiredEntryId);
+  assert.equal(keptEntry.data.snapshot.items[0].data.name, 'Retired coat'); assert.equal(keptEntry.data.outfitId, retiredOutfitId);
+  res = await post({ op: 'save', kind: 'calendar', id: keptEntry.id, version: keptEntry.version, data: { date: keptEntry.data.date, status: 'planned', outfitId: keptEntry.data.outfitId, notes: 'Still editable' } });
+  assert.equal(res.status, 200, await res.clone().text());
+  assert.equal((await (await request('/api/closet?collection=main')).json()).records.find(record => record.id === retiredEntryId).data.snapshot.items[0].data.name, 'Retired coat');
+  assert.equal((await post({ op: 'deleteItem', kind: 'item', id: retiredId, version: retiredVersion })).status, 404);
+  const someOutfit = afterDeletion.find(record => record.kind === 'outfit');
+  assert.equal((await post({ op: 'deleteItem', kind: 'outfit', id: someOutfit.id, version: someOutfit.version })).status, 400);
   const englishPage = await (await request('/')).text();
   assert.match(englishPage, /<html lang="en"/);
   assert.match(englishPage, /My wardrobe/);
@@ -229,9 +253,12 @@ try {
   assert.match(chinesePage, /New Closet · 我的衣橱/);
   const persisted = new DatabaseSync(path.join(directory, 'closet.sqlite'), { readOnly: true });
   const stored = persisted.prepare('SELECT storage_key FROM assets WHERE hash=?').get(asset.hash);
-  assert.deepEqual(await readFile(path.join(directory, 'assets', stored.storage_key)), png); persisted.close();
+  assert.deepEqual(await readFile(path.join(directory, 'assets', stored.storage_key)), png);
+  assert.ok(persisted.prepare('SELECT record_id FROM sync_tombstones WHERE owner=? AND record_id=?').get(profileId, retiredId), 'Deleted items leave a sync tombstone');
+  assert.ok(persisted.prepare('SELECT record_id FROM sync_tombstones WHERE owner=? AND record_id=?').get(profileId, retiredOutfitId), 'Outfits removed with the item leave a sync tombstone');
+  persisted.close();
   assert.equal((await request('/api/auth', { method: 'DELETE' })).status, 410);
-  console.log('PASS: production Node server; personal sizes singleton under concurrent creation, optional field clearing, invalid inputs, stale edits, per-collection isolation and item brands and multi-photo v9 ZIP recovery; nested category/item/outfit subsets, multiple membership, concurrent auto-add without lost members, stale edits blocked, invalid parent/scope/category and cyclic imports rejected; photo/calendar/subset transactions, original bytes, legacy records, restart persistence and complete ZIP recovery.');
+  console.log('PASS: production Node server; personal sizes singleton under concurrent creation, optional field clearing, invalid inputs, stale edits, per-collection isolation and item brands and multi-photo v9 ZIP recovery; nested category/item/outfit subsets, multiple membership, concurrent auto-add without lost members, stale edits blocked, invalid parent/scope/category and cyclic imports rejected; item deletion that unlinks outfits/groups, drops emptied outfits, tombstones the record and keeps calendar snapshots editable; photo/calendar/subset transactions, original bytes, legacy records, restart persistence and complete ZIP recovery.');
 } catch (error) { console.error(logs); throw error; }
 finally {
   globalThis.fetch = originalFetch; await stop();

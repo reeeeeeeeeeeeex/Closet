@@ -11,7 +11,7 @@ import { LockKeyhole } from "lucide-react";
 import { tr, translatedOptions } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Shirt, Layers3, CalendarDays, Database, Sparkles, Plus, Search, ArrowRight, Download, Upload, Check, X, Archive, ChevronLeft, ChevronRight, ChevronDown,  Loader2, Camera, AlertCircle, PackageOpen, Ruler, } from "lucide-react";
+import { Shirt, Layers3, CalendarDays, Database, Sparkles, Plus, Search, ArrowRight, Download, Upload, Check, X, Archive, ChevronLeft, ChevronRight, ChevronDown,  Loader2, Camera, AlertCircle, PackageOpen, Ruler, Trash2, } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -215,6 +215,12 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
         toast.success(t("分组已删除，内容已保留")); await refresh();
     };
     const removeCalendar = async (record: CalendarRecord) => { await api("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "deleteCalendar", collectionId: selectedCollection.current || "main", kind: "calendar", id: record.id, version: record.version }) }); setEditor(null); toast.success(t("日历记录已删除")); await refresh(); };
+    const removeItem = async (record: ItemRecord) => {
+        await api("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "deleteItem", collectionId: selectedCollection.current || "main", kind: "item", id: record.id, version: record.version }) });
+        setEditor(null);
+        toast.success(t("单品已删除"));
+        await refresh();
+    };
     const items = useMemo(() => (state?.records || []).filter((r): r is ItemRecord => r.kind === "item"), [state]);
     const outfits = useMemo(() => (state?.records || []).filter((r): r is OutfitRecord => r.kind === "outfit"), [state]);
     const calendar = useMemo(() => (state?.records || []).filter((r): r is CalendarRecord => r.kind === "calendar"), [state]);
@@ -300,7 +306,7 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
     <AlertDialog open={pendingCollection !== null} onOpenChange={open => { if (!open) setPendingCollection(null); }}><AlertDialogContent className="closet-dialog"><AlertDialogHeader><AlertDialogTitle>{t("切换衣橱前放弃草稿？")}</AlertDialogTitle><AlertDialogDescription>{t("当前页面有未保存的内容，可以先保留并继续编辑。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("保留草稿")}</AlertDialogCancel><AlertDialogAction onClick={() => { const target = pendingCollection; setPendingCollection(null); setDraftDirty(false); setEditor(null); if (target) void refresh(target); }}>{t("放弃草稿并切换")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <AlertDialog open={pendingView !== null} onOpenChange={open => { if (!open) setPendingView(null); }}><AlertDialogContent className="closet-dialog"><AlertDialogHeader><AlertDialogTitle>{t("切换页面前放弃草稿？")}</AlertDialogTitle><AlertDialogDescription>{t("当前页面有未保存的内容，可以先保留并继续编辑。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("保留草稿")}</AlertDialogCancel><AlertDialogAction onClick={() => { if (pendingView) goView(pendingView); setPendingView(null); }}>{t("放弃草稿并切换")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <AlertDialog open={reloadConfirm} onOpenChange={setReloadConfirm}><AlertDialogContent className="closet-dialog"><AlertDialogHeader><AlertDialogTitle>{t("载入当前账号前放弃草稿？")}</AlertDialogTitle><AlertDialogDescription>{t("当前页面有未保存的内容。重新载入后会放弃这些草稿，已保存的资料保留。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("保留草稿")}</AlertDialogCancel><AlertDialogAction onClick={() => window.location.reload()}>{t("放弃草稿并载入")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-    {editor?.kind === "item" && <ItemEditor compact={android} key={editor.record?.id || "new-item"} record={editor.record} initialCategory={editor.initialCategory} brands={itemBrands(items)} colorLibrary={state?.colorLibrary || []} onClose={() => setEditor(null)} onSave={save}/>}
+    {editor?.kind === "item" && <ItemEditor compact={android} key={editor.record?.id || "new-item"} record={editor.record} initialCategory={editor.initialCategory} brands={itemBrands(items)} colorLibrary={state?.colorLibrary || []} onClose={() => setEditor(null)} onSave={save} onDelete={removeItem}/>}
     {editor?.kind === "outfit" && <OutfitEditor compact={android} key={editor.record?.id || "new-outfit"} record={editor.record} items={items} onClose={() => setEditor(null)} onSave={save}/>}
     {editor?.kind === "calendar" && <CalendarEditor key={editor.record?.id || "new-calendar"} record={editor.record} date={editor.date} outfitId={editor.outfitId} outfits={outfits} items={items} onClose={() => setEditor(null)} onSave={save} onDelete={removeCalendar}/>}
   </SidebarProvider>;
@@ -322,7 +328,7 @@ function EmptyState({ icon: Icon, title, text, action, onAction }: {
 function FormError({ message }: {
     message: string;
 }) { return message ? <div className="form-error" role="alert"><AlertCircle size={16}/><span>{message}</span></div> : null; }
-function ItemEditor({ record, initialCategory, brands, colorLibrary, onClose, onSave, compact = false }: {
+function ItemEditor({ record, initialCategory, brands, colorLibrary, onClose, onSave, onDelete, compact = false }: {
     compact?: boolean;
     record?: ItemRecord;
     initialCategory?: Item["category"];
@@ -330,6 +336,7 @@ function ItemEditor({ record, initialCategory, brands, colorLibrary, onClose, on
     colorLibrary: ColorValue[];
     onClose: () => void;
     onSave: Save;
+    onDelete: (record: ItemRecord) => Promise<void>;
 }) {
     const { t } = useI18n();
     const [data, setData] = useState<Item>(record?.data || { ...blankItem, category: initialCategory || "top" });
@@ -354,8 +361,23 @@ function ItemEditor({ record, initialCategory, brands, colorLibrary, onClose, on
     finally {
         setBusy(false);
     } };
+    const remove = async () => {
+        if (!record)
+            return;
+        setBusy(true);
+        setError("");
+        try {
+            await onDelete(record);
+        }
+        catch (e) {
+            setError(errorMessage(e));
+        }
+        finally {
+            setBusy(false);
+        }
+    };
     return <Dialog open onOpenChange={(open: boolean) => { if (!open && !busy)
-        onClose(); }}><DialogContent className="closet-dialog editor-dialog item-dialog" onEscapeKeyDown={event => { if (cancelScreenPick.current) { event.preventDefault(); cancelScreenPick.current(); } }}><DialogHeader><DialogTitle>{record ? t("单品详情") : t("添加单品")}</DialogTitle><DialogDescription>{t("原图会完整保存。你可以随时补充或修改信息。")}</DialogDescription></DialogHeader><form onSubmit={e => { e.preventDefault(); void submit(); }}><fieldset disabled={busy}><div className="item-form-grid"><PhotoEditor compact={compact} draft={photos} onChange={setPhotos} kind="item" onError={setError}/><div className="form-fields"><div className="field"><Label htmlFor="item-name">{t("单品名称")}<span>*</span></Label><Input id="item-name" required maxLength={100} autoFocus value={data.name} placeholder={t("例如：短款牛仔外套")} onChange={e => setData({ ...data, name: e.target.value })}/></div><BrandField value={data.brand || ""} brands={brands} onChange={brand => setData({ ...data, brand })}/><div className="field-pair"><div className="field"><Label>{t("分类")}</Label><Picker label={t("单品分类")} value={data.category} onChange={value => { const category = value as Item["category"]; const allowed = CATEGORY_MEASUREMENTS[category] || []; setData({ ...data, category, fit: garmentCategory(category) ? data.fit : null, shoeFit: category === "shoes" ? data.shoeFit : null, shoeSize: category === "shoes" ? data.shoeSize : { eu: null, cn: null }, measurements: Object.fromEntries(Object.entries(data.measurements).filter(([key]) => allowed.some(value => value === key))) }); }} options={translatedOptions(CATEGORIES, t)}/></div></div><PurchasePriceField value={data.purchasePrice ?? ""} onChange={purchasePrice => setData({ ...data, purchasePrice })}/><AndroidOptionalSection enabled={compact} title={t("颜色")}><ColorField draft={colors} onChange={setColors} library={colorLibrary} sampling={onSample => <ColorSamplingTools photos={photos} onSample={onSample} onScreenPicking={cancel => { cancelScreenPick.current = cancel; }}/>}/></AndroidOptionalSection><AndroidOptionalSection enabled={compact} title={t("版型与尺寸")}><ItemDetailsFields item={data} onChange={setData}/></AndroidOptionalSection><div className="field"><Label>{t("适合场合")}</Label><Chips options={OCCASIONS} value={data.occasions} onChange={occasions => setData({ ...data, occasions })}/></div><div className="field"><Label>{t("季节")}</Label><Chips options={SEASONS} value={data.seasons} onChange={seasons => setData({ ...data, seasons })}/></div><AndroidOptionalSection enabled={compact} title={t("穿着备注")}><div className="field"><Label htmlFor="item-notes">{t("穿着备注")}</Label><Textarea id="item-notes" maxLength={3000} rows={3} value={data.notes} placeholder={t("版型、搭配想法，或舒适度\u2026")} onChange={e => setData({ ...data, notes: e.target.value })}/></div></AndroidOptionalSection></div></div></fieldset><FormError message={error}/><DialogFooter className="editor-footer">{record && <Button type="button" variant="ghost" className="mr-auto" disabled={busy} onClick={() => void submit(!data.archived)}><Archive size={16}/>{data.archived ? t("放回衣橱") : t("收起单品")}</Button>}<Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy}>{busy ? <Loader2 size={16} className="animate-spin"/> : <Check size={16}/>}{busy ? t("保存中\u2026") : t("保存单品")}</Button></DialogFooter></form></DialogContent></Dialog>;
+        onClose(); }}><DialogContent className="closet-dialog editor-dialog item-dialog" onEscapeKeyDown={event => { if (cancelScreenPick.current) { event.preventDefault(); cancelScreenPick.current(); } }}><DialogHeader><DialogTitle>{record ? t("单品详情") : t("添加单品")}</DialogTitle><DialogDescription>{t("原图会完整保存。你可以随时补充或修改信息。")}</DialogDescription></DialogHeader><form onSubmit={e => { e.preventDefault(); void submit(); }}><fieldset disabled={busy}><div className="item-form-grid"><PhotoEditor compact={compact} draft={photos} onChange={setPhotos} kind="item" onError={setError}/><div className="form-fields"><div className="field"><Label htmlFor="item-name">{t("单品名称")}<span>*</span></Label><Input id="item-name" required maxLength={100} autoFocus value={data.name} placeholder={t("例如：短款牛仔外套")} onChange={e => setData({ ...data, name: e.target.value })}/></div><BrandField value={data.brand || ""} brands={brands} onChange={brand => setData({ ...data, brand })}/><div className="field-pair"><div className="field"><Label>{t("分类")}</Label><Picker label={t("单品分类")} value={data.category} onChange={value => { const category = value as Item["category"]; const allowed = CATEGORY_MEASUREMENTS[category] || []; setData({ ...data, category, fit: garmentCategory(category) ? data.fit : null, shoeFit: category === "shoes" ? data.shoeFit : null, shoeSize: category === "shoes" ? data.shoeSize : { eu: null, cn: null }, measurements: Object.fromEntries(Object.entries(data.measurements).filter(([key]) => allowed.some(value => value === key))) }); }} options={translatedOptions(CATEGORIES, t)}/></div></div><PurchasePriceField value={data.purchasePrice ?? ""} onChange={purchasePrice => setData({ ...data, purchasePrice })}/><AndroidOptionalSection enabled={compact} title={t("颜色")}><ColorField draft={colors} onChange={setColors} library={colorLibrary} sampling={onSample => <ColorSamplingTools photos={photos} onSample={onSample} onScreenPicking={cancel => { cancelScreenPick.current = cancel; }}/>}/></AndroidOptionalSection><AndroidOptionalSection enabled={compact} title={t("版型与尺寸")}><ItemDetailsFields item={data} onChange={setData}/></AndroidOptionalSection><div className="field"><Label>{t("适合场合")}</Label><Chips options={OCCASIONS} value={data.occasions} onChange={occasions => setData({ ...data, occasions })}/></div><div className="field"><Label>{t("季节")}</Label><Chips options={SEASONS} value={data.seasons} onChange={seasons => setData({ ...data, seasons })}/></div><AndroidOptionalSection enabled={compact} title={t("穿着备注")}><div className="field"><Label htmlFor="item-notes">{t("穿着备注")}</Label><Textarea id="item-notes" maxLength={3000} rows={3} value={data.notes} placeholder={t("版型、搭配想法，或舒适度\u2026")} onChange={e => setData({ ...data, notes: e.target.value })}/></div></AndroidOptionalSection></div></div></fieldset><FormError message={error}/><DialogFooter className="editor-footer">{record && <><Button type="button" variant="ghost" disabled={busy} onClick={() => void submit(!data.archived)}><Archive size={16}/>{data.archived ? t("放回衣橱") : t("收起单品")}</Button><AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="ghost" className="mr-auto text-destructive" disabled={busy}><Trash2 size={16}/>{t("删除单品")}</Button></AlertDialogTrigger><AlertDialogContent className="closet-dialog"><AlertDialogHeader><AlertDialogTitle>{t("删除这件单品？")}</AlertDialogTitle><AlertDialogDescription>{t("删除后无法恢复。这件单品会从相关搭配和分组中移除，因此没有任何单品和照片的空搭配会一并删除；日历里已保存的穿搭快照会保留。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("取消")}</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => void remove()}>{t("确认删除")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></>}<Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy}>{busy ? <Loader2 size={16} className="animate-spin"/> : <Check size={16}/>}{busy ? t("保存中\u2026") : t("保存单品")}</Button></DialogFooter></form></DialogContent></Dialog>;
 }
 function OutfitEditor({ record, items, onClose, onSave, compact = false }: {
     compact?: boolean;

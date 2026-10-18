@@ -18,7 +18,7 @@ The desktop app runs as a local web service. The Android app stores its interfac
 - **Free-text sizes:** type shoe sizes and garment or body measurements directly, including ranges and notes such as `38/39` or `about 70`. Existing numeric measurements remain intact.
 - **Purchase prices:** optional free-text prices in item details, such as `¥299`, `about $30`, or `gift`. Prices stay off the wardrobe cards.
 - **Original photos:** up to 20 photos per item or outfit, with a cover, zoom, and cropping saved as a new photo. Originals are never recompressed.
-- **Flexible organization:** nested groups, search, filters, and archived items. An item or outfit can belong to multiple groups.
+- **Flexible organization:** nested groups, search, filters, and archived items; delete an item to remove it from the wardrobe and its outfits. An item or outfit can belong to multiple groups.
 - **Outfits and calendar:** combine items, save outfit photos, or use both. Calendar entries keep independent snapshots, so later edits don't rewrite what you wore.
 - **Personal measurements:** optional body measurements and separate EU and Chinese shoe sizes for each wardrobe.
 - **AI and MCP:** connect an OpenAI-compatible or Anthropic model, or an external MCP client. Choose whether it can view photos, read measurements, or save outfits and calendar plans.
@@ -117,7 +117,7 @@ New Closet 帮你整理已有衣物、组合搭配，并记录计划穿着和实
 - **自由填写尺码：** 鞋码、衣物尺寸和身体尺寸均可直接输入，支持“38/39”“约70”等文字；已有数字记录保留。
 - **购买价格：**在单品详情自由填写，例如 `¥299`、`约200元` 或 `赠品`，可留空，主页面卡片不显示。
 - **原图保存：**每件单品或搭配最多 20 张原图，可选封面、放大查看、将裁剪结果另存为新照片，原图不重新压缩。
-- **灵活分组：**支持嵌套分组、搜索和筛选，同一内容可加入多个分组，暂时不穿的衣物可以收起。
+- **灵活分组：**支持嵌套分组、搜索和筛选，同一内容可加入多个分组，暂时不穿的衣物可以收起，也可以彻底删除单品及其关联。
 - **搭配与日历：**可关联单品、保存搭配照片，或同时使用。日历保存独立快照，后续修改不会改变历史穿搭。
 - **个人尺码：**每个衣橱单独记录身体尺寸、欧码和中国毫米鞋码，各项均可留空。
 - **AI 与 MCP：**连接 OpenAI 兼容或 Anthropic 模型，也可使用外部 MCP 客户端。照片、身体尺码以及保存搭配和日历的权限由你选择。

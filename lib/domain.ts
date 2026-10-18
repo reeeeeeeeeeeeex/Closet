@@ -106,9 +106,12 @@ export function validateArchive(input: unknown): ClosetArchive {
   if (media.size !== a.assets.length) throw new Error("图片标识重复");
   for (const r of a.records) {
     if (r.kind === "outfit") for (const itemId of r.data.itemIds) if (map.get(itemId)?.kind !== "item") throw new Error("搭配引用了不存在的单品");
+    // Calendar snapshots are self-contained: they keep the photos and item copies captured that day.
+    // A deliberately deleted item, or an emptied outfit, may therefore no longer exist as a record.
     if (r.kind === "calendar") {
-      if (map.get(r.data.outfitId)?.kind !== "outfit") throw new Error("日历引用了不存在的搭配");
-      for (const i of r.data.snapshot.items) if (map.get(i.id)?.kind !== "item") throw new Error("日历快照缺少单品记录");
+      const outfit = map.get(r.data.outfitId);
+      if (outfit && outfit.kind !== "outfit") throw new Error("日历关联的记录不是搭配");
+      for (const snapshotItem of r.data.snapshot.items) { const item = map.get(snapshotItem.id); if (item && item.kind !== "item") throw new Error("日历快照引用的记录不是单品"); }
     }
   }
   for (const hash of referencedAssets(a.records)) if (!media.has(hash)) throw new Error("备份缺少原图");
