@@ -1,7 +1,7 @@
 import { authorizeSync,sha } from "@/lib/sync-server";
 import { ApiError,json,failure,digest,sameOrigin } from "@/lib/server";
 import { hashSchema, type Asset } from "@/lib/domain";
-import { imageMime } from "@/lib/image-type";
+import { assetMime } from "@/lib/asset-type";
 type Route={params:Promise<{hash:string}>};
 export async function GET(request:Request,route:Route){
   try{
@@ -18,7 +18,7 @@ export async function PUT(request:Request,route:Route){
     let size=0;const chunks:Uint8Array[]=[];
     try{while(true){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>20*1024*1024)throw new ApiError(413,"单张图片最多 20 MB");chunks.push(part.value);}}finally{await reader.cancel();}
     const bytes=new Uint8Array(size);let offset=0;for(const c of chunks){bytes.set(c,offset);offset+=c.length;}
-    const mime=imageMime(bytes);if(!mime||await digest(bytes)!==hash)throw new ApiError(400,"原图校验失败");
+    const mime=assetMime(bytes, request.headers.get("content-type") || "");if(!mime||await digest(bytes)!==hash)throw new ApiError(400,"原图校验失败");
     const old=db.prepare("SELECT hash,name,mime,size FROM assets WHERE owner=? AND hash=?").bind(owner,hash).rows<Asset>()[0];
     if(old)return json(old);
     const key=sha(owner)+"/"+hash;await bucket.put(key,bytes.buffer);

@@ -4,6 +4,7 @@ import { getClosetClient } from "./closet-client";
 import { tr } from "./i18n/core";
 import { Zip, ZipPassThrough, Unzip, UnzipInflate, strToU8, strFromU8 } from "fflate";
 import { ARCHIVE_SCHEMA_VERSION, validateArchive, type ClosetArchive, type ClosetState, type Asset } from "./domain";
+import { ASSET_LIMIT, ASSET_PATH } from "./asset-type";
 export class ApiClientError extends Error { constructor(public status: number, message: string, public code?: string) { super(message); } }
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const work = async () => {
@@ -18,13 +19,14 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     };
     return init?.method && !["GET", "HEAD"].includes(init.method) && !path.startsWith("/api/profiles") ? withProfileActivity(work) : work();
 }
-export async function uploadAsset(file: File): Promise<Asset> {
+export async function uploadAsset(file: File, attachment = false): Promise<Asset> {
     const client = getClosetClient();
-    if (client?.uploadAsset) return withProfileActivity(() => client.uploadAsset!(file, getProfileContext()!));
-    if (file.size > 20 * 1024 * 1024)
-        throw new Error(tr("单张图片最多 20 MB"));
+    if (client?.uploadAsset) return withProfileActivity(() => client.uploadAsset!(file, getProfileContext()!, attachment));
+    if (file.size > ASSET_LIMIT)
+        throw new Error(attachment ? tr("单个文件最多 20 MB") : tr("单张图片最多 20 MB"));
     const body = new FormData();
     body.append("file", file);
+    if (attachment) body.append("attachment", "true");
     return api<Asset>("/api/assets", { method: "POST", body });
 }
 export const hashBytes = async (bytes: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as BufferSource))).map(b => b.toString(16).padStart(2, "0")).join("");
@@ -41,7 +43,7 @@ async function exportArchiveWork(state: ClosetState, progress: (message: string)
     const add = (name: string, bytes: Uint8Array) => { const f = new ZipPassThrough(name); zip.add(f); f.push(bytes, true); if (zipError)
         throw zipError; };
     add("manifest.json", strToU8(JSON.stringify(manifest, null, 2)));
-    add("README.txt", strToU8("New Closet backup v11\nmanifest.json contains account custom colors, structured item colors, all records, item brands, purchase prices and fabric materials, nested groups and memberships, clothing fits/measurements, personal body measurements including knee circumference, shoe sizes, item/outfit photo galleries and covers, relationships, snapshots and original filenames.\nassets/ contains exact original bytes, named by SHA-256.\nImages and JSON can be opened independently of this app.\n"));
+    add("README.txt", strToU8(`New Closet backup v${ARCHIVE_SCHEMA_VERSION}\nmanifest.json contains wardrobe records, notes, groups, snapshots and original filenames.\nassets/ contains exact original photos and attachments, named by SHA-256.\n`));
     for (const [index, asset] of manifest.assets.entries()) {
         progress(tr("正在打包原图 {value1} / {value2}", { value1: index + 1, value2: manifest.assets.length }));
         const response = await profileFetch(assetUrl(asset.hash, state.profile?.id), { cache: "no-store" });
@@ -79,11 +81,11 @@ async function walkArchive(file: File, visit: (name: string, bytes: Uint8Array) 
         names.add(entry.name);
         if (entry.name === "README.txt" || entry.name.endsWith("/"))
             return;
-        if (entry.name !== "manifest.json" && !/^assets\/[a-f0-9]{64}\.(jpeg|png|webp|gif|avif)$/.test(entry.name)) {
+        if (entry.name !== "manifest.json" && !ASSET_PATH.test(entry.name)) {
             error = new Error(tr("备份含有无法识别的文件路径"));
             return;
         }
-        const limit = entry.name === "manifest.json" ? 3 * 1024 * 1024 : 20 * 1024 * 1024;
+        const limit = entry.name === "manifest.json" ? 3 * 1024 * 1024 : ASSET_LIMIT;
         if (entry.originalSize && entry.originalSize > limit) {
             error = new Error(tr("备份中的单个文件过大"));
             return;
@@ -170,7 +172,7 @@ async function importArchiveWork(file: File, manifest: ClosetArchive, progress: 
         if (!a)
             throw new Error(tr("图片未列入备份清单"));
         progress(tr("恢复原图 {value1} / {value2}", { value1: ++uploaded, value2: manifest.assets.length }));
-        const saved = await uploadAsset(new File([bytes as BlobPart], a.name, { type: a.mime }));
+        const saved = await uploadAsset(new File([bytes as BlobPart], a.name, { type: a.mime }), !a.mime.startsWith("image/"));
         if (saved.hash !== a.hash || saved.size !== a.size || saved.mime !== a.mime)
             throw new Error(tr("图片恢复校验失败"));
     });

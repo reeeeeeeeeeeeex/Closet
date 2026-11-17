@@ -51,6 +51,7 @@ export function mergeReplicas(base: Replica, local: Replica, remote: Replica, re
       if (r.kind === "outfit") r.data.itemIds.forEach(id => join(r.id,id));
       if (r.kind === "calendar") { join(r.id,r.data.outfitId); r.data.snapshot.items.forEach(i => join(r.id,i.id)); }
       if (r.kind === "subset") { if (r.data.parentId) join(r.id,r.data.parentId); r.data.memberIds.forEach(id => join(r.id,id)); }
+      if (r.kind === "note" && r.data.subsetId) join(r.id, r.data.subsetId);
       if (r.kind === "personalSizes") { if (sizes) join(r.id,sizes); sizes = r.id; }
     }
     const groups = new Map<string,string[]>();

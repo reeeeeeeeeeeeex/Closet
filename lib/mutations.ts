@@ -1,16 +1,19 @@
 import { z } from "zod";
-import { itemSchema, outfitSchema, subsetSchema, personalSizesSchema, dateSchema, makeSnapshot, photoAssets, referencedAssets, type Asset, type ClosetRecord, type ItemRecord } from "./domain";
+import { itemSchema, outfitSchema, subsetSchema, personalSizesSchema, noteSchema, dateSchema, makeSnapshot, photoAssets, validateNotes, validateRecordAssets, type Asset, type ClosetRecord, type ItemRecord } from "./domain";
 import { validateSubsets } from "./subsets";
 
 export class MutationError extends Error { constructor(public status: number, message: string) { super(message); } }
-export const mutationSchema = z.object({ op: z.enum(["save", "deleteItem", "deleteCalendar", "deleteSubset"]), collectionId: z.string().min(1).max(100), id: z.string().uuid().optional(), version: z.number().int().positive().optional(), subsetId: z.string().uuid().optional(), kind: z.enum(["item", "outfit", "calendar", "subset", "personalSizes"]), data: z.unknown() });
+export const mutationSchema = z.object({ op: z.enum(["save", "deleteItem", "deleteCalendar", "deleteSubset", "deleteNote"]), collectionId: z.string().min(1).max(100), id: z.string().uuid().optional(), version: z.number().int().positive().optional(), subsetId: z.string().uuid().optional(), kind: z.enum(["item", "outfit", "calendar", "subset", "personalSizes", "note"]), data: z.unknown() });
 export function mutateRecords(records: ClosetRecord[], input: unknown, assets: Asset[], now = new Date().toISOString()) {
   const body = mutationSchema.parse(input), existing = records.find(r => r.id === body.id);
   const fail = (status: number, message: string): never => { throw new MutationError(status, message); };
   if (body.id && (!existing || existing.kind !== body.kind)) fail(404, "记录不存在");
   if (existing && existing.version !== body.version) fail(409, "另一台设备已修改这条记录。草稿仍保留，请载入最新记录后重新确认。");
   let next = [...records]; const result: { ok: true; id?: string; record?: ClosetRecord; parentId?: string | null; outfitId?: string; removedOutfits?: string[] } = { ok: true };
-  if (body.op === "deleteCalendar") {
+  if (body.op === "deleteNote") {
+    if (existing?.kind !== "note") return fail(400, "只能删除笔记");
+    next = next.filter(r => r.id !== existing.id);
+  } else if (body.op === "deleteCalendar") {
     if (existing?.kind !== "calendar") return fail(400, "只能删除日历记录");
     next = next.filter(r => r.id !== existing.id);
   } else if (body.op === "deleteItem") {
@@ -29,6 +32,7 @@ export function mutateRecords(records: ClosetRecord[], input: unknown, assets: A
     if (existing?.kind !== "subset") return fail(400, "只能删除分组");
     const target = existing;
     next = next.filter(r => r.id !== target.id).map(r => {
+      if (r.kind === "note" && r.data.subsetId === target.id) return { ...r, data: { ...r.data, subsetId: target.data.parentId }, version: r.version + 1, updatedAt: now };
       if (r.kind !== "subset" || (r.id !== target.data.parentId && r.data.parentId !== target.id)) return r;
       const data = r.id === target.data.parentId ? { ...r.data, memberIds: [...new Set([...r.data.memberIds, ...target.data.memberIds])] } : { ...r.data, parentId: target.data.parentId };
       return { ...r, data, version: r.version + 1, updatedAt: now };
@@ -38,6 +42,7 @@ export function mutateRecords(records: ClosetRecord[], input: unknown, assets: A
     let data: ClosetRecord["data"];
     if (body.kind === "item") { const item = itemSchema.parse(body.data); if (item.colorStyle) item.color = item.colorStyle.values[0]?.name || ""; data = item; }
     else if (body.kind === "outfit") data = outfitSchema.parse(body.data);
+    else if (body.kind === "note") data = noteSchema.parse(body.data);
     else if (body.kind === "subset") {
       data = subsetSchema.parse(body.data);
       if (existing?.kind === "subset" && (data.scope !== existing.data.scope || data.root !== existing.data.root || data.parentId !== existing.data.parentId)) fail(400, "分组的上级分组和所属分类不能修改");
@@ -76,9 +81,8 @@ export function mutateRecords(records: ClosetRecord[], input: unknown, assets: A
     }
   }
   if (next.length > 2000) fail(400, "此衣橱已达首版的 2000 条记录上限");
-  const media = new Set(assets.map(a => a.hash));
-  for (const hash of referencedAssets(next)) if (!media.has(hash)) fail(400, "原图尚未上传完成");
   for (const r of next) if (r.kind === "outfit" && r.data.itemIds.some(id => !next.some(i => i.id === id && i.kind === "item"))) fail(400, "搭配中的单品不存在");
-  try { validateSubsets(next); } catch (e) { fail(400, e instanceof Error ? e.message : "分组关系无效"); }
+  try { validateSubsets(next); validateNotes(next); validateRecordAssets(next, assets); }
+  catch (e) { fail(400, e instanceof Error ? e.message : "分组关系无效"); }
   return { records: next, result };
 }

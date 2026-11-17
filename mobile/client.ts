@@ -59,11 +59,11 @@ export const androidClient:ClosetClient={
       });return Response.json(result);
     }catch(e){return Response.json({error:e instanceof z.ZodError?e.issues[0]?.message:e instanceof Error?e.message:'操作失败',...(e instanceof McpToolError && e.status===409 ? {code:'PROFILE_CHANGED'} : {})},{status:e instanceof MutationError||e instanceof McpToolError?e.status:400});}
   },
-  async uploadAsset(file,owner){
+  async uploadAsset(file,owner,attachment){
     if(file.size>20*1024*1024||!file.size)throw Error('单张图片最多 20 MB，且不能为空');
     const {handle}=await Native.beginFile({owner});
     for(let offset=0;offset<file.size;offset+=192*1024){const bytes=new Uint8Array(await file.slice(offset,offset+192*1024).arrayBuffer());let binary='';for(const b of bytes)binary+=String.fromCharCode(b);await Native.appendFile({handle,data:btoa(binary)});}
-    const {asset}=await Native.finishFile({handle,owner,name:file.name});
+    const {asset}=await Native.finishFile({handle,owner,name:file.name,attachment, mime:file.type || (/\.m4a$/i.test(file.name) ? "audio/mp4" : "")});
     await updateDocument(owner,doc=>{if(!doc.replica.assets.some(a=>a.hash===asset.hash))doc.replica.assets.push(asset);});return asset;
   },
   async exportArchive(state){const result=await Native.exportArchive({owner:state.profile!.id,manifest:manifestFromState(state),filename:`new-closet-${new Date().toISOString().slice(0,10)}.zip`});if(!result.saved)throw Error('已取消保存备份');},

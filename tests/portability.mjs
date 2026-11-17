@@ -32,6 +32,10 @@ assert.throws(() => outfitSchema.parse({ ...photoOnly.data, itemIds: [], asset: 
 const state = { collections: [{ id: 'main', name: 'Round trip', createdAt: item.createdAt }], collectionId: 'main', records: [item, outfit, entry, photoOnly, photoEntry], assets: [{ hash, name: '原始照片.png', mime: 'image/png', size: png.length }, { hash: photoHash, name: '穿搭原图.png', mime: 'image/png', size: outfitPhoto.length }] };
 const personal = {...metadata(),kind:'personalSizes',data:personalSizesSchema.parse({measurements:{height:168,waist:"约68",knee:36.5,inseam:77,outseam:103},shoeSize:{eu:"38/39",cn:"240–245 mm"}})};
 state.records.push(personal);
+const audio = new Uint8Array(Buffer.from('UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQIAAACAgA==', 'base64'));
+const audioHash = await hashBytes(audio);
+state.assets.push({ hash: audioHash, name: 'inspiration.wav', mime: 'audio/wav', size: audio.length });
+state.records.push({ ...metadata(), kind: 'note', data: { scope: 'item', root: 'outerwear', subsetId: null, name: 'Layering', text: 'Pair with denim.', attachments: [{ hash: audioHash, name: 'inspiration.wav' }] } });
 state.records.push({...metadata(),kind:'item',data:itemSchema.parse({...item.data,name:'Trousers',category:'bottom',measurements:{waist:72,knee:42.5}})});
 assert.throws(()=>personalSizesSchema.parse({measurements:{waist:0}}));
 assert.throws(()=>personalSizesSchema.parse({measurements:{knee:0}}));
@@ -44,7 +48,8 @@ let written = null; let uploadCount = 0;
 globalThis.fetch = async (url, init = {}) => {
   if (url === `/api/assets/${hash}`) return new Response(png);
   if (url === `/api/assets/${photoHash}`) return new Response(outfitPhoto);
-  if (url === '/api/assets' && init.method === 'POST') { const file = init.body.get('file'); const bytes = new Uint8Array(await file.arrayBuffer()); const saved = await hashBytes(bytes); assert.deepEqual(bytes, saved === hash ? png : outfitPhoto); uploadCount++; return Response.json(state.assets.find(a => a.hash === saved)); }
+  if (url === `/api/assets/${audioHash}`) return new Response(audio);
+  if (url === '/api/assets' && init.method === 'POST') { const file = init.body.get('file'); const bytes = new Uint8Array(await file.arrayBuffer()); const saved = await hashBytes(bytes); assert.deepEqual(bytes, saved === hash ? png : saved === audioHash ? audio : outfitPhoto); assert.equal(init.body.has('attachment'), saved === audioHash); uploadCount++; return Response.json(state.assets.find(a => a.hash === saved)); }
   if (url === '/api/closet' && init.method === 'PUT') { written = JSON.parse(init.body); return Response.json({ collectionId: 'restored' }); }
   throw new Error('Unexpected fetch ' + url);
 };
@@ -52,22 +57,23 @@ const blob = await exportArchive(state, () => {});
 const file = new File([blob], 'test.zip');
 const manifest = await inspectArchive(file, () => {});
 assert.deepEqual(manifest.records, state.records); assert.deepEqual(manifest.assets, state.assets);
-assert.equal(manifest.schemaVersion, 11);
-assert.equal(await importArchive(file, manifest, () => {}), 'restored'); assert.equal(uploadCount, 2); assert.deepEqual(written.records, state.records);
+assert.equal(manifest.schemaVersion, 12);
+assert.equal(await importArchive(file, manifest, () => {}), 'restored'); assert.equal(uploadCount, 3); assert.deepEqual(written.records, state.records);
 const files = unzipSync(new Uint8Array(await blob.arrayBuffer()));
 assert.deepEqual(files[`assets/${hash}.png`], png);
 assert.deepEqual(files[`assets/${photoHash}.png`], outfitPhoto);
+assert.deepEqual(files[`assets/${audioHash}.wav`], audio);
 const corrupt = { ...files, [`assets/${hash}.png`]: strToU8('changed bytes') };
 await assert.rejects(() => inspectArchive(new File([zipSync(corrupt)], 'bad.zip'), () => {}), /SHA-256/);
 const missing = { ...files }; delete missing[`assets/${hash}.png`];
 await assert.rejects(() => inspectArchive(new File([zipSync(missing)], 'missing.zip'), () => {}), /original photo is missing/);
-assert.throws(() => validateArchive({ ...manifest, schemaVersion: 12 }));
+assert.throws(() => validateArchive({ ...manifest, schemaVersion: 13 }));
 assert.throws(() => validateArchive({ ...manifest, assets: [state.assets[0]] }), /缺少原图/);
 const legacy = { ...manifest, schemaVersion: 1, records: structuredClone([item, outfit, entry]), assets: [state.assets[0]] };
 delete legacy.records[2].data.snapshot.photos; delete legacy.records[1].data.asset; delete legacy.records[2].data.snapshot.asset;
 for (const data of [legacy.records[0].data, legacy.records[2].data.snapshot.items[0].data]) for (const key of ['brand','purchasePrice','fabric','fit','shoeFit','shoeSize','measurements']) delete data[key];
-for (const version of [1,2,3,4,5,6,7,8,9,10]) {
-  const upgraded = validateArchive({ ...legacy, schemaVersion: version }); assert.equal(upgraded.schemaVersion, 11); assert.equal(upgraded.records[0].data.brand, undefined); assert.equal(upgraded.records[1].data.asset, null); assert.equal(upgraded.records[2].data.snapshot.asset, null);
+for (const version of [1,2,3,4,5,6,7,8,9,10,11]) {
+  const upgraded = validateArchive({ ...legacy, schemaVersion: version }); assert.equal(upgraded.schemaVersion, 12); assert.equal(upgraded.records[0].data.brand, undefined); assert.equal(upgraded.records[1].data.asset, null); assert.equal(upgraded.records[2].data.snapshot.asset, null);
   assert.equal(upgraded.records[0].data.purchasePrice, undefined); assert.equal(upgraded.records[0].data.fabric, undefined); assert.equal(upgraded.records[0].data.fit, null); assert.deepEqual(upgraded.records[0].data.shoeSize, { eu: null, cn: null }); assert.deepEqual(upgraded.records[0].data.measurements, {});
 }
 assert.equal(validateArchive({ ...manifest, schemaVersion: 10 }).records.find(record => record.id === item.id).data.fabric, 'Changed fabric');
@@ -75,4 +81,4 @@ assert.throws(() => validateArchive({ ...manifest, records: [outfit] }), /不存
 assert.throws(() => validateArchive({ ...manifest, records: [...manifest.records, item] }), /重复/);
 assert.throws(()=>validateArchive({...manifest,records:[...manifest.records,{...personal,id:crypto.randomUUID()}]}),/一份我的尺码/);
 await rm('.test-build', { recursive: true, force: true });
-console.log('PASS: exact item/outfit original bytes + all records round trip; immutable photo-only snapshots; legacy v1-v10 backup upgrades and free-text prices/measurements/fabric v11 round trip; leap-year month jumps; corrupt/missing media, future version, duplicate IDs and broken references rejected.');
+console.log('PASS: exact photo and audio attachment bytes and all records round trip; immutable photo-only snapshots; legacy v1-v11 backup upgrades; corrupt/missing media, future version, duplicate IDs and broken references rejected.');

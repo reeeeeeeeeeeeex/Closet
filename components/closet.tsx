@@ -7,6 +7,8 @@ import { getClosetClient } from "@/lib/closet-client";
 import { getProfileContext, withProfileActivity } from "@/lib/profile-client";
 import { SyncPanel } from "@/components/sync-panel";
 import { AiAssistant } from "@/components/ai-assistant";
+import { ClosetNotes, NoteEditor } from "@/components/closet-notes";
+import type { Note, NoteRecord } from "@/lib/domain";
 import { LockKeyhole } from "lucide-react";
 import { tr, translatedOptions } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
@@ -54,6 +56,10 @@ const localDate = (date = new Date()) => `${date.getFullYear()}-${String(date.ge
 const formatSize = (bytes: number) => bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 type View = ClosetView;
 type Editor = {
+    kind: "note";
+    record?: NoteRecord;
+    location: Pick<Note, "scope" | "root" | "subsetId">;
+} | {
     kind: "item";
     record?: ItemRecord;
     initialCategory?: Item["category"];
@@ -216,6 +222,12 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
         toast.success(t("分组已删除，内容已保留")); await refresh();
     };
     const removeCalendar = async (record: CalendarRecord) => { await api("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "deleteCalendar", collectionId: selectedCollection.current || "main", kind: "calendar", id: record.id, version: record.version }) }); setEditor(null); toast.success(t("日历记录已删除")); await refresh(); };
+    const removeNote = async (record: NoteRecord) => {
+        await api("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "deleteNote", collectionId: selectedCollection.current || "main", kind: "note", id: record.id, version: record.version }) });
+        setEditor(null);
+        toast.success(t("笔记已删除"));
+        await refresh();
+    };
     const removeItem = async (record: ItemRecord) => {
         await api("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "deleteItem", collectionId: selectedCollection.current || "main", kind: "item", id: record.id, version: record.version }) });
         setEditor(null);
@@ -230,6 +242,16 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
     const scope = view === "wardrobe" ? "item" : "outfit";
     const subsetRoot = view === "wardrobe" ? category as Subset["root"] : "all";
     const activeSubset = state?.records.find((record): record is SubsetRecord => record.kind === "subset" && record.id === selectedSubsetId && record.data.scope === scope && record.data.root === subsetRoot);
+    const noteLocation = { scope, root: subsetRoot, subsetId: activeSubset?.id || null } as const;
+    const notes = (state?.records || []).filter((record): record is NoteRecord => {
+        if (record.kind !== "note" || record.data.scope !== scope) return false;
+        if (activeSubset) return record.data.subsetId === activeSubset.id;
+        return subsetRoot === "all" || record.data.root === subsetRoot;
+    }).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    const noteLocations = new Map((state?.records || []).filter(record => record.kind === "subset").map(record => [record.id, record.data.name]));
+    const noteSection = !archived && <ClosetNotes notes={notes} locations={noteLocations} disabled={!!error || syncing}
+        onAdd={() => setEditor({ kind: "note", location: noteLocation })}
+        onOpen={record => setEditor({ kind: "note", record, location: record.data })}/>;
     const subsetMembers = activeSubset ? subsetMemberIds(state!.records, activeSubset.id) : null;
     const filteredItems = filterItems(items, { category, occasion, archived, search, colors: colorFilter, members: subsetMembers }, t);
     const filteredOutfits = outfits.filter(o => (!subsetMembers || subsetMembers.has(o.id)) && o.data.archived === archived && (occasion === "all" || o.data.occasions.includes(occasion as Item["occasions"][number])) && [o.data.name, o.data.notes].join(" ").toLowerCase().includes(search.toLowerCase()));
@@ -294,7 +316,7 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
       {error && <div className="error-banner" role="alert"><AlertCircle size={19}/><div><strong>{t("暂时无法同步衣橱")}</strong><p>{error}</p>{profileChanged && <Button variant="outline" onClick={() => { if (draftDirty || editor) { setReloadConfirm(true); } else window.location.reload(); }}>{t("载入当前账号")}</Button>}</div><Button variant="outline" onClick={() => void refresh()}>{t("重试")}</Button></div>}
       {loading ? <div className="loading-grid">{[1, 2, 3, 4].map(n => <Skeleton key={n} className="h-72 rounded-2xl"/>)}</div> : state && <>
         {view === "wardrobe" && !android && categoryNavigation}
-        {(view === "wardrobe" || view === "outfits") && <><SubsetBrowser renderToolbar={renderToolbar} key={state.collectionId + ":" + view + ":" + subsetRoot + ":" + (activeSubset?.id || "root")} records={state.records} scope={scope} root={subsetRoot} activeId={activeSubset?.id || null} disabled={!!error || syncing} onSelect={setSelectedSubsetId} onSave={saveSubset} onDelete={removeSubset} visibleRecords={view === "wardrobe" ? filteredItems : filteredOutfits} onAdd={subsetId => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"], subsetId } : { kind: "outfit", subsetId })} renderCards={records => view === "wardrobe" ? <div className="item-grid">{records.map(record => record.kind === "item" && <ItemCard compact={android} key={record.id} item={record} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "item", record })}/>)}</div> : <div className="outfit-grid">{records.map(record => record.kind === "outfit" && <OutfitCard compact={android} key={record.id} outfit={record} items={items} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "outfit", record })} onCalendar={() => setEditor({ kind: "calendar", outfitId: record.id, date: localDate() })}/>)}</div>} />
+        {(view === "wardrobe" || view === "outfits") && <><SubsetBrowser notes={noteSection} renderToolbar={renderToolbar} key={state.collectionId + ":" + view + ":" + subsetRoot + ":" + (activeSubset?.id || "root")} records={state.records} scope={scope} root={subsetRoot} activeId={activeSubset?.id || null} disabled={!!error || syncing} onSelect={setSelectedSubsetId} onSave={saveSubset} onDelete={removeSubset} visibleRecords={view === "wardrobe" ? filteredItems : filteredOutfits} onAdd={subsetId => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"], subsetId } : { kind: "outfit", subsetId })} renderCards={records => view === "wardrobe" ? <div className="item-grid">{records.map(record => record.kind === "item" && <ItemCard compact={android} key={record.id} item={record} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "item", record })}/>)}</div> : <div className="outfit-grid">{records.map(record => record.kind === "outfit" && <OutfitCard compact={android} key={record.id} outfit={record} items={items} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "outfit", record })} onCalendar={() => setEditor({ kind: "calendar", outfitId: record.id, date: localDate() })}/>)}</div>} />
         {view === "wardrobe" && !filteredItems.length && (items.length === 0 && !search && !colorFilter.length && category === "all" && occasion === "all" && !archived ? <Welcome onAdd={() => setEditor({ kind: "item" })} onImport={() => goView("backup")}/> : <EmptyState icon={Search} title={t("这里还没有单品")} text={t("试试其他分类，或清空筛选条件。")} action={t("清空筛选")} onAction={() => { setSearch(""); setColorFilter([]); setOccasion("all"); setArchived(false); }}/>) }
         {view === "outfits" && !filteredOutfits.length && <EmptyState icon={Layers3} title={t("没有找到这个搭配")} text={t("拍照、导入搭配照片，或从单品组合一套穿搭。")} action={t("新建搭配")} onAction={() => setEditor({ kind: "outfit" })}/>}</>}
         {view === "calendar" && <CalendarPanel compact={android} entries={calendar} disabled={!!error} onAdd={date => setEditor({ kind: "calendar", date })} onEdit={record => setEditor({ kind: "calendar", record })}/>}
@@ -310,6 +332,7 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
     {editor?.kind === "item" && <ItemEditor compact={android} key={editor.record?.id || "new-item"} record={editor.record} initialCategory={editor.initialCategory} brands={itemBrands(items)} colorLibrary={state?.colorLibrary || []} onClose={() => setEditor(null)} onSave={save} onDelete={removeItem}/>}
     {editor?.kind === "outfit" && <OutfitEditor compact={android} key={editor.record?.id || "new-outfit"} record={editor.record} items={items} onClose={() => setEditor(null)} onSave={save}/>}
     {editor?.kind === "calendar" && <CalendarEditor key={editor.record?.id || "new-calendar"} record={editor.record} date={editor.date} outfitId={editor.outfitId} outfits={outfits} items={items} onClose={() => setEditor(null)} onSave={save} onDelete={removeCalendar}/>}
+    {editor?.kind === "note" && <NoteEditor key={editor.record?.id || "new-note"} record={editor.record} location={editor.location} assets={state?.assets || []} disabled={!!error} onClose={() => setEditor(null)} onSave={(data, record) => save("note", data, record)} onDelete={removeNote}/>}
   </SidebarProvider>;
 }
 function Welcome({ onAdd, onImport }: {

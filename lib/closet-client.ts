@@ -4,7 +4,7 @@ import type { Asset, ClosetArchive, ClosetState } from "./domain";
 export interface ClosetClient {
   request(path: string, init?: RequestInit): Promise<Response>;
   assetUrl(hash: string, profile: string | null): string;
-  uploadAsset?(file: File, profile: string): Promise<Asset>;
+  uploadAsset?(file: File, profile: string, attachment?: boolean): Promise<Asset>;
   exportArchive?(state: ClosetState): Promise<void>;
   pickArchive?(): Promise<{ manifest: ClosetArchive; handle: string } | null>;
   importArchive?(handle: string, manifest: ClosetArchive, profile: string): Promise<string>;

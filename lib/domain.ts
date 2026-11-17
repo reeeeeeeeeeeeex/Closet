@@ -4,6 +4,7 @@ import { CATEGORY_MEASUREMENTS, garmentCategory, type Measurement } from "./item
 import { DEFAULT_LOCALE, messageForLocale } from "./i18n/core";
 import { validateSubsets } from "./subsets";
 import { colorStyleSchema, libraryColorSchema, type LibraryColor } from "./colors";
+import { ASSET_LIMIT, NOTE_MEDIA_TYPES } from "./asset-type";
 // Key order is the default wardrobe order: everyday garments first, then bags and accessories, one-pieces last.
 export const CATEGORIES = { top: "上装", bottom: "下装", outerwear: "外套", shoes: "鞋履", bag: "包袋", accessory: "配饰", dress: "连体 / 裙装" } as const;
 export const OCCASIONS = { work: "通勤", casual: "日常", party: "聚会", formal: "正式", vacation: "旅行", sport: "运动" } as const;
@@ -62,6 +63,16 @@ export const calendarSchema = z.object({ date: dateSchema, status: z.enum(["plan
 export const subsetSchema = z.object({ name: title, scope: z.enum(["item", "outfit"]), root: z.enum(["all", "top", "bottom", "dress", "outerwear", "shoes", "bag", "accessory"]), parentId: id.nullable(), memberIds: z.array(id).max(2000).default([]) }).strict()
   .refine(data => new Set(data.memberIds).size === data.memberIds.length, "分组不能重复添加同一记录");
 export type Subset = z.infer<typeof subsetSchema>;
+export const NOTE_TEXT_LIMIT = 12000;
+export const NOTE_ATTACHMENT_LIMIT = 10;
+export const noteSchema = subsetSchema.innerType().pick({ scope: true, root: true }).extend({
+  name: title,
+  subsetId: id.nullable(),
+  text: z.string().max(NOTE_TEXT_LIMIT, "笔记正文最多 12000 个字符"),
+  attachments: z.array(z.object({ hash: hashSchema, name: z.string().min(1).max(255) }).strict()).max(NOTE_ATTACHMENT_LIMIT, "每条笔记最多添加 10 个附件"),
+}).refine(data => data.text.trim() || data.attachments.length, "请输入正文或添加附件")
+  .refine(data => new Set(data.attachments.map(attachment => attachment.hash)).size === data.attachments.length, "附件不能重复添加");
+export type Note = z.infer<typeof noteSchema>;
 export type Item = z.infer<typeof itemSchema>;
 export type Outfit = z.infer<typeof outfitSchema>;
 export type CalendarEntry = z.infer<typeof calendarSchema>;
@@ -73,16 +84,18 @@ export const subsetRecordSchema = z.object({ ...metadata, kind: z.literal("subse
 export const personalSizesRecordSchema = z.object({ ...metadata, kind: z.literal("personalSizes"), data: personalSizesSchema }).strict();
 export type PersonalSizesRecord = z.infer<typeof personalSizesRecordSchema>;
 export type SubsetRecord = z.infer<typeof subsetRecordSchema>;
-export const recordSchema = z.discriminatedUnion("kind", [itemRecordSchema, outfitRecordSchema, calendarRecordSchema, subsetRecordSchema, personalSizesRecordSchema]);
+export const noteRecordSchema = z.object({ ...metadata, kind: z.literal("note"), data: noteSchema }).strict();
+export type NoteRecord = z.infer<typeof noteRecordSchema>;
+export const recordSchema = z.discriminatedUnion("kind", [itemRecordSchema, outfitRecordSchema, calendarRecordSchema, subsetRecordSchema, personalSizesRecordSchema, noteRecordSchema]);
 export type ItemRecord = z.infer<typeof itemRecordSchema>;
 export type OutfitRecord = z.infer<typeof outfitRecordSchema>;
 export type CalendarRecord = z.infer<typeof calendarRecordSchema>;
 export type ClosetRecord = z.infer<typeof recordSchema>;
-export const assetSchema = z.object({ hash: hashSchema, name: z.string().max(255), mime: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]), size: z.number().int().positive().max(20 * 1024 * 1024) }).strict();
+export const assetSchema = z.object({ hash: hashSchema, name: z.string().max(255), mime: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", ...NOTE_MEDIA_TYPES]), size: z.number().int().positive().max(ASSET_LIMIT) }).strict();
 export type Asset = z.infer<typeof assetSchema>;
-export const ARCHIVE_SCHEMA_VERSION = 11;
+export const ARCHIVE_SCHEMA_VERSION = 12;
 export const archiveSchema = z.object({
-  format: z.literal("new-closet"), schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7), z.literal(8), z.literal(9), z.literal(10), z.literal(11)]), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
+  format: z.literal("new-closet"), schemaVersion: z.number().int().min(1).max(ARCHIVE_SCHEMA_VERSION), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
   colorLibrary: z.array(libraryColorSchema).default([]),
   records: z.array(recordSchema).max(2000), assets: z.array(assetSchema).max(2000),
 }).strict();
@@ -92,6 +105,7 @@ export type ClosetState = { profile?: Profile; collections: Collection[]; collec
 export function referencedAssets(records: ClosetRecord[]): Set<string> {
   const hashes = new Set<string>();
   for (const r of records) {
+    if (r.kind === "note") for (const attachment of r.data.attachments) hashes.add(attachment.hash);
     if (r.kind === "item" || r.kind === "outfit") for (const hash of photoAssets(r.data)) hashes.add(hash);
     if (r.kind === "calendar") {
       for (const hash of photoAssets(r.data.snapshot)) hashes.add(hash);
@@ -99,6 +113,23 @@ export function referencedAssets(records: ClosetRecord[]): Set<string> {
     }
   }
   return hashes;
+}
+export function validateNotes(records: ClosetRecord[]) {
+  const subsets = new Map(records.filter(record => record.kind === "subset").map(record => [record.id, record.data]));
+  for (const record of records) {
+    if (record.kind !== "note") continue;
+    const { scope, root, subsetId } = record.data;
+    const subset = subsetId && subsets.get(subsetId);
+    if ((scope === "outfit" && root !== "all") || (subsetId && (!subset || subset.scope !== scope || subset.root !== root))) throw new Error("笔记所属分组或分类无效");
+  }
+}
+
+export function validateRecordAssets(records: ClosetRecord[], assets: Asset[]) {
+  const media = new Map(assets.map(asset => [asset.hash, asset.mime]));
+  for (const hash of referencedAssets(records)) if (!media.has(hash)) throw new Error("备份缺少原图或附件");
+  for (const hash of referencedAssets(records.filter(record => record.kind !== "note"))) {
+    if (!media.get(hash)?.startsWith("image/")) throw new Error("单品、搭配和日历照片必须是图片");
+  }
 }
 export function validateArchive(input: unknown): ClosetArchive {
   const a = archiveSchema.parse(input); const map = new Map(a.records.map(r => [r.id, r]));
@@ -115,8 +146,9 @@ export function validateArchive(input: unknown): ClosetArchive {
       for (const snapshotItem of r.data.snapshot.items) { const item = map.get(snapshotItem.id); if (item && item.kind !== "item") throw new Error("日历快照引用的记录不是单品"); }
     }
   }
-  for (const hash of referencedAssets(a.records)) if (!media.has(hash)) throw new Error("备份缺少原图");
+  validateRecordAssets(a.records, a.assets);
   validateSubsets(a.records);
+  validateNotes(a.records);
   if (a.records.filter(record => record.kind === "personalSizes").length > 1) throw new Error("每个衣橱只能保存一份我的尺码");
   return { ...a, schemaVersion: ARCHIVE_SCHEMA_VERSION };
 }

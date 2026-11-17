@@ -56,16 +56,30 @@ class ClosetStoragePlugin : Plugin() {
         val pending=File(target.parentFile,target.name+"."+UUID.randomUUID()+".tmp")
         try { FileOutputStream(pending).use { out -> source.inputStream().use { copyLimited(it,out,imageLimit) };out.fd.sync() };require(pending.renameTo(target)){"原图写入失败，可能存储空间不足"} } finally { pending.delete() }
     }
-    private fun mime(file: File): String {
-        val b=ByteArray(16);val size=file.inputStream().use { it.read(b) };require(size>=12){"图片格式无效"}
-        fun ascii(a:Int,z:Int)=String(b,a,z-a,Charsets.US_ASCII)
-        return when {
-            b[0].toInt() and 255==255 && b[1].toInt() and 255==216 && b[2].toInt() and 255==255 -> "image/jpeg"
-            b[0].toInt() and 255==137 && ascii(1,4)=="PNG" -> "image/png"
+    private fun mime(file: File, attachment: Boolean = false, declared: String = ""): String {
+        val b = file.inputStream().use { input -> ByteArray(128).let { it.copyOf(input.read(it).coerceAtLeast(0)) } }
+        val prefix = b.copyOf(12)
+        fun byte(index: Int) = prefix[index].toInt() and 255
+        fun ascii(a:Int,z:Int)=String(prefix,a,z-a,Charsets.US_ASCII)
+        val image = when {
+            byte(0)==255 && byte(1)==216 && byte(2)==255 -> "image/jpeg"
+            byte(0)==137 && ascii(1,4)=="PNG" -> "image/png"
             ascii(0,4)=="RIFF" && ascii(8,12)=="WEBP" -> "image/webp"
             ascii(0,3)=="GIF" -> "image/gif"
             ascii(4,8)=="ftyp" && ascii(8,12) in listOf("avif","avis") -> "image/avif"
-            else -> throw IOException("支持 JPG、PNG、WebP、GIF 和 AVIF 原图。HEIC 请先转换。")
+            else -> null
+        }
+        if (image != null) return image
+        if (!attachment) throw IOException("支持 JPG、PNG、WebP、GIF 和 AVIF 原图。HEIC 请先转换。")
+        val brand = ascii(8,12)
+        return when {
+            ascii(4,8)=="ftyp" && brand in listOf("isom","iso2","iso5","iso6","mp41","mp42","M4A ","M4V ","MSNV","avc1","dash") ->
+                if (declared=="audio/mp4" || brand=="M4A ") "audio/mp4" else "video/mp4"
+            byte(0)==0x1a && byte(1)==0x45 && byte(2)==0xdf && byte(3)==0xa3 && String(b,Charsets.US_ASCII).contains("webm") -> "video/webm"
+            ascii(0,3)=="ID3" || (byte(0)==255 && (byte(1) and 0xe6)==0xe2) -> "audio/mpeg"
+            ascii(0,4)=="RIFF" && ascii(8,12)=="WAVE" -> "audio/wav"
+            ascii(0,4)=="OggS" -> "audio/ogg"
+            else -> throw IOException("附件格式不受支持")
         }
     }
     @PluginMethod fun read(call: PluginCall) = run(call) {
@@ -107,7 +121,7 @@ class ClosetStoragePlugin : Plugin() {
     @PluginMethod fun beginFile(call: PluginCall) = run(call) { safeId(text(call,"owner"));val handle=UUID.randomUUID().toString();temp(handle).createNewFile();call.resolve(JSObject().put("handle",handle)) }
     @PluginMethod fun appendFile(call: PluginCall) = run(call) { val file=temp(text(call,"handle"));require(file.isFile){"临时图片不存在"};val bytes=Base64.decode(text(call,"data"),Base64.DEFAULT);require(bytes.size<=256*1024 && file.length()+bytes.size<=imageLimit){"单张图片最多 20 MB"};FileOutputStream(file,true).use { it.write(bytes) };call.resolve() }
     @PluginMethod fun finishFile(call: PluginCall) = run(call) {
-        val file=temp(text(call,"handle"));try { val type=mime(file);val hash=digest(file);install(file,media(text(call,"owner"),hash));call.resolve(JSObject().put("asset",JSObject().put("hash",hash).put("mime",type).put("size",file.length()).put("name",text(call,"name").take(255)))) } finally { file.delete() }
+        val file=temp(text(call,"handle"));try { val type=mime(file,call.getBoolean("attachment",false)==true,call.getString("mime") ?: "");val hash=digest(file);install(file,media(text(call,"owner"),hash));call.resolve(JSObject().put("asset",JSObject().put("hash",hash).put("mime",type).put("size",file.length()).put("name",text(call,"name").take(255)))) } finally { file.delete() }
     }
     @PluginMethod fun pickArchive(call: PluginCall) {
         val intent=Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*").putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("application/zip","application/octet-stream","application/x-zip-compressed"))
@@ -122,7 +136,7 @@ class ClosetStoragePlugin : Plugin() {
                 val names=HashSet<String>();var total=0L;var count=0
                 context.contentResolver.openInputStream(uri)!!.use { raw -> ZipInputStream(BufferedInputStream(raw)).use { zip ->
                     while(true){val entry=zip.nextEntry ?: break;count++;require(count<=4002 && names.add(entry.name)){"备份文件重复或过多"}
-                        require(entry.name=="manifest.json" || entry.name=="README.txt" || entry.name=="assets/" || entry.name.matches(Regex("assets/[a-f0-9]{64}\\.(jpeg|png|webp|gif|avif)"))){"备份含有无法识别的文件路径"}
+                        require(entry.name=="manifest.json" || entry.name=="README.txt" || entry.name=="assets/" || entry.name.matches(Regex("assets/[a-f0-9]{64}\\.(jpeg|png|webp|gif|avif|mp4|webm|mpeg|wav|ogg)"))){"备份含有无法识别的文件路径"}
                         if(entry.name=="assets/"){zip.closeEntry();continue}
                         val limit=if(entry.name=="manifest.json")3L*1024*1024 else if(entry.name=="README.txt")65536L else imageLimit
                         val target=File(directory,entry.name);target.parentFile!!.mkdirs();FileOutputStream(target).use { total+=copyLimited(zip,it,limit);require(total<=archiveLimit){"备份解压大小超出限制"} };zip.closeEntry()
@@ -130,7 +144,7 @@ class ClosetStoragePlugin : Plugin() {
                 } }
                 val manifest=JSONObject(File(directory,"manifest.json").readText());val assets=manifest.getJSONArray("assets");require(assets.length()<=2000){"备份原图过多"}
                 val expected=HashSet<String>()
-                for(i in 0 until assets.length()){val a=assets.getJSONObject(i);val hash=safeHash(a.getString("hash"));val name="assets/$hash.${a.getString("mime").substringAfter('/')}";expected.add(name);val file=File(directory,name);require(file.isFile && file.length()==a.getLong("size") && digest(file)==hash && mime(file)==a.getString("mime")){"备份原图缺失或 SHA-256 校验失败"}}
+                for(i in 0 until assets.length()){val a=assets.getJSONObject(i);val hash=safeHash(a.getString("hash"));val name="assets/$hash.${a.getString("mime").substringAfter('/')}";expected.add(name);val file=File(directory,name);require(file.isFile && file.length()==a.getLong("size") && digest(file)==hash && mime(file,true,a.getString("mime"))==a.getString("mime")){"备份原图缺失或 SHA-256 校验失败"}}
                 require(expected.size==assets.length() && names.filter { it.startsWith("assets/") && it!="assets/" }.toSet()==expected){"图片清单与实际文件数量不一致"}
                 call.resolve(JSObject().put("handle",handle).put("manifest",JSObject(manifest.toString())))
             }catch(e:Exception){directory.deleteRecursively();throw e}
@@ -150,7 +164,7 @@ class ClosetStoragePlugin : Plugin() {
         try {
             FileOutputStream(file).use { stream -> ZipOutputStream(BufferedOutputStream(stream)).use { zip ->
                 fun entry(name:String,bytes:ByteArray){zip.putNextEntry(ZipEntry(name));zip.write(bytes);zip.closeEntry()}
-                entry("manifest.json",manifest.toString().toByteArray());entry("README.txt","New Closet backup v11. Original images retain exact bytes. No pairing credentials included.\n".toByteArray())
+                entry("manifest.json",manifest.toString().toByteArray());entry("README.txt","New Closet backup. Original photos and attachments retain exact bytes. No pairing credentials included.\n".toByteArray())
                 var total=0L
                 for(i in 0 until assets.length()){val a=assets.getJSONObject(i);val hash=a.getString("hash");val source=media(owner,hash);require(source.length()==a.getLong("size") && digest(source)==hash){"原图校验失败，备份已停止"};zip.putNextEntry(ZipEntry("assets/$hash.${a.getString("mime").substringAfter('/')}"));source.inputStream().use{total+=copyLimited(it,zip,imageLimit)};require(total<=archiveLimit){"首版支持 2 GB 以内的备份包"};zip.closeEntry()}
             } }
@@ -179,7 +193,7 @@ class ClosetStoragePlugin : Plugin() {
             if(direction=="upload"){
                 require(file.isFile && file.length()==a.getLong("size") && digest(file)==hash){"本地原图校验失败"};c.requestMethod="PUT";c.doOutput=true;c.setRequestProperty("Content-Type",a.getString("mime"));c.setRequestProperty("X-Asset-Name",java.net.URLEncoder.encode(a.getString("name"),"UTF-8").replace("+","%20"));c.setFixedLengthStreamingMode(file.length());c.outputStream.use { out -> file.inputStream().use { copyLimited(it,out,imageLimit) } };require(c.responseCode in 200..299){"原图上传失败 (${c.responseCode})"}
             }else{
-                c.requestMethod="GET";require(c.responseCode==200){"原图下载失败 (${c.responseCode})"};val pending=temp(UUID.randomUUID().toString());try{FileOutputStream(pending).use{out->c.inputStream.use{copyLimited(it,out,imageLimit)};out.fd.sync()};require(pending.length()==a.getLong("size") && digest(pending)==hash && mime(pending)==a.getString("mime")){"收到的原图校验失败"};install(pending,file)}finally{pending.delete()}
+                c.requestMethod="GET";require(c.responseCode==200){"原图下载失败 (${c.responseCode})"};val pending=temp(UUID.randomUUID().toString());try{FileOutputStream(pending).use{out->c.inputStream.use{copyLimited(it,out,imageLimit)};out.fd.sync()};require(pending.length()==a.getLong("size") && digest(pending)==hash && mime(pending,true,a.getString("mime"))==a.getString("mime")){"收到的原图校验失败"};install(pending,file)}finally{pending.delete()}
             };call.resolve()
         }finally{c.disconnect()}
     }
