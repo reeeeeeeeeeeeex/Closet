@@ -51,6 +51,11 @@ assert.throws(() => itemSchema.parse({ ...shoe, shoeSize: { eu: 38, cn: 242 } })
 assert.throws(() => itemSchema.parse({ ...base, measurements: { chest: -1 } }));
 assert.throws(() => itemSchema.parse({ ...base, category: 'bottom', measurements: { shoulderWidth: 42 } }));
 const trousers = itemSchema.parse({ ...base, category: 'bottom', measurements: { knee: 42.5 } });
+const backRise = itemSchema.parse({ ...trousers, measurements: { backRise: '约38–40 cm' } });
+assert.equal(backRise.measurements.backRise, '约38–40 cm');
+assert.match(render(ItemDetailsFields, { item: backRise, onChange: () => {} }), /Back rise/);
+assert.match(render(ItemLabels, { item: backRise }), /Back rise 约38–40 cm/);
+assert.throws(() => itemSchema.parse({ ...base, measurements: { backRise: 38 } }), /此分类/);
 assert.match(render(ItemDetailsFields,{item:trousers,onChange:()=>{}}),/Knee circumference/);
 assert.match(render(ItemLabels,{item:trousers}),/Knee circumference 42.5 cm/);
 assert.doesNotMatch(render(ItemLabels,{item:trousers,showMeasurements:false}),/Knee circumference/);
