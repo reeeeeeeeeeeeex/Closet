@@ -8,8 +8,10 @@ import { getProfileContext, withProfileActivity } from "@/lib/profile-client";
 import { SyncPanel } from "@/components/sync-panel";
 import { AiAssistant } from "@/components/ai-assistant";
 import { ClosetNotes, NoteEditor } from "@/components/closet-notes";
-import type { Note, NoteRecord } from "@/lib/domain";
-import { LockKeyhole } from "lucide-react";
+import type { Note, NoteRecord, RandomOutfitRulesRecord } from "@/lib/domain";
+import type { RandomOutfitRules } from "@/lib/random-outfit";
+import { RandomOutfitEditor } from "@/components/random-outfit";
+import { LockKeyhole, Shuffle } from "lucide-react";
 import { tr, translatedOptions } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -56,6 +58,8 @@ const localDate = (date = new Date()) => `${date.getFullYear()}-${String(date.ge
 const formatSize = (bytes: number) => bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 type View = ClosetView;
 type Editor = {
+    kind: "randomOutfitRules";
+} | {
     kind: "note";
     record?: NoteRecord;
     location: Pick<Note, "scope" | "root" | "subsetId">;
@@ -67,6 +71,7 @@ type Editor = {
 } | {
     kind: "outfit";
     record?: OutfitRecord;
+    initialItemIds?: string[];
     subsetId?: string;
 } | {
     kind: "calendar";
@@ -216,6 +221,11 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
         const result = await api<{ id: string }>("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "save", collectionId: selectedCollection.current || "main", kind: "subset", data, id: record?.id, version: record?.version }) });
         toast.success(t("分组已保存")); await refresh(); return result.id;
     };
+    const saveRandomRules = async (data: RandomOutfitRules, record?: RandomOutfitRulesRecord) => {
+        const result = await api<{ record: RandomOutfitRulesRecord }>("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "save", collectionId: selectedCollection.current || "main", kind: "randomOutfitRules", data, id: record?.id, version: record?.version }) });
+        await refresh();
+        return result.record;
+    };
     const removeSubset = async (record: SubsetRecord) => {
         const result = await api<{ parentId: string | null }>("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "deleteSubset", collectionId: selectedCollection.current || "main", kind: "subset", id: record.id, version: record.version }) });
         if (selectedSubsetId === record.id) setSelectedSubsetId(result.parentId);
@@ -316,7 +326,7 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
       {error && <div className="error-banner" role="alert"><AlertCircle size={19}/><div><strong>{t("暂时无法同步衣橱")}</strong><p>{error}</p>{profileChanged && <Button variant="outline" onClick={() => { if (draftDirty || editor) { setReloadConfirm(true); } else window.location.reload(); }}>{t("载入当前账号")}</Button>}</div><Button variant="outline" onClick={() => void refresh()}>{t("重试")}</Button></div>}
       {loading ? <div className="loading-grid">{[1, 2, 3, 4].map(n => <Skeleton key={n} className="h-72 rounded-2xl"/>)}</div> : state && <>
         {view === "wardrobe" && !android && categoryNavigation}
-        {(view === "wardrobe" || view === "outfits") && <><SubsetBrowser notes={noteSection} renderToolbar={renderToolbar} key={state.collectionId + ":" + view + ":" + subsetRoot + ":" + (activeSubset?.id || "root")} records={state.records} scope={scope} root={subsetRoot} activeId={activeSubset?.id || null} disabled={!!error || syncing} onSelect={setSelectedSubsetId} onSave={saveSubset} onDelete={removeSubset} visibleRecords={view === "wardrobe" ? filteredItems : filteredOutfits} onAdd={subsetId => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"], subsetId } : { kind: "outfit", subsetId })} renderCards={records => view === "wardrobe" ? <div className="item-grid">{records.map(record => record.kind === "item" && <ItemCard compact={android} key={record.id} item={record} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "item", record })}/>)}</div> : <div className="outfit-grid">{records.map(record => record.kind === "outfit" && <OutfitCard compact={android} key={record.id} outfit={record} items={items} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "outfit", record })} onCalendar={() => setEditor({ kind: "calendar", outfitId: record.id, date: localDate() })}/>)}</div>} />
+        {(view === "wardrobe" || view === "outfits") && <><SubsetBrowser beforeCards={<>{view === "outfits" && <div className="random-outfit-entry"><Button variant="outline" disabled={!!error || syncing} onClick={() => setEditor({ kind: "randomOutfitRules" })}><Shuffle size={16}/>{t("随机穿搭")}</Button></div>}{noteSection}</>} renderToolbar={renderToolbar} key={state.collectionId + ":" + view + ":" + subsetRoot + ":" + (activeSubset?.id || "root")} records={state.records} scope={scope} root={subsetRoot} activeId={activeSubset?.id || null} disabled={!!error || syncing} onSelect={setSelectedSubsetId} onSave={saveSubset} onDelete={removeSubset} visibleRecords={view === "wardrobe" ? filteredItems : filteredOutfits} onAdd={subsetId => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"], subsetId } : { kind: "outfit", subsetId })} renderCards={records => view === "wardrobe" ? <div className="item-grid">{records.map(record => record.kind === "item" && <ItemCard compact={android} key={record.id} item={record} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "item", record })}/>)}</div> : <div className="outfit-grid">{records.map(record => record.kind === "outfit" && <OutfitCard compact={android} key={record.id} outfit={record} items={items} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "outfit", record })} onCalendar={() => setEditor({ kind: "calendar", outfitId: record.id, date: localDate() })}/>)}</div>} />
         {view === "wardrobe" && !filteredItems.length && (items.length === 0 && !search && !colorFilter.length && category === "all" && occasion === "all" && !archived ? <Welcome onAdd={() => setEditor({ kind: "item" })} onImport={() => goView("backup")}/> : <EmptyState icon={Search} title={t("这里还没有单品")} text={t("试试其他分类，或清空筛选条件。")} action={t("清空筛选")} onAction={() => { setSearch(""); setColorFilter([]); setOccasion("all"); setArchived(false); }}/>) }
         {view === "outfits" && !filteredOutfits.length && <EmptyState icon={Layers3} title={t("没有找到这个搭配")} text={t("拍照、导入搭配照片，或从单品组合一套穿搭。")} action={t("新建搭配")} onAction={() => setEditor({ kind: "outfit" })}/>}</>}
         {view === "calendar" && <CalendarPanel compact={android} entries={calendar} disabled={!!error} onAdd={date => setEditor({ kind: "calendar", date })} onEdit={record => setEditor({ kind: "calendar", record })}/>}
@@ -330,7 +340,8 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
     <AlertDialog open={pendingView !== null} onOpenChange={open => { if (!open) setPendingView(null); }}><AlertDialogContent className="closet-dialog"><AlertDialogHeader><AlertDialogTitle>{t("切换页面前放弃草稿？")}</AlertDialogTitle><AlertDialogDescription>{t("当前页面有未保存的内容，可以先保留并继续编辑。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("保留草稿")}</AlertDialogCancel><AlertDialogAction onClick={() => { if (pendingView) goView(pendingView); setPendingView(null); }}>{t("放弃草稿并切换")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <AlertDialog open={reloadConfirm} onOpenChange={setReloadConfirm}><AlertDialogContent className="closet-dialog"><AlertDialogHeader><AlertDialogTitle>{t("载入当前账号前放弃草稿？")}</AlertDialogTitle><AlertDialogDescription>{t("当前页面有未保存的内容。重新载入后会放弃这些草稿，已保存的资料保留。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("保留草稿")}</AlertDialogCancel><AlertDialogAction onClick={() => window.location.reload()}>{t("放弃草稿并载入")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     {editor?.kind === "item" && <ItemEditor compact={android} key={editor.record?.id || "new-item"} record={editor.record} initialCategory={editor.initialCategory} brands={itemBrands(items)} colorLibrary={state?.colorLibrary || []} onClose={() => setEditor(null)} onSave={save} onDelete={removeItem}/>}
-    {editor?.kind === "outfit" && <OutfitEditor compact={android} key={editor.record?.id || "new-outfit"} record={editor.record} items={items} onClose={() => setEditor(null)} onSave={save}/>}
+    {editor?.kind === "outfit" && <OutfitEditor compact={android} key={editor.record?.id || "new-outfit"} record={editor.record} initialItemIds={editor.initialItemIds} items={items} onClose={() => setEditor(null)} onSave={save}/>}
+    {editor?.kind === "randomOutfitRules" && <RandomOutfitEditor record={state?.records.find(record => record.kind === "randomOutfitRules")} items={items} disabled={!!error || syncing} onClose={() => setEditor(null)} onSave={saveRandomRules} onUse={initialItemIds => setEditor({ kind: "outfit", initialItemIds })}/>}
     {editor?.kind === "calendar" && <CalendarEditor key={editor.record?.id || "new-calendar"} record={editor.record} date={editor.date} outfitId={editor.outfitId} outfits={outfits} items={items} onClose={() => setEditor(null)} onSave={save} onDelete={removeCalendar}/>}
     {editor?.kind === "note" && <NoteEditor key={editor.record?.id || "new-note"} record={editor.record} location={editor.location} assets={state?.assets || []} disabled={!!error} onClose={() => setEditor(null)} onSave={(data, record) => save("note", data, record)} onDelete={removeNote}/>}
   </SidebarProvider>;
@@ -403,15 +414,16 @@ function ItemEditor({ record, initialCategory, brands, colorLibrary, onClose, on
     return <Dialog open onOpenChange={(open: boolean) => { if (!open && !busy)
         onClose(); }}><DialogContent className="closet-dialog editor-dialog item-dialog" onEscapeKeyDown={event => { if (cancelScreenPick.current) { event.preventDefault(); cancelScreenPick.current(); } }}><DialogHeader><DialogTitle>{record ? t("单品详情") : t("添加单品")}</DialogTitle><DialogDescription>{t("原图会完整保存。你可以随时补充或修改信息。")}</DialogDescription></DialogHeader><form onSubmit={e => { e.preventDefault(); void submit(); }}><fieldset disabled={busy}><div className="item-form-grid"><PhotoEditor compact={compact} draft={photos} onChange={setPhotos} kind="item" onError={setError}/><div className="form-fields"><div className="field"><Label htmlFor="item-name">{t("单品名称")}<span>*</span></Label><Input id="item-name" required maxLength={100} autoFocus value={data.name} placeholder={t("例如：短款牛仔外套")} onChange={e => setData({ ...data, name: e.target.value })}/></div><BrandField value={data.brand || ""} brands={brands} onChange={brand => setData({ ...data, brand })}/><div className="field-pair"><div className="field"><Label>{t("分类")}</Label><Picker label={t("单品分类")} value={data.category} onChange={value => { const category = value as Item["category"]; const allowed = CATEGORY_MEASUREMENTS[category] || []; setData({ ...data, category, fit: garmentCategory(category) ? data.fit : null, shoeFit: category === "shoes" ? data.shoeFit : null, shoeSize: category === "shoes" ? data.shoeSize : { eu: null, cn: null }, measurements: Object.fromEntries(Object.entries(data.measurements).filter(([key]) => allowed.some(value => value === key))) }); }} options={translatedOptions(CATEGORIES, t)}/></div></div><PurchasePriceField value={data.purchasePrice ?? ""} onChange={purchasePrice => setData({ ...data, purchasePrice })}/><FabricField value={data.fabric ?? ""} onChange={fabric => setData({ ...data, fabric })}/><AndroidOptionalSection enabled={compact} title={t("颜色")}><ColorField draft={colors} onChange={setColors} library={colorLibrary} sampling={onSample => <ColorSamplingTools photos={photos} onSample={onSample} onScreenPicking={cancel => { cancelScreenPick.current = cancel; }}/>}/></AndroidOptionalSection><AndroidOptionalSection enabled={compact} title={t("版型与尺寸")}><ItemDetailsFields item={data} onChange={setData}/></AndroidOptionalSection><div className="field"><Label>{t("适合场合")}</Label><Chips options={OCCASIONS} value={data.occasions} onChange={occasions => setData({ ...data, occasions })}/></div><div className="field"><Label>{t("季节")}</Label><Chips options={SEASONS} value={data.seasons} onChange={seasons => setData({ ...data, seasons })}/></div><AndroidOptionalSection enabled={compact} title={t("穿着备注")}><div className="field"><Label htmlFor="item-notes">{t("穿着备注")}</Label><Textarea id="item-notes" maxLength={3000} rows={3} value={data.notes} placeholder={t("版型、搭配想法，或舒适度\u2026")} onChange={e => setData({ ...data, notes: e.target.value })}/></div></AndroidOptionalSection></div></div></fieldset><FormError message={error}/><DialogFooter className="editor-footer">{record && <><Button type="button" variant="ghost" disabled={busy} onClick={() => void submit(!data.archived)}><Archive size={16}/>{data.archived ? t("放回衣橱") : t("收起单品")}</Button><AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="ghost" className="mr-auto text-destructive" disabled={busy}><Trash2 size={16}/>{t("删除单品")}</Button></AlertDialogTrigger><AlertDialogContent className="closet-dialog"><AlertDialogHeader><AlertDialogTitle>{t("删除这件单品？")}</AlertDialogTitle><AlertDialogDescription>{t("删除后无法恢复。这件单品会从相关搭配和分组中移除，因此没有任何单品和照片的空搭配会一并删除；日历里已保存的穿搭快照会保留。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("取消")}</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => void remove()}>{t("确认删除")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></>}<Button type="button" variant="outline" disabled={busy} onClick={onClose}>{t("取消")}</Button><Button type="submit" disabled={busy}>{busy ? <Loader2 size={16} className="animate-spin"/> : <Check size={16}/>}{busy ? t("保存中\u2026") : t("保存单品")}</Button></DialogFooter></form></DialogContent></Dialog>;
 }
-function OutfitEditor({ record, items, onClose, onSave, compact = false }: {
+function OutfitEditor({ record, initialItemIds, items, onClose, onSave, compact = false }: {
     compact?: boolean;
     record?: OutfitRecord;
+    initialItemIds?: string[];
     items: ItemRecord[];
     onClose: () => void;
     onSave: Save;
 }) {
     const { t } = useI18n();
-    const [data, setData] = useState<Outfit>(record?.data || { ...blankOutfit });
+    const [data, setData] = useState<Outfit>(record?.data || { ...blankOutfit, itemIds: initialItemIds || [] });
     const [photos, setPhotos] = useState(() => createPhotoDraft(record?.data || blankOutfit));
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");

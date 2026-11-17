@@ -32,6 +32,7 @@ export function validateReplica(input: unknown): Replica {
 export type SyncConflict = { key: string; collectionId: string; collectionName: string; ids: string[]; local: ClosetRecord[]; remote: ClosetRecord[]; signature: string };
 export type Resolution = { choice: "local" | "remote"; signature: string };
 export type MergeResult = { local: Replica; remote: Replica; base: Replica; conflicts: SyncConflict[] };
+const singletonKind = (kind?: ClosetRecord["kind"]) => kind === "personalSizes" || kind === "randomOutfitRules";
 
 /** Connected references are resolved together: never publish half a group move or broken snapshot. */
 export function mergeReplicas(base: Replica, local: Replica, remote: Replica, resolutions: Record<string, Resolution> = {}): MergeResult {
@@ -46,13 +47,17 @@ export function mergeReplicas(base: Replica, local: Replica, remote: Replica, re
     const parent = new Map(ids.map(id => [id,id]));
     const root = (id: string): string => { const p = parent.get(id); if (!p || p === id) return id; const r = root(p); parent.set(id,r); return r; };
     const join = (a: string,b: string) => { if (parent.has(b)) parent.set(root(a),root(b)); };
-    let sizes: string | undefined;
+    const singletons = new Map<string, string>();
     for (const r of [...bm.values(), ...lm.values(), ...rm.values()]) {
       if (r.kind === "outfit") r.data.itemIds.forEach(id => join(r.id,id));
       if (r.kind === "calendar") { join(r.id,r.data.outfitId); r.data.snapshot.items.forEach(i => join(r.id,i.id)); }
       if (r.kind === "subset") { if (r.data.parentId) join(r.id,r.data.parentId); r.data.memberIds.forEach(id => join(r.id,id)); }
       if (r.kind === "note" && r.data.subsetId) join(r.id, r.data.subsetId);
-      if (r.kind === "personalSizes") { if (sizes) join(r.id,sizes); sizes = r.id; }
+      if (singletonKind(r.kind)) {
+        const other = singletons.get(r.kind);
+        if (other) join(r.id, other);
+        singletons.set(r.kind, r.id);
+      }
     }
     const groups = new Map<string,string[]>();
     for (const id of ids) { const key = root(id); groups.set(key,[...(groups.get(key) || []),id]); }
@@ -60,7 +65,7 @@ export function mergeReplicas(base: Replica, local: Replica, remote: Replica, re
     for (const group of groups.values()) {
       let conflict = group.some(id => !recordEqual(lm.get(id),rm.get(id)) && !recordEqual(lm.get(id),bm.get(id)) && !recordEqual(rm.get(id),bm.get(id))) ||
         group.some(id=>!bm.has(id)&&((lm.has(id)&&(remote.tombstones||[]).some(t=>t.collectionId===collectionId&&t.id===id))||(rm.has(id)&&(local.tombstones||[]).some(t=>t.collectionId===collectionId&&t.id===id)))) ||
-        (group.filter(id => lm.get(id)?.kind === "personalSizes" || rm.get(id)?.kind === "personalSizes").length > 1 && !group.every(id => recordEqual(lm.get(id),rm.get(id))));
+        (group.filter(id => singletonKind(lm.get(id)?.kind) || singletonKind(rm.get(id)?.kind)).length > 1 && !group.every(id => recordEqual(lm.get(id),rm.get(id))));
       if (!conflict) {
         const candidate = group.flatMap(id => { const l=lm.get(id),r=rm.get(id),b=bm.get(id);const chosen=recordEqual(l,r)?r||l:recordEqual(l,b)?r:l;return chosen?[chosen]:[]; });
         const hashes = referencedAssets(candidate);

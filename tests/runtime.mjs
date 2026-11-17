@@ -270,6 +270,18 @@ try {
   assert.deepEqual(movedNote.data, { ...noteData, subsetId: groupForNote.data.parentId });
   assert.equal((await post({ op: 'deleteNote', kind: 'note', id: noteId, version: 1 })).status, 409);
   assert.equal((await post({ op: 'deleteNote', kind: 'note', id: noteId, version: movedNote.version })).status, 200);
+  const topLevelRules = { categories: [
+    { category: 'shoes', itemIds: null },
+    { category: 'outerwear', itemIds: [item.id] },
+  ] };
+  const ruleWrites = await Promise.all([post({ kind: 'randomOutfitRules', data: topLevelRules }), post({ kind: 'randomOutfitRules', data: topLevelRules })]);
+  assert.deepEqual(ruleWrites.map(response => response.status).sort(), [200, 409]);
+  const savedRules = (await ruleWrites.find(response => response.ok).json()).record;
+  const reversed = { categories: [...topLevelRules.categories].reverse() };
+  res = await post({ kind: 'randomOutfitRules', id: savedRules.id, version: savedRules.version, data: reversed });
+  assert.equal(res.status, 200, await res.clone().text());
+  assert.equal((await post({ kind: 'randomOutfitRules', id: savedRules.id, version: savedRules.version, data: topLevelRules })).status, 409);
+  assert.deepEqual((await (await request('/api/closet')).json()).records.find(record => record.id === savedRules.id).data, reversed);
   assert.match(englishPage, /<html lang="en"/);
   assert.match(englishPage, /My wardrobe/);
   assert.match(englishPage, /New Closet · Your personal wardrobe/);

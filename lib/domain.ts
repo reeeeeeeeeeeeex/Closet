@@ -5,6 +5,7 @@ import { DEFAULT_LOCALE, messageForLocale } from "./i18n/core";
 import { validateSubsets } from "./subsets";
 import { colorStyleSchema, libraryColorSchema, type LibraryColor } from "./colors";
 import { ASSET_LIMIT, NOTE_MEDIA_TYPES } from "./asset-type";
+import { randomOutfitRulesSchema } from "./random-outfit";
 // Key order is the default wardrobe order: everyday garments first, then bags and accessories, one-pieces last.
 export const CATEGORIES = { top: "上装", bottom: "下装", outerwear: "外套", shoes: "鞋履", bag: "包袋", accessory: "配饰", dress: "连体 / 裙装" } as const;
 export const OCCASIONS = { work: "通勤", casual: "日常", party: "聚会", formal: "正式", vacation: "旅行", sport: "运动" } as const;
@@ -85,8 +86,10 @@ export const personalSizesRecordSchema = z.object({ ...metadata, kind: z.literal
 export type PersonalSizesRecord = z.infer<typeof personalSizesRecordSchema>;
 export type SubsetRecord = z.infer<typeof subsetRecordSchema>;
 export const noteRecordSchema = z.object({ ...metadata, kind: z.literal("note"), data: noteSchema }).strict();
+export const randomOutfitRulesRecordSchema = z.object({ ...metadata, kind: z.literal("randomOutfitRules"), data: randomOutfitRulesSchema }).strict();
+export type RandomOutfitRulesRecord = z.infer<typeof randomOutfitRulesRecordSchema>;
 export type NoteRecord = z.infer<typeof noteRecordSchema>;
-export const recordSchema = z.discriminatedUnion("kind", [itemRecordSchema, outfitRecordSchema, calendarRecordSchema, subsetRecordSchema, personalSizesRecordSchema, noteRecordSchema]);
+export const recordSchema = z.discriminatedUnion("kind", [itemRecordSchema, outfitRecordSchema, calendarRecordSchema, subsetRecordSchema, personalSizesRecordSchema, noteRecordSchema, randomOutfitRulesRecordSchema]);
 export type ItemRecord = z.infer<typeof itemRecordSchema>;
 export type OutfitRecord = z.infer<typeof outfitRecordSchema>;
 export type CalendarRecord = z.infer<typeof calendarRecordSchema>;
@@ -150,6 +153,7 @@ export function validateArchive(input: unknown): ClosetArchive {
   validateSubsets(a.records);
   validateNotes(a.records);
   if (a.records.filter(record => record.kind === "personalSizes").length > 1) throw new Error("每个衣橱只能保存一份我的尺码");
+  if (a.records.filter(record => record.kind === "randomOutfitRules").length > 1) throw new Error("每个衣橱只能保存一份随机穿搭规则");
   return { ...a, schemaVersion: ARCHIVE_SCHEMA_VERSION };
 }
 export function makeSnapshot(outfit: Outfit, items: ItemRecord[]): CalendarEntry["snapshot"] {

@@ -72,11 +72,15 @@ Download the signed Android 1.5.1 APK from [GitHub Releases](https://github.com/
 
 Desktop data lives in `data/` by default. `closet.sqlite` stores records, profiles, settings, and migration history. `assets/<owner-hash>/<image-sha256>` stores original image bytes, deduplicated by SHA-256. A legacy `auth.json` is used only to preserve the session-signing key during migration; password sign-in has been retired.
 
-In **Data and backups**, export a ZIP containing `manifest.json`, `README.txt`, and `assets/`. Import checks record relationships and photo checksums, then creates a **new wardrobe** in the current profile without overwriting existing wardrobes. The current format is `new-closet`, schema version **11**, with import support for versions **1–10**.
+In **Data and backups**, export a ZIP containing `manifest.json`, `README.txt`, and `assets/`. Import checks record relationships and media checksums, then creates a **new wardrobe** in the current profile without overwriting existing wardrobes. The current format is `new-closet`, schema version **12**, with import support for versions **1–11**.
 
 You can also stop the server and copy the entire data directory. Copying only the SQLite file while the server is running may miss changes in its WAL files. A complete directory copy includes local settings and credentials; the portable wardrobe ZIP excludes model keys and sync or MCP tokens.
 
-Limits: 20 MB per photo, 20 photos per item or outfit, 2,000 records per wardrobe, 2 GB per backup, and 3 MB per manifest. Supported image formats are JPG, PNG, WebP, GIF, and AVIF; convert HEIC first. Background removal and automatic outfit recommendations are not included. Optional AI features send authorized content to your chosen model service.
+Create notes in **All**, a category, a group, or **My outfits**. Import UTF-8 TXT and Markdown into the note body and attach photos, MP4/WebM videos, or MP3/WAV/OGG/M4A audio. Each note supports up to 10 attachments at 20 MB each.
+
+Open **My outfits → Random outfit** to choose categories and candidate items. Drag the handles with a mouse or touch, or move a focused handle with the arrow keys. The draw selects one item per category and presents the result in category order.
+
+Limits: 20 MB per photo, 20 photos per item or outfit, 2,000 records per wardrobe, 2 GB per backup, and 3 MB per manifest. Supported image formats are JPG, PNG, WebP, GIF, and AVIF. Optional AI features send authorized content to your chosen model service.
 
 Personal data, keys, logs, dependencies, build output, and test data are excluded from Git. No cloud account, Cloudflare, D1, or R2 is required.
 
@@ -120,6 +124,8 @@ New Closet 帮你整理已有衣物、组合搭配，并记录计划穿着和实
 - **面料材质：**在单品详情自由填写，例如“100% 棉”“羊毛混纺”或“真皮”，可留空，主页面卡片不显示。
 - **原图保存：**每件单品或搭配最多 20 张原图，可选封面、放大查看、将裁剪结果另存为新照片，原图不重新压缩。
 - **灵活分组：**支持嵌套分组、搜索和筛选，同一内容可加入多个分组，暂时不穿的衣物可以收起，也可以彻底删除单品及其关联。
+- **笔记：**可在「全部」、各分类、分组和「我的搭配」里写笔记。支持导入 UTF-8 文本和 Markdown，并添加照片、音频和视频，每个附件最多 20 MB。
+- **随机穿搭：**在「我的搭配 → 随机穿搭」设置分类和候选单品。电脑用鼠标、手机用触屏拖动手柄，每个分类随机抽一件，结果按分类顺序展示。
 - **搭配与日历：**可关联单品、保存搭配照片，或同时使用。日历保存独立快照，后续修改不会改变历史穿搭。
 - **个人尺码：**每个衣橱单独记录身体尺寸、欧码和中国毫米鞋码，各项均可留空。
 - **AI 与 MCP：**连接 OpenAI 兼容或 Anthropic 模型，也可使用外部 MCP 客户端。照片、身体尺码以及保存搭配和日历的权限由你选择。

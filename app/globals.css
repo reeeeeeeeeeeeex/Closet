@@ -565,3 +565,26 @@ html[lang="en"] .filter-controls [data-slot="select-trigger"] { width: auto; min
 .closet-note-attachment :is(img, video) { max-height: 280px; width: 100%; object-fit: contain; border-radius: 6px; }
 .closet-note-attachment audio { width: 100%; }
 .closet-note-attachment a { text-decoration: underline; }
+.random-outfit-entry { display: flex; justify-content: flex-end; margin-block: 10px; }
+.random-outfit-dialog { max-height: 92dvh; grid-template-rows: auto minmax(0, 1fr) auto; }
+.random-outfit-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 3px; }
+.random-outfit-fields, .random-rule-list, .random-rule-content { display: grid; gap: 8px; min-width: 0; }
+.random-rule-list { list-style: none; padding: 0; margin: 0; }
+.random-rule { border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.random-rule-heading, .random-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px; }
+.random-rule-heading { padding: 4px; }
+.random-rule-heading h3, .random-result h3 { font-weight: 650; }
+.random-rule-content { padding: 0 10px 10px; }
+.random-rule-content > button { justify-self: start; }
+.random-rule-pool { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 4px; }
+.random-item { border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; }
+.random-item small { color: var(--muted-foreground); }
+.random-drag-handle { cursor: grab; touch-action: none; user-select: none; min-width: 38px; min-height: 38px; }
+[data-dragging] { opacity: .6; }
+[data-dragging] .random-drag-handle { cursor: grabbing; }
+[data-drop-target] { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+.random-rule-select { width: 100%; min-height: 38px; border-radius: 8px; border: 1px solid var(--border); background: var(--background); padding: 5px 8px; }
+.random-result { display: grid; gap: 8px; margin-top: 12px; padding: 12px; background: var(--muted); border-radius: 10px; }
+.random-result ol { list-style: decimal; padding-inline-start: 28px; }
+.random-result button { justify-self: start; }
+.random-outfit-footer { flex-direction: row; justify-content: flex-end; flex-wrap: wrap; }
