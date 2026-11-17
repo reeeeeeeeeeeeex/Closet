@@ -161,7 +161,7 @@ try {
   globalThis.fetch = (url, init = {}) => request(url, init);
   const backup = new File([await exportArchive(state, () => {})], 'wardrobe.zip');
   const manifest = await inspectArchive(backup, () => {});
-  assert.equal(manifest.schemaVersion,13); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
+  assert.equal(manifest.schemaVersion,14); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
   const restoredId = await importArchive(backup, manifest, () => {});
   const restored = await (await request('/api/closet?collection=' + restoredId)).json(); assert.deepEqual(restored.records, state.records); assert.equal(restored.collections.length, 2);
   assert.deepEqual((await (await request('/api/closet?collection=main')).json()).records, state.records);
@@ -282,6 +282,12 @@ try {
   assert.equal(res.status, 200, await res.clone().text());
   assert.equal((await post({ kind: 'randomOutfitRules', id: savedRules.id, version: savedRules.version, data: topLevelRules })).status, 409);
   assert.deepEqual((await (await request('/api/closet')).json()).records.find(record => record.id === savedRules.id).data, reversed);
+  const wardrobeOrder = { categories: ['bottom', 'top', 'shoes'], items: [item.id], groups: [] };
+  const orderWrites = await Promise.all([post({ kind: 'wardrobeOrder', data: wardrobeOrder }), post({ kind: 'wardrobeOrder', data: wardrobeOrder })]);
+  assert.deepEqual(orderWrites.map(response => response.status).sort(), [200, 409]);
+  const savedOrder = (await orderWrites.find(response => response.ok).json()).record;
+  assert.equal((await post({ kind: 'wardrobeOrder', id: savedOrder.id, version: savedOrder.version, data: { ...wardrobeOrder, items: [item.id, item.id] } })).status, 400);
+  assert.deepEqual((await (await request('/api/closet')).json()).records.find(record => record.id === savedOrder.id).data, wardrobeOrder);
   assert.match(englishPage, /<html lang="en"/);
   assert.match(englishPage, /My wardrobe/);
   assert.match(englishPage, /New Closet · Your personal wardrobe/);

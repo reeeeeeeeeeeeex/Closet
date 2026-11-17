@@ -1,4 +1,5 @@
 import type { ClosetRecord, ItemRecord, OutfitRecord, Subset, SubsetRecord } from "./domain";
+import { applyOrder } from "./wardrobe-order";
 
 export function rootRecords(records: ClosetRecord[], scope: Subset["scope"], root: Subset["root"]): (ItemRecord | OutfitRecord)[] {
   return records.filter((record): record is ItemRecord | OutfitRecord => record.kind === scope && (root === "all" || record.kind === "item" && record.data.category === root));
@@ -50,8 +51,8 @@ export function subsetTrail(records: ClosetRecord[], id: string): SubsetRecord[]
 
 export type SubsetSection = { subset: SubsetRecord; count: number; records: (ItemRecord | OutfitRecord)[]; children: SubsetSection[] };
 /** Render each branch at its deepest membership; siblings retain independent memberships. */
-export function subsetSections(records: ClosetRecord[], scope: Subset["scope"], root: Subset["root"], parentId: string | null, visible: (ItemRecord | OutfitRecord)[]) {
-  const subsets = records.filter((record): record is SubsetRecord => record.kind === "subset" && record.data.scope === scope && record.data.root === root);
+export function subsetSections(records: ClosetRecord[], scope: Subset["scope"], root: Subset["root"], parentId: string | null, visible: (ItemRecord | OutfitRecord)[], order?: readonly string[]) {
+  const subsets = applyOrder(records.filter((record): record is SubsetRecord => record.kind === "subset" && record.data.scope === scope && record.data.root === root), order, subset => subset.id);
   const children = new Map<string | null, SubsetRecord[]>();
   for (const subset of subsets) children.set(subset.data.parentId, [...(children.get(subset.data.parentId) || []), subset]);
   const aggregate = new Map<string, Set<string>>();

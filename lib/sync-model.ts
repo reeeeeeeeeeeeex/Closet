@@ -32,7 +32,7 @@ export function validateReplica(input: unknown): Replica {
 export type SyncConflict = { key: string; collectionId: string; collectionName: string; ids: string[]; local: ClosetRecord[]; remote: ClosetRecord[]; signature: string };
 export type Resolution = { choice: "local" | "remote"; signature: string };
 export type MergeResult = { local: Replica; remote: Replica; base: Replica; conflicts: SyncConflict[] };
-const singletonKind = (kind?: ClosetRecord["kind"]) => kind === "personalSizes" || kind === "randomOutfitRules";
+const singletonKind = (kind?: ClosetRecord["kind"]) => kind === "personalSizes" || kind === "randomOutfitRules" || kind === "wardrobeOrder";
 
 /** Connected references are resolved together: never publish half a group move or broken snapshot. */
 export function mergeReplicas(base: Replica, local: Replica, remote: Replica, resolutions: Record<string, Resolution> = {}): MergeResult {

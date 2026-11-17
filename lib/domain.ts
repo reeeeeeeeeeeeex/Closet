@@ -5,7 +5,7 @@ import { DEFAULT_LOCALE, messageForLocale } from "./i18n/core";
 import { validateSubsets } from "./subsets";
 import { colorStyleSchema, libraryColorSchema, type LibraryColor } from "./colors";
 import { ASSET_LIMIT, NOTE_MEDIA_TYPES } from "./asset-type";
-import { randomOutfitRulesSchema } from "./random-outfit";
+import { outfitRuleCategory, randomOutfitRulesSchema } from "./random-outfit";
 import { noteDocumentSchema, notePlainText, noteAttachments } from "./note-document";
 // Key order is the default wardrobe order: everyday garments first, then bags and accessories, one-pieces last.
 export const CATEGORIES = { top: "上装", bottom: "下装", outerwear: "外套", shoes: "鞋履", bag: "包袋", accessory: "配饰", dress: "连体 / 裙装" } as const;
@@ -95,15 +95,25 @@ export type SubsetRecord = z.infer<typeof subsetRecordSchema>;
 export const noteRecordSchema = z.object({ ...metadata, kind: z.literal("note"), data: noteSchema }).strict();
 export const randomOutfitRulesRecordSchema = z.object({ ...metadata, kind: z.literal("randomOutfitRules"), data: randomOutfitRulesSchema }).strict();
 export type RandomOutfitRulesRecord = z.infer<typeof randomOutfitRulesRecordSchema>;
+const uniqueOrder = <T>(values: T[]) => new Set(values).size === values.length;
+const recordOrder = z.array(id).max(2000).refine(uniqueOrder, "排序中不能有重复记录");
+export const wardrobeOrderSchema = z.object({
+  categories: z.array(outfitRuleCategory).max(outfitRuleCategory.options.length).refine(uniqueOrder, "排序中不能有重复分类"),
+  items: recordOrder,
+  groups: recordOrder,
+}).strict();
+export type WardrobeOrder = z.infer<typeof wardrobeOrderSchema>;
+const wardrobeOrderRecordSchema = z.object({ ...metadata, kind: z.literal("wardrobeOrder"), data: wardrobeOrderSchema }).strict();
+export type WardrobeOrderRecord = z.infer<typeof wardrobeOrderRecordSchema>;
 export type NoteRecord = z.infer<typeof noteRecordSchema>;
-export const recordSchema = z.discriminatedUnion("kind", [itemRecordSchema, outfitRecordSchema, calendarRecordSchema, subsetRecordSchema, personalSizesRecordSchema, noteRecordSchema, randomOutfitRulesRecordSchema]);
+export const recordSchema = z.discriminatedUnion("kind", [itemRecordSchema, outfitRecordSchema, calendarRecordSchema, subsetRecordSchema, personalSizesRecordSchema, noteRecordSchema, randomOutfitRulesRecordSchema, wardrobeOrderRecordSchema]);
 export type ItemRecord = z.infer<typeof itemRecordSchema>;
 export type OutfitRecord = z.infer<typeof outfitRecordSchema>;
 export type CalendarRecord = z.infer<typeof calendarRecordSchema>;
 export type ClosetRecord = z.infer<typeof recordSchema>;
 export const assetSchema = z.object({ hash: hashSchema, name: z.string().max(255), mime: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", ...NOTE_MEDIA_TYPES]), size: z.number().int().positive().max(ASSET_LIMIT) }).strict();
 export type Asset = z.infer<typeof assetSchema>;
-export const ARCHIVE_SCHEMA_VERSION = 13;
+export const ARCHIVE_SCHEMA_VERSION = 14;
 export const archiveSchema = z.object({
   format: z.literal("new-closet"), schemaVersion: z.number().int().min(1).max(ARCHIVE_SCHEMA_VERSION), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
   colorLibrary: z.array(libraryColorSchema).default([]),
@@ -161,6 +171,7 @@ export function validateArchive(input: unknown): ClosetArchive {
   validateNotes(a.records);
   if (a.records.filter(record => record.kind === "personalSizes").length > 1) throw new Error("每个衣橱只能保存一份我的尺码");
   if (a.records.filter(record => record.kind === "randomOutfitRules").length > 1) throw new Error("每个衣橱只能保存一份随机穿搭规则");
+  if (a.records.filter(record => record.kind === "wardrobeOrder").length > 1) throw new Error("每个衣橱只能保存一份排序");
   return { ...a, schemaVersion: ARCHIVE_SCHEMA_VERSION };
 }
 export function makeSnapshot(outfit: Outfit, items: ItemRecord[]): CalendarEntry["snapshot"] {

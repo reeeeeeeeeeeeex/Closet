@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { itemSchema, outfitSchema, subsetSchema, personalSizesSchema, noteSchema, dateSchema, makeSnapshot, photoAssets, validateNotes, validateRecordAssets, type Asset, type ClosetRecord, type ItemRecord } from "./domain";
+import { itemSchema, outfitSchema, subsetSchema, personalSizesSchema, noteSchema, wardrobeOrderSchema, dateSchema, makeSnapshot, photoAssets, validateNotes, validateRecordAssets, type Asset, type ClosetRecord, type ItemRecord } from "./domain";
 import { validateSubsets } from "./subsets";
 import { randomOutfitRulesSchema } from "./random-outfit";
 
 export class MutationError extends Error { constructor(public status: number, message: string) { super(message); } }
-export const mutationSchema = z.object({ op: z.enum(["save", "deleteItem", "deleteCalendar", "deleteSubset", "deleteNote"]), collectionId: z.string().min(1).max(100), id: z.string().uuid().optional(), version: z.number().int().positive().optional(), subsetId: z.string().uuid().optional(), kind: z.enum(["item", "outfit", "calendar", "subset", "personalSizes", "note", "randomOutfitRules"]), data: z.unknown() });
+export const mutationSchema = z.object({ op: z.enum(["save", "deleteItem", "deleteCalendar", "deleteSubset", "deleteNote"]), collectionId: z.string().min(1).max(100), id: z.string().uuid().optional(), version: z.number().int().positive().optional(), subsetId: z.string().uuid().optional(), kind: z.enum(["item", "outfit", "calendar", "subset", "personalSizes", "note", "randomOutfitRules", "wardrobeOrder"]), data: z.unknown() });
 export function mutateRecords(records: ClosetRecord[], input: unknown, assets: Asset[], now = new Date().toISOString()) {
   const body = mutationSchema.parse(input), existing = records.find(r => r.id === body.id);
   const fail = (status: number, message: string): never => { throw new MutationError(status, message); };
@@ -44,6 +44,10 @@ export function mutateRecords(records: ClosetRecord[], input: unknown, assets: A
     if (body.kind === "item") { const item = itemSchema.parse(body.data); if (item.colorStyle) item.color = item.colorStyle.values[0]?.name || ""; data = item; }
     else if (body.kind === "outfit") data = outfitSchema.parse(body.data);
     else if (body.kind === "note") data = noteSchema.parse(body.data);
+    else if (body.kind === "wardrobeOrder") {
+      data = wardrobeOrderSchema.parse(body.data);
+      if (records.some(r => r.kind === "wardrobeOrder" && r.id !== existing?.id)) fail(409, "此衣橱的排序已更改，请刷新后重试。");
+    }
     else if (body.kind === "randomOutfitRules") {
       data = randomOutfitRulesSchema.parse(body.data);
       if (records.some(r => r.kind === "randomOutfitRules" && r.id !== existing?.id)) fail(409, "此衣橱已有随机穿搭规则，请重新打开规则后编辑。");
@@ -75,7 +79,7 @@ export function mutateRecords(records: ClosetRecord[], input: unknown, assets: A
     }
     const record = { id: existing?.id || crypto.randomUUID(), kind: body.kind, data, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || now, updatedAt: now } as ClosetRecord;
     next = [...next.filter(r => r.id !== record.id), record]; result.id = record.id;
-    if (record.kind === "personalSizes" || record.kind === "randomOutfitRules") result.record = record;
+    if (record.kind === "personalSizes" || record.kind === "randomOutfitRules" || record.kind === "wardrobeOrder") result.record = record;
     if (body.subsetId) {
       const member = result.outfitId ? next.find(r => r.id === result.outfitId)! : record;
       if (existing || !["item", "outfit"].includes(member.kind)) fail(400, "只能在新增单品或搭配时指定分组");

@@ -12,7 +12,10 @@ import { NoteEditor } from "@/components/note-editor";
 import type { Note, NoteRecord, RandomOutfitRulesRecord } from "@/lib/domain";
 import type { RandomOutfitRules } from "@/lib/random-outfit";
 import { RandomOutfitEditor } from "@/components/random-outfit";
-import { LockKeyhole, Shuffle } from "lucide-react";
+import { useSortDrag } from "@/components/use-sort-drag";
+import { applyOrder, moveVisible } from "@/lib/wardrobe-order";
+import type { WardrobeOrder, WardrobeOrderRecord } from "@/lib/domain";
+import { GripVertical, LockKeyhole, Shuffle } from "lucide-react";
 import { tr, translatedOptions } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -58,6 +61,7 @@ const errorMessage = (e: unknown) => e instanceof Error ? tr(e.message) : tr("�
 const localDate = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const formatSize = (bytes: number) => bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 type View = ClosetView;
+const defaultCategories = Object.keys(CATEGORIES) as Item["category"][];
 type Editor = {
     kind: "randomOutfitRules";
 } | {
@@ -156,6 +160,8 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
     const [selectedSubsetId, setSelectedSubsetId] = useState<string | null>(null);
     const [occasion, setOccasion] = useState("all");
     const [archived, setArchived] = useState(false);
+    const [pendingOrder, setPendingOrder] = useState<{ collectionId: string; data: WardrobeOrder } | null>(null);
+    const categoryScroller = useRef<HTMLDivElement>(null);
     const selectedCollection = useRef<string | undefined>(undefined);
     const refreshId = useRef(0);
     const stateRef = useRef(state);
@@ -245,7 +251,32 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
         toast.success(t("单品已删除"));
         await refresh();
     };
-    const items = useMemo(() => (state?.records || []).filter((r): r is ItemRecord => r.kind === "item"), [state]);
+    const orderRecord = state?.records.find((record): record is WardrobeOrderRecord => record.kind === "wardrobeOrder");
+    const savingOrder = !!pendingOrder && pendingOrder.collectionId === state?.collectionId;
+    const order = savingOrder ? pendingOrder.data : orderRecord?.data;
+    const categoryIds = applyOrder(defaultCategories, order?.categories, id => id);
+    const items = useMemo(() => applyOrder((state?.records || []).filter((r): r is ItemRecord => r.kind === "item"), order?.items, item => item.id), [state, order?.items]);
+    const groups = applyOrder((state?.records || []).filter((r): r is SubsetRecord => r.kind === "subset" && r.data.scope === "item"), order?.groups, group => group.id);
+    const sortDisabled = !!error || syncing || savingOrder;
+    const wardrobeDrag = useSortDrag((group, from, to, visible) => {
+        if (!state || sortDisabled) return;
+        const data: WardrobeOrder = { categories: order?.categories ?? [], items: order?.items ?? [], groups: order?.groups ?? [] };
+        if (group === "wardrobe-categories") data.categories = moveVisible(categoryIds, visible, from, to);
+        else if (group.startsWith("wardrobe-groups:")) data.groups = moveVisible(groups.map(record => record.id), visible, from, to);
+        else data.items = moveVisible(items.map(record => record.id), visible, from, to);
+        const collectionId = state.collectionId;
+        setPendingOrder({ collectionId, data });
+        void (async () => {
+            try {
+                await api("/api/closet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "save", collectionId, kind: "wardrobeOrder", data, id: orderRecord?.id, version: orderRecord?.version }) });
+            } catch (cause) {
+                toast.error(errorMessage(cause));
+            } finally {
+                if (selectedCollection.current === collectionId) await refresh(undefined, true);
+                setPendingOrder(current => current?.data === data ? null : current);
+            }
+        })();
+    }, group => group === "wardrobe-categories" ? categoryScroller.current : null);
     const outfits = useMemo(() => (state?.records || []).filter((r): r is OutfitRecord => r.kind === "outfit"), [state]);
     const calendar = useMemo(() => (state?.records || []).filter((r): r is CalendarRecord => r.kind === "calendar"), [state]);
     const activeItems = items.filter(i => !i.data.archived);
@@ -306,7 +337,23 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
     const titles = { personalSizes: t("我的尺码"), wardrobe: t("我的衣橱"), outfits: t("我的搭配"), calendar: t("穿搭日历"), backup: t("数据与备份"), assistant: t("AI 穿搭灵感"), account: t("我的") };
     const profileMenu = <ProfileMenu compact={android} current={currentProfile} disabled={operations > 0 || panelBusy || loading} hasDraft={!!editor || draftDirty} onSelected={next => { setProfileContext(next.id); window.location.reload(); }} onRenamed={next => { if (next.id === currentProfile.id) setCurrentProfile(next); }}/>;
     const status = <ClosetHeader compact menu={null} error={!!error} loading={loading} syncing={syncing} synced={synced} onAdd={() => {}} onRefresh={() => void refresh()}/>;
-    const categoryNavigation = <div className="wardrobe-toolbar"><div className="category-tabs" role="group" aria-label={t("单品分类")}>{Object.entries({ all: t("全部"), ...translatedOptions(CATEGORIES, t) }).map(([key, label]) => <button key={key} onClick={() => { setCategory(key); setSelectedSubsetId(null); }} className={category === key ? "active" : ""}>{label}<span>{key === "all" ? items.filter(i => i.data.archived === archived).length : items.filter(i => i.data.category === key && i.data.archived === archived).length}</span></button>)}</div></div>;
+    const selectCategory = (key: string) => { setCategory(key); setSelectedSubsetId(null); };
+    const categoryNavigation = <div className="wardrobe-toolbar"><div className="category-tabs" ref={categoryScroller} role="group" aria-label={t("单品分类")}>
+      <button type="button" className={category === "all" ? "active" : ""} aria-pressed={category === "all"} onClick={() => selectCategory("all")}>{t("全部")}<span>{items.filter(item => item.data.archived === archived).length}</span></button>
+      {categoryIds.map(key => <div className={category === key ? "wardrobe-category active" : "wardrobe-category"} key={key} {...wardrobeDrag.row("wardrobe-categories", key)}>
+        <button type="button" className="wardrobe-category-label" aria-pressed={category === key} onClick={() => selectCategory(key)}>{t(CATEGORIES[key])}<span>{items.filter(item => item.data.category === key && item.data.archived === archived).length}</span></button>
+        <button type="button" className="wardrobe-drag-handle" disabled={sortDisabled} {...wardrobeDrag.handle("wardrobe-categories", key, t(CATEGORIES[key]), categoryIds, true)}><GripVertical size={15}/></button>
+      </div>)}
+    </div></div>;
+    function renderWardrobeCards(records: (ItemRecord | OutfitRecord)[], section: string | null) {
+        const cards = records.filter((record): record is ItemRecord => record.kind === "item");
+        const ids = cards.map(record => record.id);
+        const group = `wardrobe-items:${subsetRoot}:${section ?? "root"}`;
+        return <div className="item-grid">{cards.map(record => <div key={record.id} className="wardrobe-sort-card" {...wardrobeDrag.row(group, record.id)}>
+            <ItemCard compact={android} item={record} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "item", record })}/>
+            {ids.length > 1 && <button type="button" className="wardrobe-drag-handle" disabled={sortDisabled} {...wardrobeDrag.handle(group, record.id, record.data.name, ids)}><GripVertical size={19}/></button>}
+        </div>)}</div>;
+    }
     const renderToolbar = (controls: React.ReactNode) => android ? <>
       <AndroidSearch value={search} onChange={setSearch} placeholder={view === "wardrobe" ? t("搜索衣服、品牌…") : t("寻找我的搭配…")} count={colorFilter.length + (occasion === "all" ? 0 : 1) + (archived ? 1 : 0)} onReset={() => { setColorFilter([]); setOccasion("all"); setArchived(false); }}>
         {view === "wardrobe" && <ColorFilter colors={wardrobeColors(items)} selected={colorFilter} onChange={setColorFilter}/>}
@@ -327,7 +374,7 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
       {error && <div className="error-banner" role="alert"><AlertCircle size={19}/><div><strong>{t("暂时无法同步衣橱")}</strong><p>{error}</p>{profileChanged && <Button variant="outline" onClick={() => { if (draftDirty || editor) { setReloadConfirm(true); } else window.location.reload(); }}>{t("载入当前账号")}</Button>}</div><Button variant="outline" onClick={() => void refresh()}>{t("重试")}</Button></div>}
       {loading ? <div className="loading-grid">{[1, 2, 3, 4].map(n => <Skeleton key={n} className="h-72 rounded-2xl"/>)}</div> : state && <>
         {view === "wardrobe" && !android && categoryNavigation}
-        {(view === "wardrobe" || view === "outfits") && <><SubsetBrowser beforeCards={<>{view === "outfits" && <div className="random-outfit-entry"><Button variant="outline" disabled={!!error || syncing} onClick={() => setEditor({ kind: "randomOutfitRules" })}><Shuffle size={16}/>{t("随机穿搭")}</Button></div>}{noteSection}</>} renderToolbar={renderToolbar} key={state.collectionId + ":" + view + ":" + subsetRoot + ":" + (activeSubset?.id || "root")} records={state.records} scope={scope} root={subsetRoot} activeId={activeSubset?.id || null} disabled={!!error || syncing} onSelect={setSelectedSubsetId} onSave={saveSubset} onDelete={removeSubset} visibleRecords={view === "wardrobe" ? filteredItems : filteredOutfits} onAdd={subsetId => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"], subsetId } : { kind: "outfit", subsetId })} renderCards={records => view === "wardrobe" ? <div className="item-grid">{records.map(record => record.kind === "item" && <ItemCard compact={android} key={record.id} item={record} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "item", record })}/>)}</div> : <div className="outfit-grid">{records.map(record => record.kind === "outfit" && <OutfitCard compact={android} key={record.id} outfit={record} items={items} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "outfit", record })} onCalendar={() => setEditor({ kind: "calendar", outfitId: record.id, date: localDate() })}/>)}</div>} />
+        {(view === "wardrobe" || view === "outfits") && <><SubsetBrowser beforeCards={<>{view === "outfits" && <div className="random-outfit-entry"><Button variant="outline" disabled={!!error || syncing} onClick={() => setEditor({ kind: "randomOutfitRules" })}><Shuffle size={16}/>{t("随机穿搭")}</Button></div>}{noteSection}</>} renderToolbar={renderToolbar} key={state.collectionId + ":" + view + ":" + subsetRoot + ":" + (activeSubset?.id || "root")} records={state.records} scope={scope} root={subsetRoot} activeId={activeSubset?.id || null} disabled={!!error || syncing} onSelect={setSelectedSubsetId} onSave={saveSubset} onDelete={removeSubset} visibleRecords={view === "wardrobe" ? filteredItems : filteredOutfits} onAdd={subsetId => setEditor(view === "wardrobe" ? { kind: "item", initialCategory: category === "all" ? "top" : category as Item["category"], subsetId } : { kind: "outfit", subsetId })} sort={view === "wardrobe" ? { drag: wardrobeDrag, order: order?.groups, disabled: sortDisabled } : undefined} renderCards={view === "wardrobe" ? renderWardrobeCards : records => <div className="outfit-grid">{records.map(record => record.kind === "outfit" && <OutfitCard compact={android} key={record.id} outfit={record} items={items} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "outfit", record })} onCalendar={() => setEditor({ kind: "calendar", outfitId: record.id, date: localDate() })}/>)}</div>} />
         {view === "wardrobe" && !filteredItems.length && (items.length === 0 && !search && !colorFilter.length && category === "all" && occasion === "all" && !archived ? <Welcome onAdd={() => setEditor({ kind: "item" })} onImport={() => goView("backup")}/> : <EmptyState icon={Search} title={t("这里还没有单品")} text={t("试试其他分类，或清空筛选条件。")} action={t("清空筛选")} onAction={() => { setSearch(""); setColorFilter([]); setOccasion("all"); setArchived(false); }}/>) }
         {view === "outfits" && !filteredOutfits.length && <EmptyState icon={Layers3} title={t("没有找到这个搭配")} text={t("拍照、导入搭配照片，或从单品组合一套穿搭。")} action={t("新建搭配")} onAction={() => setEditor({ kind: "outfit" })}/>}</>}
         {view === "calendar" && <CalendarPanel compact={android} entries={calendar} disabled={!!error} onAdd={date => setEditor({ kind: "calendar", date })} onEdit={record => setEditor({ kind: "calendar", record })}/>}

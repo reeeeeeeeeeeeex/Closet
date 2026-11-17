@@ -72,7 +72,7 @@ Download the signed Android 1.5.1 APK from [GitHub Releases](https://github.com/
 
 Desktop data lives in `data/` by default. `closet.sqlite` stores records, profiles, settings, and migration history. `assets/<owner-hash>/<image-sha256>` stores original image bytes, deduplicated by SHA-256. A legacy `auth.json` is used only to preserve the session-signing key during migration; password sign-in has been retired.
 
-In **Data and backups**, export a ZIP containing `manifest.json`, `README.txt`, and `assets/`. Import checks record relationships and media checksums, then creates a **new wardrobe** in the current profile without overwriting existing wardrobes. The current format is `new-closet`, schema version **13**, with import support for versions **1–12**.
+In **Data and backups**, export a ZIP containing `manifest.json`, `README.txt`, and `assets/`. Import checks record relationships and media checksums, then creates a **new wardrobe** in the current profile without overwriting existing wardrobes. The current format is `new-closet`, schema version **14**, with import support for versions **1–13**. The backup includes any custom wardrobe order.
 
 You can also stop the server and copy the entire data directory. Copying only the SQLite file while the server is running may miss changes in its WAL files. A complete directory copy includes local settings and credentials; the portable wardrobe ZIP excludes model keys and sync or MCP tokens.
 
@@ -178,7 +178,7 @@ Android App 支持离线编辑与手动双向同步。在电脑的“数据与�
 
 电脑端默认使用 `data/`。`closet.sqlite` 保存记录、账号、设置和迁移记录；`assets/<owner-hash>/<image-sha256>` 保存原始图片字节，按 SHA-256 去重。旧版 `auth.json` 仅用于迁移时保留会话签名密钥，密码登录已停用。
 
-在“数据与备份”导出完整 ZIP，包含 `manifest.json`、`README.txt` 和 `assets/`。导入先检查记录关联和照片校验值，再在当前账号下创建一个**新衣橱**，不覆盖原衣橱。当前格式为 `new-closet`、版本 **11**，支持导入 **1–10** 版备份。
+在“数据与备份”导出完整 ZIP，包含 `manifest.json`、`README.txt` 和 `assets/`。导入先检查记录关联和照片校验值，再在当前账号下创建一个**新衣橱**，不覆盖原衣橱。当前格式为 `new-closet`、版本 **14**，支持导入 **1–13** 版备份。备份包含自定义的衣橱顺序。
 
 也可停止服务后复制整个数据目录。运行时仅复制 SQLite 文件可能遗漏 WAL 中的数据。整个目录包含本地设置和凭据；可移植的衣橱 ZIP 不包含模型密钥、同步令牌或 MCP 令牌。
 

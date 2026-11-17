@@ -21,6 +21,14 @@ assert.equal(result.conflicts[0].ids.length,2);assert.equal(result.local.collect
 result=mergeReplicas(emptyReplica(),replica([a]),replica([b],crypto.randomUUID()));assert.equal(result.local.collections.length,2);
 const sizes=id=>({id,kind:'personalSizes',version:1,createdAt:now,updatedAt:now,data:{measurements:{height:170},shoeSize:{eu:null,cn:null}}});
 result=mergeReplicas(replica([]),replica([sizes(crypto.randomUUID())]),replica([sizes(crypto.randomUUID())]));assert.equal(result.conflicts.length,1);
+const wardrobeOrder = { id: crypto.randomUUID(), kind: 'wardrobeOrder', version: 1, createdAt: now, updatedAt: now, data: { categories: ['bottom', 'top'], items: [b.id, a.id], groups: [] } };
+result = mergeReplicas(base, replica([a, b, wardrobeOrder]), replica([changed(a, 'Edited on desktop'), b]));
+assert.equal(result.conflicts.length, 0);
+assert.deepEqual(result.remote.collections[0].records.find(r => r.kind === 'wardrobeOrder'), wardrobeOrder);
+const competingOrder = { ...wardrobeOrder, id: crypto.randomUUID(), data: { ...wardrobeOrder.data, items: [a.id, b.id] } };
+result = mergeReplicas(base, replica([a, b, wardrobeOrder]), replica([a, b, competingOrder]));
+assert.equal(result.conflicts.length, 1);
+assert.deepEqual(result.conflicts[0].ids.sort(), [wardrobeOrder.id, competingOrder.id].sort());
 assert.throws(()=>validateReplica(replica([outfit])));
 const subset={id:crypto.randomUUID(),kind:'subset',version:1,createdAt:now,updatedAt:now,data:{name:'Tops',scope:'item',root:'top',parentId:null,memberIds:[a.id]}};
 result=mergeReplicas(replica([a]),replica([{...a,data:{...a.data,category:'bottom'}}]),replica([a,subset]));assert.equal(result.conflicts.length,1);assert.equal(result.conflicts[0].ids.length,2);

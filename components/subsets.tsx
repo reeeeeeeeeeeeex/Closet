@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState, type ReactNode } from "react";
-import { ChevronRight, ChevronDown, FolderPlus, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, ChevronDown, FolderPlus, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -11,15 +11,17 @@ import { CATEGORIES, type ClosetRecord, type ItemRecord, type OutfitRecord, type
 import { subsetMemberIds, subsetTrail, subsetSections, type SubsetSection } from "@/lib/subsets";
 import { tr } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
+import type { SortDrag } from "@/components/use-sort-drag";
 
 type SaveSubset = (data: Subset, record?: SubsetRecord) => Promise<string>;
-export function SubsetBrowser({ records, scope, root, activeId, disabled, onSelect, onSave, onDelete, visibleRecords, renderCards, onAdd, renderToolbar, beforeCards }: {
+export function SubsetBrowser({ records, scope, root, activeId, disabled, onSelect, onSave, onDelete, visibleRecords, renderCards, onAdd, renderToolbar, beforeCards, sort }: {
   records: ClosetRecord[]; scope: Subset["scope"]; root: Subset["root"]; activeId: string | null; disabled: boolean;
   onSelect: (id: string | null) => void; onSave: SaveSubset; visibleRecords: (ItemRecord | OutfitRecord)[];
   onDelete: (record: SubsetRecord) => Promise<void>;
   renderToolbar?: (controls: ReactNode) => ReactNode;
   beforeCards?: ReactNode;
-  renderCards: (records: (ItemRecord | OutfitRecord)[]) => ReactNode; onAdd: (subsetId: string) => void;
+  renderCards: (records: (ItemRecord | OutfitRecord)[], section: string | null) => ReactNode; onAdd: (subsetId: string) => void;
+  sort?: { drag: SortDrag; order?: string[]; disabled: boolean };
 }) {
   const { t } = useI18n();
   const [dialog, setDialog] = useState<{ record?: SubsetRecord; parentId: string | null } | null>(null);
@@ -27,17 +29,23 @@ export function SubsetBrowser({ records, scope, root, activeId, disabled, onSele
   const active = records.find((record): record is SubsetRecord => record.kind === "subset" && record.id === activeId && record.data.scope === scope && record.data.root === root);
   const trail = active ? subsetTrail(records, active.id) : [];
   const rootName = scope === "outfit" ? t("全部搭配") : root === "all" ? t("全部") : t(CATEGORIES[root]);
-  const { sections, ungrouped } = subsetSections(records, scope, root, active?.id || null, visibleRecords);
+  const { sections, ungrouped } = subsetSections(records, scope, root, active?.id || null, visibleRecords, sort?.order);
   function toggle(id: string) { setCollapsed(current => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; }); }
-  function renderSection(section: SubsetSection): ReactNode {
+  function renderSections(siblings: SubsetSection[]): ReactNode {
+    const ids = siblings.map(section => section.subset.id);
+    return siblings.map(section => renderSection(section, ids));
+  }
+  function renderSection(section: SubsetSection, siblings: string[]): ReactNode {
     const { subset, count } = section; const open = !collapsed.has(subset.id); const contentId = "subset-content-" + subset.id;
+    const group = `wardrobe-groups:${root}:${subset.data.parentId ?? "root"}`;
     return <section className="subset-section" key={subset.id} data-subset-id={subset.id}>
-      <div className="subset-section-heading">
+      <div className="subset-section-heading" {...sort?.drag.row(group, subset.id)}>
+        {sort && siblings.length > 1 && <button type="button" className="wardrobe-drag-handle" disabled={sort.disabled} {...sort.drag.handle(group, subset.id, subset.data.name, siblings)}><GripVertical size={18}/></button>}
         <button type="button" className="subset-toggle" aria-expanded={open} aria-controls={contentId} aria-label={t("展开或折叠分组 {name}", { name: subset.data.name })} onClick={() => toggle(subset.id)}>{open ? <ChevronDown size={18}/> : <ChevronRight size={18}/>}</button>
         <button type="button" className="subset-title" onClick={() => onSelect(subset.id)}>{subset.data.name}</button><span className="subset-count">{t("{count} 条内容", { count })}</span>
         <div className="subset-actions"><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDialog({ record: subset, parentId: subset.data.parentId })}><Pencil size={14}/>{t("编辑")}</Button><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDialog({ record: subset, parentId: subset.data.parentId })}>{t("添加内容")}</Button><Button variant="ghost" size="sm" disabled={disabled} onClick={() => onAdd(subset.id)}><Plus size={14}/>{scope === "item" ? t("添加单品") : t("新建搭配")}</Button><Button variant="outline" size="sm" disabled={disabled} onClick={() => setDialog({ parentId: subset.id })}><FolderPlus size={14}/>{t("新建分组")}</Button></div>
       </div>
-      {open && <div id={contentId} className="subset-section-content">{section.children.map(renderSection)}{!!section.records.length && renderCards(section.records)}{!count && <p className="field-hint">{t("此分组在当前筛选下没有内容。")}</p>}</div>}
+      {open && <div id={contentId} className="subset-section-content">{renderSections(section.children)}{!!section.records.length && renderCards(section.records, subset.id)}{!count && <p className="field-hint">{t("此分组在当前筛选下没有内容。")}</p>}</div>}
     </section>;
   }
   const controls = <div className="subset-actions">{active && <><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDialog({ record: active, parentId: active.data.parentId })}><Pencil size={15}/>{t("编辑分组")}</Button><Button variant="ghost" size="sm" disabled={disabled} onClick={() => onAdd(active.id)}><Plus size={15}/>{scope === "item" ? t("添加单品") : t("新建搭配")}</Button></>}<Button variant="outline" size="sm" disabled={disabled} onClick={() => setDialog({ parentId: active?.id || null })}><FolderPlus size={16}/>{t("新建分组")}</Button></div>;
@@ -45,8 +53,8 @@ export function SubsetBrowser({ records, scope, root, activeId, disabled, onSele
     {renderToolbar ? renderToolbar(controls) : <div className="subset-toolbar">{controls}</div>}
     {active && <nav className="subset-path" aria-label={t("分组路径")}><button type="button" onClick={() => onSelect(null)}>{rootName}</button>{trail.map(record => <span key={record.id}><ChevronRight size={14} /><button type="button" aria-current={record.id === active?.id ? "page" : undefined} onClick={() => onSelect(record.id)}>{record.data.name}</button></span>)}</nav>}
     {beforeCards}
-    {sections.map(renderSection)}
-    {!!ungrouped.length && <section className="subset-ungrouped">{!!sections.length && <h2>{t("未分组")}</h2>}{renderCards(ungrouped)}</section>}
+    {renderSections(sections)}
+    {!!ungrouped.length && <section className="subset-ungrouped">{!!sections.length && <h2>{t("未分组")}</h2>}{renderCards(ungrouped, activeId)}</section>}
     {dialog && <SubsetEditor key={dialog.record?.id || dialog.parentId || "root"} record={dialog.record} preset={{ scope, root, parentId: dialog.parentId }} records={records} onClose={() => setDialog(null)} onSave={async (data, record) => { await onSave(data, record); setDialog(null); }} onDelete={async record => { await onDelete(record); setDialog(null); }} />}
   </section>;
 }

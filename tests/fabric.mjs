@@ -16,7 +16,7 @@ assert.equal(itemSchema.parse(base).fabric, undefined);
 for (const category of ['top','bottom','outerwear','dress','shoes','bag','accessory']) for (const fabric of ['100% 棉','羊毛混纺','真皮 / 再生皮革','38% wool, 62% polyester','']) assert.equal(itemSchema.parse({ ...base, category, fabric }).fabric, fabric.trim());
 assert.equal(itemSchema.parse({ ...base, fabric: '  100% 亚麻  ' }).fabric, '100% 亚麻');
 assert.throws(() => itemSchema.parse({ ...base, fabric: 'x'.repeat(101) }), /面料材质/);
-assert.equal(ARCHIVE_SCHEMA_VERSION, 13);
+assert.equal(ARCHIVE_SCHEMA_VERSION, 14);
 const now = new Date().toISOString();
 const record = { id: crypto.randomUUID(), kind: 'item', version: 1, createdAt: now, updatedAt: now, data: itemSchema.parse({ ...base, fabric: '100% 羊毛' }) };
 const snapshot = makeSnapshot({ name: 'Look', itemIds: [record.id], asset: null, occasions: [], notes: '', archived: false }, [record]);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useRef, useState } from "react";
 import { GripVertical, Shuffle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -8,98 +8,7 @@ import { CATEGORIES, type ItemRecord, type RandomOutfitRulesRecord } from "@/lib
 import { defaultOutfitRules, moveTo, outfitCandidates, randomOutfit, type CategoryRule, type RandomOutfitRules } from "@/lib/random-outfit";
 import { useI18n } from "@/lib/i18n/provider";
 
-type SortGroup = "categories" | CategoryRule["category"];
-type SortRow = { group: SortGroup; id: string };
-type Drag = SortRow & { x: number; y: number; frame: number; cleanup: () => void };
-
-function useRuleDrag(onMove: (group: SortGroup, from: string, to: string) => void) {
-  const { t } = useI18n();
-  const drag = useRef<Drag | null>(null);
-  const scroller = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState<SortRow | null>(null);
-  const [target, setTarget] = useState<SortRow | null>(null);
-
-  useEffect(() => () => drag.current?.cleanup(), []);
-
-  function rowAt(current: Drag, x: number, y: number) {
-    return document.elementFromPoint(x, y)?.closest<HTMLElement>(`[data-sort-group="${current.group}"]`)?.dataset.sortId;
-  }
-
-  function track() {
-    const current = drag.current;
-    if (!current) return;
-    const bounds = scroller.current?.getBoundingClientRect();
-    if (bounds) {
-      const edge = Math.min(44, bounds.height / 4);
-      if (current.y < bounds.top + edge) scroller.current?.scrollBy(0, -10);
-      if (current.y > bounds.bottom - edge) scroller.current?.scrollBy(0, 10);
-    }
-    const id = rowAt(current, current.x, current.y);
-    setTarget(previous => previous?.id === id ? previous : id ? { group: current.group, id } : null);
-    current.frame = requestAnimationFrame(track);
-  }
-
-  function handle(group: SortGroup, id: string, name: string, ids: string[]) {
-    return {
-      "aria-label": t("拖动 {name} 排序，也可使用上下方向键", { name }),
-      onPointerDown(event: PointerEvent<HTMLButtonElement>) {
-        if (event.button !== 0 || drag.current) return;
-        event.preventDefault();
-        const pointer = event.pointerId;
-        const current = { group, id, x: event.clientX, y: event.clientY, frame: requestAnimationFrame(track), cleanup };
-        function cleanup() {
-          cancelAnimationFrame(current.frame);
-          window.removeEventListener("pointermove", move, true);
-          window.removeEventListener("pointerup", drop, true);
-          window.removeEventListener("pointercancel", cancel, true);
-          window.removeEventListener("blur", finish);
-          drag.current = null;
-        }
-        function finish() {
-          cleanup();
-          setActive(null);
-          setTarget(null);
-        }
-        function move(next: globalThis.PointerEvent) {
-          if (next.pointerId !== pointer) return;
-          current.x = next.clientX;
-          current.y = next.clientY;
-        }
-        function drop(next: globalThis.PointerEvent) {
-          if (next.pointerId !== pointer) return;
-          const targetId = rowAt(current, next.clientX, next.clientY);
-          finish();
-          if (targetId && targetId !== id) onMove(group, id, targetId);
-        }
-        function cancel(next: globalThis.PointerEvent) {
-          if (next.pointerId === pointer) finish();
-        }
-        drag.current = current;
-        window.addEventListener("pointermove", move, true);
-        window.addEventListener("pointerup", drop, true);
-        window.addEventListener("pointercancel", cancel, true);
-        window.addEventListener("blur", finish);
-        setActive({ group, id });
-      },
-      onKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
-        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
-        event.preventDefault();
-        const neighbor = ids[ids.indexOf(id) + (event.key === "ArrowUp" ? -1 : 1)];
-        if (neighbor) onMove(group, id, neighbor);
-      },
-    };
-  }
-
-  function row(group: SortGroup, id: string) {
-    return {
-      "data-sort-group": group,
-      "data-sort-id": id,
-      "data-dragging": (active?.group === group && active.id === id) || undefined,
-      "data-drop-target": (target?.group === group && target.id === id && active?.id !== id) || undefined,
-    };
-  }
-  return { handle, row, scroller };
-}
+import { useSortDrag } from "@/components/use-sort-drag";
 
 export function RandomOutfitEditor({ record, items, disabled, onClose, onSave, onUse }: {
   record?: RandomOutfitRulesRecord;
@@ -132,14 +41,15 @@ export function RandomOutfitEditor({ record, items, disabled, onClose, onSave, o
     update(rules.categories.map(rule => rule.category === category ? { ...rule, itemIds } : rule));
   }
 
-  const { handle, row, scroller } = useRuleDrag((group, from, to) => {
+  const scroller = useRef<HTMLDivElement>(null);
+  const { handle, row } = useSortDrag((group, from, to) => {
     if (group === "categories") {
       update(moveTo(rules.categories, categoryIds.findIndex(id => id === from), categoryIds.findIndex(id => id === to)));
     } else {
-      const ids = rules.categories.find(rule => rule.category === group)?.itemIds;
-      if (ids) setCandidates(group, moveTo(ids, ids.indexOf(from), ids.indexOf(to)));
+      const rule = rules.categories.find(rule => rule.category === group);
+      if (rule?.itemIds) setCandidates(rule.category, moveTo(rule.itemIds, rule.itemIds.indexOf(from), rule.itemIds.indexOf(to)));
     }
-  });
+  }, () => scroller.current);
 
   function draw() {
     setError("");
