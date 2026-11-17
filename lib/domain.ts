@@ -6,6 +6,7 @@ import { validateSubsets } from "./subsets";
 import { colorStyleSchema, libraryColorSchema, type LibraryColor } from "./colors";
 import { ASSET_LIMIT, NOTE_MEDIA_TYPES } from "./asset-type";
 import { randomOutfitRulesSchema } from "./random-outfit";
+import { noteDocumentSchema, notePlainText, noteAttachments } from "./note-document";
 // Key order is the default wardrobe order: everyday garments first, then bags and accessories, one-pieces last.
 export const CATEGORIES = { top: "上装", bottom: "下装", outerwear: "外套", shoes: "鞋履", bag: "包袋", accessory: "配饰", dress: "连体 / 裙装" } as const;
 export const OCCASIONS = { work: "通勤", casual: "日常", party: "聚会", formal: "正式", vacation: "旅行", sport: "运动" } as const;
@@ -70,9 +71,15 @@ export const noteSchema = subsetSchema.innerType().pick({ scope: true, root: tru
   name: title,
   subsetId: id.nullable(),
   text: z.string().max(NOTE_TEXT_LIMIT, "笔记正文最多 12000 个字符"),
+  content: noteDocumentSchema.optional(),
   attachments: z.array(z.object({ hash: hashSchema, name: z.string().min(1).max(255) }).strict()).max(NOTE_ATTACHMENT_LIMIT, "每条笔记最多添加 10 个附件"),
 }).refine(data => data.text.trim() || data.attachments.length, "请输入正文或添加附件")
-  .refine(data => new Set(data.attachments.map(attachment => attachment.hash)).size === data.attachments.length, "附件不能重复添加");
+  .refine(data => new Set(data.attachments.map(attachment => attachment.hash)).size === data.attachments.length, "附件不能重复添加")
+  .superRefine((data, context) => {
+    if (!data.content || !noteDocumentSchema.safeParse(data.content).success) return;
+    if (data.text !== notePlainText(data.content) || JSON.stringify(data.attachments) !== JSON.stringify(noteAttachments(data.content)))
+      context.addIssue({ code: "custom", message: "笔记正文与附件不一致，请重新保存" });
+  });
 export type Note = z.infer<typeof noteSchema>;
 export type Item = z.infer<typeof itemSchema>;
 export type Outfit = z.infer<typeof outfitSchema>;
@@ -96,7 +103,7 @@ export type CalendarRecord = z.infer<typeof calendarRecordSchema>;
 export type ClosetRecord = z.infer<typeof recordSchema>;
 export const assetSchema = z.object({ hash: hashSchema, name: z.string().max(255), mime: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", ...NOTE_MEDIA_TYPES]), size: z.number().int().positive().max(ASSET_LIMIT) }).strict();
 export type Asset = z.infer<typeof assetSchema>;
-export const ARCHIVE_SCHEMA_VERSION = 12;
+export const ARCHIVE_SCHEMA_VERSION = 13;
 export const archiveSchema = z.object({
   format: z.literal("new-closet"), schemaVersion: z.number().int().min(1).max(ARCHIVE_SCHEMA_VERSION), exportedAt: z.string().datetime(), collection: z.object({ name: title }).strict(),
   colorLibrary: z.array(libraryColorSchema).default([]),

@@ -72,11 +72,11 @@ Download the signed Android 1.5.1 APK from [GitHub Releases](https://github.com/
 
 Desktop data lives in `data/` by default. `closet.sqlite` stores records, profiles, settings, and migration history. `assets/<owner-hash>/<image-sha256>` stores original image bytes, deduplicated by SHA-256. A legacy `auth.json` is used only to preserve the session-signing key during migration; password sign-in has been retired.
 
-In **Data and backups**, export a ZIP containing `manifest.json`, `README.txt`, and `assets/`. Import checks record relationships and media checksums, then creates a **new wardrobe** in the current profile without overwriting existing wardrobes. The current format is `new-closet`, schema version **12**, with import support for versions **1–11**.
+In **Data and backups**, export a ZIP containing `manifest.json`, `README.txt`, and `assets/`. Import checks record relationships and media checksums, then creates a **new wardrobe** in the current profile without overwriting existing wardrobes. The current format is `new-closet`, schema version **13**, with import support for versions **1–12**.
 
 You can also stop the server and copy the entire data directory. Copying only the SQLite file while the server is running may miss changes in its WAL files. A complete directory copy includes local settings and credentials; the portable wardrobe ZIP excludes model keys and sync or MCP tokens.
 
-Create notes in **All**, a category, a group, or **My outfits**. Import UTF-8 TXT and Markdown into the note body and attach photos, MP4/WebM videos, or MP3/WAV/OGG/M4A audio. Each note supports up to 10 attachments at 20 MB each.
+Create notes in **All**, a category, a group, or **My outfits**. Write on a full-page editor with headings, font sizes, text colors, highlights, lists, checklists, and inline media. Choose **Done** to save your changes. Import UTF-8 TXT and Markdown into the note body and attach photos, MP4/WebM videos, or MP3/WAV/OGG/M4A audio. Each note supports up to 10 attachments at 20 MB each.
 
 Open **My outfits → Random outfit** to choose categories and candidate items. Drag the handles with a mouse or touch, or move a focused handle with the arrow keys. The draw selects one item per category and presents the result in category order.
 

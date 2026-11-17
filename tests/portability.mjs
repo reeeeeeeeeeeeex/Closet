@@ -35,7 +35,14 @@ state.records.push(personal);
 const audio = new Uint8Array(Buffer.from('UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQIAAACAgA==', 'base64'));
 const audioHash = await hashBytes(audio);
 state.assets.push({ hash: audioHash, name: 'inspiration.wav', mime: 'audio/wav', size: audio.length });
-state.records.push({ ...metadata(), kind: 'note', data: { scope: 'item', root: 'outerwear', subsetId: null, name: 'Layering', text: 'Pair with denim.', attachments: [{ hash: audioHash, name: 'inspiration.wav' }] } });
+state.records.push({ ...metadata(), kind: 'note', data: {
+  scope: 'item', root: 'outerwear', subsetId: null, name: 'Layering', text: 'Pair with denim.',
+  attachments: [{ hash: audioHash, name: 'inspiration.wav' }],
+  content: { type: 'doc', content: [
+    { type: 'paragraph', content: [{ type: 'text', text: 'Pair with denim.', marks: [{ type: 'bold' }, { type: 'textStyle', attrs: { color: '#1d4ed8', fontSize: '22px' } }, { type: 'highlight', attrs: { color: '#fef08a' } }] }] },
+    { type: 'noteAttachment', attrs: { hash: audioHash, name: 'inspiration.wav' } },
+  ] },
+} });
 state.records.push({...metadata(),kind:'item',data:itemSchema.parse({...item.data,name:'Trousers',category:'bottom',measurements:{waist:72,knee:42.5}})});
 assert.throws(()=>personalSizesSchema.parse({measurements:{waist:0}}));
 assert.throws(()=>personalSizesSchema.parse({measurements:{knee:0}}));
@@ -57,7 +64,7 @@ const blob = await exportArchive(state, () => {});
 const file = new File([blob], 'test.zip');
 const manifest = await inspectArchive(file, () => {});
 assert.deepEqual(manifest.records, state.records); assert.deepEqual(manifest.assets, state.assets);
-assert.equal(manifest.schemaVersion, 12);
+assert.equal(manifest.schemaVersion, 13);
 assert.equal(await importArchive(file, manifest, () => {}), 'restored'); assert.equal(uploadCount, 3); assert.deepEqual(written.records, state.records);
 const files = unzipSync(new Uint8Array(await blob.arrayBuffer()));
 assert.deepEqual(files[`assets/${hash}.png`], png);
@@ -67,13 +74,13 @@ const corrupt = { ...files, [`assets/${hash}.png`]: strToU8('changed bytes') };
 await assert.rejects(() => inspectArchive(new File([zipSync(corrupt)], 'bad.zip'), () => {}), /SHA-256/);
 const missing = { ...files }; delete missing[`assets/${hash}.png`];
 await assert.rejects(() => inspectArchive(new File([zipSync(missing)], 'missing.zip'), () => {}), /original photo is missing/);
-assert.throws(() => validateArchive({ ...manifest, schemaVersion: 13 }));
+assert.throws(() => validateArchive({ ...manifest, schemaVersion: 14 }));
 assert.throws(() => validateArchive({ ...manifest, assets: [state.assets[0]] }), /缺少原图/);
 const legacy = { ...manifest, schemaVersion: 1, records: structuredClone([item, outfit, entry]), assets: [state.assets[0]] };
 delete legacy.records[2].data.snapshot.photos; delete legacy.records[1].data.asset; delete legacy.records[2].data.snapshot.asset;
 for (const data of [legacy.records[0].data, legacy.records[2].data.snapshot.items[0].data]) for (const key of ['brand','purchasePrice','fabric','fit','shoeFit','shoeSize','measurements']) delete data[key];
 for (const version of [1,2,3,4,5,6,7,8,9,10,11]) {
-  const upgraded = validateArchive({ ...legacy, schemaVersion: version }); assert.equal(upgraded.schemaVersion, 12); assert.equal(upgraded.records[0].data.brand, undefined); assert.equal(upgraded.records[1].data.asset, null); assert.equal(upgraded.records[2].data.snapshot.asset, null);
+  const upgraded = validateArchive({ ...legacy, schemaVersion: version }); assert.equal(upgraded.schemaVersion, 13); assert.equal(upgraded.records[0].data.brand, undefined); assert.equal(upgraded.records[1].data.asset, null); assert.equal(upgraded.records[2].data.snapshot.asset, null);
   assert.equal(upgraded.records[0].data.purchasePrice, undefined); assert.equal(upgraded.records[0].data.fabric, undefined); assert.equal(upgraded.records[0].data.fit, null); assert.deepEqual(upgraded.records[0].data.shoeSize, { eu: null, cn: null }); assert.deepEqual(upgraded.records[0].data.measurements, {});
 }
 assert.equal(validateArchive({ ...manifest, schemaVersion: 10 }).records.find(record => record.id === item.id).data.fabric, 'Changed fabric');

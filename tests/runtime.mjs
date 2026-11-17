@@ -161,7 +161,7 @@ try {
   globalThis.fetch = (url, init = {}) => request(url, init);
   const backup = new File([await exportArchive(state, () => {})], 'wardrobe.zip');
   const manifest = await inspectArchive(backup, () => {});
-  assert.equal(manifest.schemaVersion,12); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
+  assert.equal(manifest.schemaVersion,13); assert.deepEqual(manifest.records.find(record=>record.kind==='personalSizes').data,personalData);
   const restoredId = await importArchive(backup, manifest, () => {});
   const restored = await (await request('/api/closet?collection=' + restoredId)).json(); assert.deepEqual(restored.records, state.records); assert.equal(restored.collections.length, 2);
   assert.deepEqual((await (await request('/api/closet?collection=main')).json()).records, state.records);

@@ -12,7 +12,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     sameOrigin(request); const { db, owner } = await context(request);
-    return json(saveClosetMutation(db, owner, await limitedJson(request, 128 * 1024)));
+    return json(saveClosetMutation(db, owner, await limitedJson(request, 1024 * 1024)));
   } catch (e) { return failure(e); }
 }
 export async function PUT(request: Request) {
