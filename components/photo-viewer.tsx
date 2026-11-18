@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element -- View the original pixels without an image proxy. */
 "use client";
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { ChevronLeft, ChevronRight, Crop, Download, Loader2, Pencil, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
+import { useCallback, useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { ChevronDown, ChevronLeft, ChevronRight, Crop, Download, Info, Loader2, Pencil, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useI18n } from "@/lib/i18n/provider";
 import { getClosetClient } from "@/lib/closet-client";
@@ -11,24 +11,29 @@ import { constrainPhoto, cropPixels, fitPhoto, INITIAL_TRANSFORM, initialCrop, m
 export type ViewerPhoto = { key: string; src: string; asset?: string | null };
 export type CropPhoto = (file: File, photo: ViewerPhoto) => Promise<void> | void;
 
-export function PhotoViewer({ photos, initialKey, name, onClose, onEdit, onCrop }: {
+export function PhotoViewer({ photos, initialKey, name, onClose, onEdit, onCrop, details }: {
   photos: ViewerPhoto[]; initialKey?: string | null; name: string; onClose: () => void;
-  onEdit?: () => void; onCrop?: CropPhoto;
+  onEdit?: () => void; onCrop?: CropPhoto; details?: ReactNode;
 }) {
   const [selected, setSelected] = useState(initialKey);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const index = Math.max(0, photos.findIndex(photo => photo.key === selected));
   const photo = photos[index];
   if (!photo) return null;
   return <PhotoViewerContent key={photo.key} photo={photo} name={name} index={index} count={photos.length}
     onNavigate={step => setSelected(photos[(index + step + photos.length) % photos.length].key)}
-    onClose={onClose} onEdit={onEdit} onCrop={onCrop}/>;
+    onClose={onClose} onEdit={onEdit} onCrop={onCrop}
+    details={details} detailsOpen={detailsOpen} onToggleDetails={() => setDetailsOpen(open => !open)}/>;
 }
 
-function PhotoViewerContent({ photo, name, index, count, onNavigate, onClose, onEdit, onCrop }: {
+function PhotoViewerContent({ photo, name, index, count, onNavigate, onClose, onEdit, onCrop, details, detailsOpen, onToggleDetails }: {
   photo: ViewerPhoto; name: string; index: number; count: number; onNavigate: (step: number) => void;
   onClose: () => void; onEdit?: () => void; onCrop?: CropPhoto;
+  details?: ReactNode; detailsOpen: boolean; onToggleDetails: () => void;
 }) {
   const { t } = useI18n();
+  const detailsId = useId();
+  const detailsButton = useRef<HTMLButtonElement>(null);
   const stage = useRef<HTMLDivElement>(null), image = useRef<HTMLImageElement>(null);
   const [viewport, setViewport] = useState<Size>({ width: 0, height: 0 });
   // Dialog portals mount after the parent effect. Observe the actual stage attachment.
@@ -165,10 +170,15 @@ function PhotoViewerContent({ photo, name, index, count, onNavigate, onClose, on
     top: (viewport.height - fitted.height) / 2 + crop.y / natural.height * fitted.height,
     width: crop.width / natural.width * fitted.width, height: crop.height / natural.height * fitted.height } : null;
   return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}><DialogContent className="photo-viewer" style={{ translate: 'none' }} showCloseButton={false}
-    onEscapeKeyDown={event => { if (busy || crop) { event.preventDefault(); if (!busy) setCrop(null); } }}
+    onEscapeKeyDown={event => {
+      if (busy || crop || detailsOpen) event.preventDefault();
+      if (busy) return;
+      if (crop) setCrop(null);
+      else if (detailsOpen) { onToggleDetails(); detailsButton.current?.focus(); }
+    }}
     onPointerDownOutside={event => event.preventDefault()}
     onKeyDown={event => {
-      if (busy || crop || (event.target as HTMLElement).closest('button,select,input')) return;
+      if (busy || crop || (event.target as HTMLElement).closest('button,select,input,.photo-viewer-details')) return;
       if (event.key === 'ArrowLeft' && count > 1) { event.preventDefault(); onNavigate(-1); }
       if (event.key === 'ArrowRight' && count > 1) { event.preventDefault(); onNavigate(1); }
       if (event.key === '+' || event.key === '=') { event.preventDefault(); zoom(display.scale * 1.25); }
@@ -199,10 +209,14 @@ function PhotoViewerContent({ photo, name, index, count, onNavigate, onClose, on
         <button type="button" disabled={busy} onClick={reset}><RotateCcw/>{t("重置")}</button>
         {count > 1 && <button type="button" disabled={busy} aria-label={t("下一张照片")} onClick={() => onNavigate(1)}><ChevronRight/></button>}
       </div><div className="photo-viewer-tools">
+        {details && <button ref={detailsButton} className="photo-viewer-details-toggle" type="button" disabled={busy} aria-expanded={detailsOpen} aria-controls={detailsId} onClick={onToggleDetails}>
+          {detailsOpen ? <ChevronDown/> : <Info/>}{t("单品资料")}
+        </button>}
         {onEdit && <button type="button" disabled={busy} onClick={() => { onClose(); onEdit(); }}><Pencil/>{t("编辑资料")}</button>}
         {onCrop && <button type="button" disabled={!natural.width || busy} onClick={() => { reset(); setCrop(initialCrop(natural)); setRatio(undefined); setError(""); }}><Crop/>{t("裁剪")}</button>}
         {(photo.asset || !getClosetClient()) && <button type="button" disabled={!natural.width || busy} onClick={() => void download()}><Download/>{t("下载原图")}</button>}
-      </div><p>{t("双指或滚轮缩放，放大后拖动查看")}</p></>}
+      </div>{details && <section id={detailsId} className="photo-viewer-details" aria-label={t("单品资料")} hidden={!detailsOpen} tabIndex={0}>{details}</section>}
+        <p>{t("双指或滚轮缩放，放大后拖动查看")}</p></>}
     </footer>
   </DialogContent></Dialog>;
 }

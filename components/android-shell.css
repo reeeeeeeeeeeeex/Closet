@@ -179,6 +179,10 @@ html[data-closet-ui="android"] .photo-viewer-tools:nth-of-type(2) > button { fle
 html[data-closet-ui="android"] .photo-viewer-tools select { color: #29352c; background: #eeece6; }
 html[data-closet-ui="android"] .photo-viewer-tools .photo-viewer-primary { background: #3e5038; color: #fff; }
 html[data-closet-ui="android"] .photo-viewer-footer p[role="alert"] { color: #a05232; }
+html[data-closet-ui="android"] .photo-viewer-details-toggle,
+html[data-closet-ui="android"] .photo-viewer-details { background: #eae8e0; }
+html[data-closet-ui="android"] .photo-viewer-details-toggle[aria-expanded="true"] { background: #dce3d5; }
+html[data-closet-ui="android"] .item-photo-details dt { color: #616c62; }
 /* Auxiliary pages share the same compact, content-first layout. */
 .android-app .personal-sizes-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; margin: 0; }
 .android-app .personal-sizes-card { border: 0; border-radius: 0; padding: 0 0 14px; background: transparent; border-bottom: 1px solid #dfded6; }

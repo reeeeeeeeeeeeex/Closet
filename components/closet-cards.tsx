@@ -7,6 +7,7 @@ import { ArrowUpRight, CalendarDays, Check, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { itemColorStyle, itemColorText, isCommonColor } from "@/lib/colors";
 import { ItemLabels } from "@/components/item-details";
+import { ItemPhotoDetails } from "@/components/item-photo-details";
 import { CATEGORIES, OCCASIONS, photoAssets, type Item, type ItemRecord, type OutfitRecord } from "@/lib/domain";
 import { useI18n } from "@/lib/i18n/provider";
 
@@ -50,7 +51,7 @@ export function ItemCard({ item, onOpen, selection, onCrop, compact = false }: {
     const details = compact && !selection ? <><h3>{item.data.name}</h3><p className="android-card-meta">{t(CATEGORIES[item.data.category])}{item.data.brand && ` · ${item.data.brand}`}</p></> : <><div className="item-category" title={itemColorText(item.data)}>{t(CATEGORIES[item.data.category])}{summary && ` / ${summary}`}</div><h3>{item.data.name}</h3><OccasionLabels values={item.data.occasions}/><ItemLabels item={item.data} showMeasurements={false}/></>;
     if (selection) return <button type="button" className={`item-card selectable-card ${selection.selected ? 'picked' : ''}`} onClick={onOpen} aria-label={selection.label} aria-pressed={selection.selected}><Photo asset={item.data.asset} name={item.data.name}/><div className="item-card-body">{details}</div><SelectionMarker selection={selection}/></button>;
     return <><div className="item-card"><Photo asset={item.data.asset} name={item.data.name} onOpen={() => item.data.asset ? setViewing(true) : onOpen()}/><button type="button" className="item-card-body" onClick={onOpen} aria-label={t("编辑 {name}", { name: item.data.name })}>{details}<span className="card-edit"><ArrowUpRight size={18}/></span></button></div>
-      {viewing && <PhotoViewer photos={photoAssets(item.data).map(hash => ({ key: hash, src: assetUrl(hash), asset: hash }))} initialKey={item.data.asset} name={item.data.name} onClose={() => setViewing(false)} onEdit={onOpen} onCrop={onCrop}/>}</>;
+      {viewing && <PhotoViewer photos={photoAssets(item.data).map(hash => ({ key: hash, src: assetUrl(hash), asset: hash }))} initialKey={item.data.asset} name={item.data.name} onClose={() => setViewing(false)} onEdit={onOpen} onCrop={onCrop} details={<ItemPhotoDetails item={item.data}/>}/>}</>;
 }
 
 export function OutfitCard({ outfit, items, onOpen, onCalendar, selection, onCrop, compact = false }: { outfit: OutfitRecord; items: ItemRecord[]; onOpen: () => void; onCalendar?: () => void; selection?: CardSelection; onCrop?: CropPhoto; compact?: boolean }) {
