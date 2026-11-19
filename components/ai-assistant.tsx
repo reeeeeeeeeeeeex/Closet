@@ -4,6 +4,7 @@ import { Loader2, Send, Square, Copy } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Textarea } from "./ui/textarea";
 import { useI18n } from "@/lib/i18n/provider";
 import { tr } from "@/lib/i18n/core";
@@ -91,7 +92,7 @@ export function AiAssistant({ state, onDraftChange, onBusyChange, onRefresh, nat
     <details className="ai-card" open={!configured}>
       <summary>{t("模型设置")}{configured && <span className="ai-muted">{settings.model}</span>}</summary>
       <div className="ai-settings-grid">
-        <div className="field"><Label htmlFor="ai-provider">{t("接口类型")}</Label><select id="ai-provider" className="ai-select" disabled={busy} value={settings.provider} onChange={e => update({ provider: e.target.value as ModelSettings["provider"], baseUrl: e.target.value === "anthropic" ? "https://api.anthropic.com/v1" : "https://api.openai.com/v1" })}><option value="openai">{t("OpenAI 兼容接口")}</option><option value="anthropic">{t("Anthropic 原生接口")}</option></select></div>
+        <div className="field"><Label htmlFor="ai-provider">{t("接口类型")}</Label><Select disabled={busy} value={settings.provider} onValueChange={value => update({ provider: value as ModelSettings["provider"], baseUrl: value === "anthropic" ? "https://api.anthropic.com/v1" : "https://api.openai.com/v1" })}><SelectTrigger id="ai-provider" aria-label={t("接口类型")} className="ai-select"><SelectValue/></SelectTrigger><SelectContent position="popper"><SelectItem value="openai">{t("OpenAI 兼容接口")}</SelectItem><SelectItem value="anthropic">{t("Anthropic 原生接口")}</SelectItem></SelectContent></Select></div>
         <div className="field"><Label htmlFor="ai-model">{t("模型名")}</Label><Input id="ai-model" disabled={busy} value={settings.model} maxLength={200} onChange={e => update({ model: e.target.value })}/></div>
         <div className="field ai-wide"><Label htmlFor="ai-base-url">{t("服务地址（包含 /v1 等路径）")}</Label><Input id="ai-base-url" disabled={busy} value={settings.baseUrl} maxLength={1000} onChange={e => update({ baseUrl: e.target.value })}/></div>
         <div className="field ai-wide"><Label htmlFor="ai-key">API Key</Label><Input id="ai-key" type="password" autoComplete="off" disabled={busy} value={key} maxLength={4000} placeholder={settings.hasKey ? t("已保存，留空继续使用") : t("填写服务密钥")} onChange={e => { setKey(e.target.value); setDirty(true); onDraftChange(true); }}/></div>

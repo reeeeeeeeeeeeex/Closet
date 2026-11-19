@@ -199,7 +199,17 @@ function PhotoViewerContent({ photo, name, index, count, onNavigate, onClose, on
     </div>
     <footer className="photo-viewer-footer">{error && <p role="alert">{t(error)}</p>}
       {crop ? <><p>{t("拖动选框和四角调整裁剪范围，原图会保留。")}</p><div className="photo-viewer-tools">
-        <select aria-label={t("裁剪比例")} value={ratio || ''} disabled={busy} onChange={event => { const next = Number(event.target.value) || undefined; setRatio(next); setCrop(initialCrop(natural, next)); }}><option value="">{t("自由裁剪")}</option><option value="1">1:1</option><option value={3 / 4}>3:4</option><option value={4 / 3}>4:3</option></select>
+        <div className="photo-crop-ratios" role="group" aria-label={t("裁剪比例")}>
+          {([
+            [undefined, t("自由裁剪")],
+            [1, "1:1"],
+            [3 / 4, "3:4"],
+            [4 / 3, "4:3"],
+          ] as const).map(([value, label]) => {
+            const active = value === ratio;
+            return <button key={label} type="button" className={active ? "active" : undefined} aria-pressed={active} disabled={busy} onClick={() => { setRatio(value); setCrop(initialCrop(natural, value)); }}>{label}</button>;
+          })}
+        </div>
         <button type="button" disabled={busy} onClick={() => setCrop(null)}>{t("取消裁剪")}</button><button type="button" className="photo-viewer-primary" disabled={busy} onClick={() => void saveCrop()}>{busy && <Loader2 className="animate-spin"/>}{t("保存为新照片")}</button>
       </div></> : <><div className="photo-viewer-tools">
         {count > 1 && <button type="button" disabled={busy} aria-label={t("上一张照片")} onClick={() => onNavigate(-1)}><ChevronLeft/></button>}

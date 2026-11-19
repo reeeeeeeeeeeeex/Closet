@@ -12,6 +12,7 @@ import TaskItem from "@tiptap/extension-task-item";
 import { ArrowLeft, Bold, Italic, Underline, Strikethrough, List, ListOrdered, ListTodo, Quote, Undo2, Redo2, Paperclip, Trash2, X, Highlighter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Attachment } from "@/components/closet-notes";
 import { NOTE_ATTACHMENT_LIMIT, NOTE_TEXT_LIMIT, noteSchema, type Asset, type Note, type NoteRecord } from "@/lib/domain";
 import { NOTE_COLORS, NOTE_FONT_SIZES, NOTE_HIGHLIGHTS, noteDocument, notePlainText, noteAttachments, type NoteDocument } from "@/lib/note-document";
@@ -190,21 +191,28 @@ export function NoteEditor({ record, location, assets, disabled, onClose, onSave
       </header>
       <fieldset className="note-formatbar" disabled={!editor || busy || disabled} aria-label={t("文字格式")}>
         <div className="note-format-row">
-          <select aria-label={t("段落样式")} value={editor?.isActive("heading") ? String(editor.getAttributes("heading").level) : "p"} onChange={event => {
-            const value = event.target.value;
+          <Select value={editor?.isActive("heading") ? String(editor.getAttributes("heading").level) : "p"} onValueChange={value => {
             if (value === "p") editor?.chain().focus().setParagraph().run();
             else editor?.chain().focus().setHeading({ level: Number(value) as 1 | 2 | 3 }).run();
-          }}><option value="p">{t("正文")}</option><option value="1">{t("大标题")}</option><option value="2">{t("小标题")}</option><option value="3">{t("次级标题")}</option></select>
-          <select aria-label={t("字号")} value={editor?.getAttributes("textStyle").fontSize || "18px"} onChange={event => editor?.chain().focus().setFontSize(event.target.value).run()}>
-            {NOTE_FONT_SIZES.map(size => <option key={size} value={size}>{parseInt(size)}</option>)}
-          </select>
-          <label className="note-color-control"><span>{t("文字颜色")}</span><select aria-label={t("文字颜色")} value={editor?.getAttributes("textStyle").color || NOTE_COLORS[0]} onChange={event => editor?.chain().focus().setColor(event.target.value).run()}>
-            {NOTE_COLORS.map((color, index) => <option key={color} value={color}>{[t("墨黑"), t("红色"), t("棕色"), t("绿色"), t("蓝色"), t("紫色")][index]}</option>)}
-          </select></label>
-          <label className="note-color-control"><span>{t("高亮颜色")}</span><select aria-label={t("高亮颜色")} value={highlightColor} onChange={event => {
-            setHighlightColor(event.target.value);
-            editor?.chain().focus().setHighlight({ color: event.target.value }).run();
-          }}>{NOTE_HIGHLIGHTS.map((color, index) => <option key={color} value={color}>{[t("黄色"), t("绿色"), t("蓝色"), t("粉色"), t("紫色")][index]}</option>)}</select></label>
+          }}>
+            <SelectTrigger size="sm" className="note-select-trigger" aria-label={t("段落样式")}><SelectValue/></SelectTrigger>
+            <SelectContent position="popper"><SelectItem value="p">{t("正文")}</SelectItem><SelectItem value="1">{t("大标题")}</SelectItem><SelectItem value="2">{t("小标题")}</SelectItem><SelectItem value="3">{t("次级标题")}</SelectItem></SelectContent>
+          </Select>
+          <Select value={editor?.getAttributes("textStyle").fontSize || "18px"} onValueChange={value => editor?.chain().focus().setFontSize(value).run()}>
+            <SelectTrigger size="sm" className="note-select-trigger note-size-trigger" aria-label={t("字号")}><SelectValue/></SelectTrigger>
+            <SelectContent position="popper">{NOTE_FONT_SIZES.map(size => <SelectItem key={size} value={size}>{parseInt(size)}</SelectItem>)}</SelectContent>
+          </Select>
+          <div className="note-color-control"><span>{t("文字颜色")}</span><Select value={editor?.getAttributes("textStyle").color || NOTE_COLORS[0]} onValueChange={value => editor?.chain().focus().setColor(value).run()}>
+            <SelectTrigger size="sm" className="note-select-trigger" aria-label={t("文字颜色")}><SelectValue/></SelectTrigger>
+            <SelectContent position="popper">{NOTE_COLORS.map((color, index) => <SelectItem key={color} value={color}><span className="note-color-dot" style={{ backgroundColor: color }} aria-hidden="true"/>{[t("墨黑"), t("红色"), t("棕色"), t("绿色"), t("蓝色"), t("紫色")][index]}</SelectItem>)}</SelectContent>
+          </Select></div>
+          <div className="note-color-control"><span>{t("高亮颜色")}</span><Select value={highlightColor} onValueChange={value => {
+            setHighlightColor(value);
+            editor?.chain().focus().setHighlight({ color: value }).run();
+          }}>
+            <SelectTrigger size="sm" className="note-select-trigger" aria-label={t("高亮颜色")}><SelectValue/></SelectTrigger>
+            <SelectContent position="popper">{NOTE_HIGHLIGHTS.map((color, index) => <SelectItem key={color} value={color}><span className="note-color-dot" style={{ backgroundColor: color }} aria-hidden="true"/>{[t("黄色"), t("绿色"), t("蓝色"), t("粉色"), t("紫色")][index]}</SelectItem>)}</SelectContent>
+          </Select></div>
         </div>
         <div className="note-format-row">
           {tools?.map(tool => <button type="button" key={tool.label} aria-label={tool.label} title={tool.label} aria-pressed={tool.active} onPointerDown={event => event.preventDefault()} onClick={tool.run}><tool.icon size={18}/></button>)}
