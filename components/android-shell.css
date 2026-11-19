@@ -28,16 +28,9 @@ html[data-closet-ui="android"] .android-search-input [data-slot="input"] { heigh
 .android-app .wardrobe-toolbar { border: 0; margin: 0 0 12px; }
 .android-app .category-tabs, .android-occasion-tabs { display: flex; overflow-x: auto; gap: 8px; scrollbar-width: none; margin: 0 0 12px; }
 .android-app .category-tabs { margin-bottom: 0; }
-.android-app .category-tabs > button, .android-occasion-tabs > button { min-height: 36px; padding: 0 17px; border: 0; border-radius: 50px; background: #eeece6; color: #7a8077; font-size: 13px; font-weight: 400; white-space: nowrap; flex-shrink: 0; }
+.android-app .category-tabs > button, .android-occasion-tabs > button { min-height: 36px; padding: 0 16px; border: 0; border-radius: 50px; background: #eeece6; color: #7a8077; font-size: 13px; font-weight: 400; white-space: nowrap; flex-shrink: 0; }
 .android-app .category-tabs > button.active, .android-occasion-tabs > button.active { background: #29362f; color: #fff; }
 .android-app .category-tabs button span { display: none; }
-.android-app .wardrobe-category { border: 0; border-radius: 50px; background: #eeece6; }
-.android-app .wardrobe-category.active { background: #29362f; }
-.android-app .category-tabs .wardrobe-category > button { min-height: 36px; padding: 0; color: #656d62; font-size: 13px; }
-.android-app .category-tabs .wardrobe-category > .wardrobe-category-label { padding-left: 16px; }
-.android-app .category-tabs .wardrobe-category.active > button { color: #fff; }
-.android-app .wardrobe-category .wardrobe-drag-handle { border-radius: 0 50px 50px 0; }
-.android-app .wardrobe-category.active .wardrobe-drag-handle:hover { background: #3d4b42; }
 .android-app .item-grid, .android-app .outfit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 10px; }
 .android-app .item-card, .android-app .outfit-card { background: transparent; border: 0; border-radius: 0; overflow: visible; box-shadow: none; position: relative; }
 .android-app .item-card:hover, .android-app .outfit-card:hover { transform: none; box-shadow: none; }

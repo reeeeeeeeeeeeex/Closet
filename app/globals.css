@@ -172,20 +172,42 @@ h1 { font-size: 34px; line-height: 1.35; font-weight: 600; letter-spacing: -1.4p
 .category-tabs button.active { color: #242d3a; border-color: #242d3a; font-weight: 600; }
 .category-tabs button span { margin-left: 5px; color: #a1a8b2; font-size: 12px; font-weight: 400; }
 .category-tabs button.active span { color: #647388; }
-.wardrobe-category { display: inline-flex; flex: none; align-items: stretch; border-bottom: 2px solid transparent; }
-.category-tabs .wardrobe-category > button { border: 0; padding: 0 0 4px; }
-.wardrobe-category.active { border-color: #242d3a; }
-.category-tabs .wardrobe-category.active > button { color: #242d3a; font-weight: 600; }
-.wardrobe-drag-handle { display: inline-grid; place-items: center; width: 36px; min-height: 36px; flex: none; cursor: grab; touch-action: none; user-select: none; color: #66758a; border-radius: 8px; }
-.wardrobe-drag-handle:hover, .wardrobe-drag-handle:focus-visible { background: #e6ebf2; }
-.wardrobe-drag-handle:disabled { cursor: default; }
-[data-dragging] > .wardrobe-drag-handle { cursor: grabbing; }
-:is(.wardrobe-category, .wardrobe-sort-card, .subset-section-heading)[data-dragging] { opacity: .55; }
-:is(.wardrobe-category, .wardrobe-sort-card, .subset-section-heading)[data-drop-target] { outline: 2px solid #546e87; outline-offset: -2px; border-radius: 10px; }
+.wardrobe-category { flex: none; }
 .wardrobe-sort-card { position: relative; display: grid; min-width: 0; }
-.wardrobe-sort-card > .wardrobe-drag-handle { position: absolute; top: 6px; right: 6px; width: 44px; min-height: 44px; z-index: 1; background: #fff; color: #344359; box-shadow: 0 1px 5px #242d3a29; }
-.wardrobe-sort-card > .wardrobe-drag-handle:hover { background: #e6ebf2; }
-@media (pointer: coarse) { .wardrobe-drag-handle { min-width: 44px; min-height: 44px; } }
+:is(.wardrobe-category, .wardrobe-sort-card, .subset-section-heading) {
+  -webkit-touch-callout: none;
+  user-select: none;
+  transition: transform 200ms var(--ease-apple), box-shadow 200ms var(--ease-apple), opacity 180ms ease;
+}
+:is(.wardrobe-sort-card, .subset-section-heading)[data-dragging] {
+  transform: scale(1.035);
+  z-index: 25;
+  opacity: .94;
+  box-shadow: var(--shadow-drag);
+  border-radius: 16px;
+  cursor: grabbing;
+}
+.wardrobe-category[data-dragging] {
+  transform: scale(1.04);
+  z-index: 25;
+  opacity: .94;
+  box-shadow: var(--shadow-drag);
+  border-radius: 9999px;
+  cursor: grabbing;
+}
+:is(.wardrobe-sort-card, .subset-section-heading)[data-drop-target] {
+  outline: 2px solid var(--apple-blue);
+  outline-offset: 2px;
+  border-radius: 16px;
+  background: rgba(0, 122, 255, .04);
+}
+.wardrobe-category[data-drop-target] {
+  outline: 2px solid var(--apple-blue);
+  outline-offset: 2px;
+  border-radius: 9999px;
+}
+body.is-sort-dragging { cursor: grabbing; user-select: none; }
+body.is-sort-dragging * { cursor: grabbing !important; }
 .filter-row { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; min-width: 0; }
 .search-box { display: flex; align-items: center; position: relative; flex: 1; max-width: 335px; }
 .search-box > svg { position: absolute; left: 13px; color: #929ba7; }

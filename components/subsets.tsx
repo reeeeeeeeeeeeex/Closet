@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState, type ReactNode } from "react";
-import { ChevronRight, ChevronDown, FolderPlus, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, ChevronDown, FolderPlus, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -39,11 +39,10 @@ export function SubsetBrowser({ records, scope, root, activeId, disabled, onSele
     const { subset, count } = section; const open = !collapsed.has(subset.id); const contentId = "subset-content-" + subset.id;
     const group = `wardrobe-groups:${root}:${subset.data.parentId ?? "root"}`;
     return <section className="subset-section" key={subset.id} data-subset-id={subset.id}>
-      <div className="subset-section-heading" {...sort?.drag.row(group, subset.id)}>
-        {sort && siblings.length > 1 && <button type="button" className="wardrobe-drag-handle" disabled={sort.disabled} {...sort.drag.handle(group, subset.id, subset.data.name, siblings)}><GripVertical size={18}/></button>}
-        <button type="button" className="subset-toggle" aria-expanded={open} aria-controls={contentId} aria-label={t("展开或折叠分组 {name}", { name: subset.data.name })} onClick={() => toggle(subset.id)}>{open ? <ChevronDown size={18}/> : <ChevronRight size={18}/>}</button>
+      <div className="subset-section-heading" {...sort?.drag.row(group, subset.id)} {...sort?.drag.surface(group, subset.id, subset.data.name, siblings, { disabled: sort.disabled || siblings.length <= 1, ignoreSelector: "[data-drag-ignore]" })}>
+        <button type="button" data-drag-ignore="true" className="subset-toggle" aria-expanded={open} aria-controls={contentId} aria-label={t("展开或折叠分组 {name}", { name: subset.data.name })} onClick={() => toggle(subset.id)}>{open ? <ChevronDown size={18}/> : <ChevronRight size={18}/>}</button>
         <button type="button" className="subset-title" onClick={() => onSelect(subset.id)}>{subset.data.name}</button><span className="subset-count">{t("{count} 条内容", { count })}</span>
-        <div className="subset-actions"><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDialog({ record: subset, parentId: subset.data.parentId })}><Pencil size={14}/>{t("编辑")}</Button><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDialog({ record: subset, parentId: subset.data.parentId })}>{t("添加内容")}</Button><Button variant="ghost" size="sm" disabled={disabled} onClick={() => onAdd(subset.id)}><Plus size={14}/>{scope === "item" ? t("添加单品") : t("新建搭配")}</Button><Button variant="outline" size="sm" disabled={disabled} onClick={() => setDialog({ parentId: subset.id })}><FolderPlus size={14}/>{t("新建分组")}</Button></div>
+        <div className="subset-actions" data-drag-ignore="true"><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDialog({ record: subset, parentId: subset.data.parentId })}><Pencil size={14}/>{t("编辑")}</Button><Button variant="ghost" size="sm" disabled={disabled} onClick={() => setDialog({ record: subset, parentId: subset.data.parentId })}>{t("添加内容")}</Button><Button variant="ghost" size="sm" disabled={disabled} onClick={() => onAdd(subset.id)}><Plus size={14}/>{scope === "item" ? t("添加单品") : t("新建搭配")}</Button><Button variant="outline" size="sm" disabled={disabled} onClick={() => setDialog({ parentId: subset.id })}><FolderPlus size={14}/>{t("新建分组")}</Button></div>
       </div>
       {open && <div id={contentId} className="subset-section-content">{renderSections(section.children)}{!!section.records.length && renderCards(section.records, subset.id)}{!count && <p className="field-hint">{t("此分组在当前筛选下没有内容。")}</p>}</div>}
     </section>;

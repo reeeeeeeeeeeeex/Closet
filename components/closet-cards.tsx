@@ -18,7 +18,7 @@ export function Photo({ asset, name, className = "", onOpen }: {
     onOpen?: () => void;
 }) {
     const { t } = useI18n();
-    const content = asset ? <img src={assetUrl(asset)} alt={name} loading="lazy" onError={e => { e.currentTarget.style.opacity = ".2"; }}/> : <div className="photo-placeholder"><Shirt strokeWidth={1}/><span>{t("未添加照片")}</span></div>;
+    const content = asset ? <img src={assetUrl(asset)} alt={name} draggable={false} loading="lazy" onError={e => { e.currentTarget.style.opacity = ".2"; }}/> : <div className="photo-placeholder"><Shirt strokeWidth={1}/><span>{t("未添加照片")}</span></div>;
     return onOpen ? <button type="button" className={`photo ${className}`} onClick={onOpen} aria-label={t("展开 {name} 的大图", { name })}>{content}</button> : <div className={`photo ${className}`}>{content}</div>;
 }
 export function OccasionLabels({ values }: {

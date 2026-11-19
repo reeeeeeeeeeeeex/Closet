@@ -15,7 +15,7 @@ import { RandomOutfitEditor } from "@/components/random-outfit";
 import { useSortDrag } from "@/components/use-sort-drag";
 import { applyOrder, moveVisible } from "@/lib/wardrobe-order";
 import type { WardrobeOrder, WardrobeOrderRecord } from "@/lib/domain";
-import { GripVertical, LockKeyhole, Shuffle } from "lucide-react";
+import { LockKeyhole, Shuffle } from "lucide-react";
 import { tr, translatedOptions } from "@/lib/i18n/core";
 import { useI18n } from "@/lib/i18n/provider";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -340,18 +340,14 @@ export default function Home({ profile, appearance = "web" }: { profile: Profile
     const selectCategory = (key: string) => { setCategory(key); setSelectedSubsetId(null); };
     const categoryNavigation = <div className="wardrobe-toolbar"><div className="category-tabs" ref={categoryScroller} role="group" aria-label={t("单品分类")}>
       <button type="button" className={category === "all" ? "active" : ""} aria-pressed={category === "all"} onClick={() => selectCategory("all")}>{t("全部")}<span>{items.filter(item => item.data.archived === archived).length}</span></button>
-      {categoryIds.map(key => <div className={category === key ? "wardrobe-category active" : "wardrobe-category"} key={key} {...wardrobeDrag.row("wardrobe-categories", key)}>
-        <button type="button" className="wardrobe-category-label" aria-pressed={category === key} onClick={() => selectCategory(key)}>{t(CATEGORIES[key])}<span>{items.filter(item => item.data.category === key && item.data.archived === archived).length}</span></button>
-        <button type="button" className="wardrobe-drag-handle" disabled={sortDisabled} {...wardrobeDrag.handle("wardrobe-categories", key, t(CATEGORIES[key]), categoryIds, true)}><GripVertical size={15}/></button>
-      </div>)}
+      {categoryIds.map(key => <button type="button" className={category === key ? "wardrobe-category active" : "wardrobe-category"} key={key} aria-pressed={category === key} onClick={() => selectCategory(key)} {...wardrobeDrag.row("wardrobe-categories", key)} {...wardrobeDrag.surface("wardrobe-categories", key, t(CATEGORIES[key]), categoryIds, { horizontal: true, disabled: sortDisabled })}>{t(CATEGORIES[key])}<span>{items.filter(item => item.data.category === key && item.data.archived === archived).length}</span></button>)}
     </div></div>;
     function renderWardrobeCards(records: (ItemRecord | OutfitRecord)[], section: string | null) {
         const cards = records.filter((record): record is ItemRecord => record.kind === "item");
         const ids = cards.map(record => record.id);
         const group = `wardrobe-items:${subsetRoot}:${section ?? "root"}`;
-        return <div className="item-grid">{cards.map(record => <div key={record.id} className="wardrobe-sort-card" {...wardrobeDrag.row(group, record.id)}>
+        return <div className="item-grid">{cards.map(record => <div key={record.id} className="wardrobe-sort-card" {...wardrobeDrag.row(group, record.id)} {...wardrobeDrag.surface(group, record.id, record.data.name, ids, { disabled: sortDisabled || ids.length <= 1 })}>
             <ItemCard compact={android} item={record} onCrop={(file, photo) => saveCroppedPhoto(record, file, photo.key)} onOpen={() => setEditor({ kind: "item", record })}/>
-            {ids.length > 1 && <button type="button" className="wardrobe-drag-handle" disabled={sortDisabled} {...wardrobeDrag.handle(group, record.id, record.data.name, ids)}><GripVertical size={19}/></button>}
         </div>)}</div>;
     }
     const renderToolbar = (controls: React.ReactNode) => android ? <>
