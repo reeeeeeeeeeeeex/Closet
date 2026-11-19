@@ -1,35 +1,50 @@
-/* Android appearance is explicit; the PC view keeps its existing layout. */
-html[data-closet-ui="android"] { --background: #f7f5f0; --foreground: #252c28; --primary: #29362f; --primary-foreground: #fff; --secondary: #eeece6; --accent: #eeece6; --border: #deded5; --input: #deded5; --muted-foreground: #858780; --ring: #7c8876; }
-html[data-closet-ui="android"] body { background: #f7f5f0; color: #252c28; }
-.android-app { background: #f7f5f0; min-height: 100dvh; }
+/* Unified Apple HIG mobile shell overrides; tokens come from globals.css. */
+.android-app { background: var(--background); min-height: 100dvh; }
 .android-app .main-inset { background: transparent; }
-.android-app .workspace { max-width: 600px; padding: 12px 18px calc(88px + env(safe-area-inset-bottom)); }
-.android-app .android-topbar { display: block; height: auto; background: transparent; border: 0; padding: 0 18px; width: 100%; max-width: 600px; margin: 0 auto; }
-/* Main tabs already identify the page. Keep its heading accessible without using screen space. */
-.android-app .android-topbar.is-primary { position: absolute; height: 0; padding: 0; }
-.android-page-heading { display: flex; align-items: center; gap: 10px; }
-.android-page-heading h1 { font-size: 17px; font-weight: 550; line-height: 1.4; margin: 0; }
-.android-back { width: 44px; height: 44px; display: grid; place-items: center; margin-left: -10px; flex-shrink: 0; }
+.android-app .workspace { max-width: 600px; padding: 12px 16px calc(86px + env(safe-area-inset-bottom)); }
+.android-app .android-topbar {
+  position: sticky; top: 0; z-index: 30;
+  display: block; height: auto; width: 100%; max-width: 600px; margin: 0 auto;
+  padding: max(8px, env(safe-area-inset-top)) 16px 10px;
+  background: rgba(245, 245, 247, 0.84);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.07);
+}
+.android-page-heading { display: flex; align-items: center; gap: 8px; min-height: 38px; }
+.android-page-heading h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.25; margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.android-app .android-topbar.is-secondary .android-page-heading h1 { font-size: 17px; font-weight: 600; }
+.android-back { width: 40px; height: 40px; border-radius: 9999px; display: grid; place-items: center; margin-left: -10px; flex-shrink: 0; color: var(--apple-blue); }
+.android-header-add { width: 34px; height: 34px; border-radius: 9999px; background: var(--primary); color: var(--primary-foreground); display: grid; place-items: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14); transition: transform 150ms ease, opacity 150ms ease; }
+.android-header-add:active { transform: scale(0.92); }
+.android-header-add:disabled { opacity: 0.4; }
 .android-status-accessible { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.android-bottom-nav { position: fixed; z-index: 40; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: repeat(4, 1fr); background: #f9f8f4; border-top: 1px solid #e6e4de; padding: 6px 8px max(6px, env(safe-area-inset-bottom)); }
-.android-bottom-nav button { height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #999c96; font-size: 11px; }
-.android-bottom-nav button[aria-current="page"] { color: #28362e; }
-.android-bottom-nav button:disabled, .android-add:disabled { opacity: .45; }
-.android-add { position: fixed; z-index: 39; bottom: calc(76px + env(safe-area-inset-bottom)); right: 20px; height: 52px; width: 52px; border-radius: 50%; background: #29362f; color: #fff; box-shadow: 0 4px 16px #29362f18; display: grid; place-items: center; }
-.android-search-row { display: flex; gap: 9px; align-items: center; margin-bottom: 10px; }
-.android-search-input { background: #eeece6; border: 1px solid #e3e1da; height: 44px; flex: 1; min-width: 0; border-radius: 14px; display: flex; align-items: center; padding: 0 13px; gap: 9px; }
-.android-search-input > svg { flex-shrink: 0; color: #59635a; }
-html[data-closet-ui="android"] .android-search-input [data-slot="input"] { height: 42px; min-height: 42px; min-width: 0; border: 0; box-shadow: none; outline: none; background: transparent; padding: 0; font-size: 14px; }
+.android-bottom-nav {
+  position: fixed; z-index: 40; bottom: 0; left: 0; right: 0;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: rgba(249, 249, 251, 0.86);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  border-top: 0.5px solid rgba(0, 0, 0, 0.08);
+  padding: 5px 8px max(6px, env(safe-area-inset-bottom));
+}
+.android-bottom-nav button { height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #8e8e93; font-size: 10.5px; font-weight: 500; transition: color 150ms ease; }
+.android-bottom-nav button[aria-current="page"] { color: var(--foreground); font-weight: 600; }
+.android-bottom-nav button:disabled { opacity: 0.4; }
+.android-search-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.android-search-input { background: rgba(118, 118, 128, 0.12); border: 0; height: 40px; flex: 1; min-width: 0; border-radius: 12px; display: flex; align-items: center; padding: 0 11px; gap: 8px; }
+.android-search-input > svg { flex-shrink: 0; color: #8e8e93; }
+html[data-closet-ui="android"] .android-search-input [data-slot="input"] { height: 38px; min-height: 38px; min-width: 0; border: 0; box-shadow: none; outline: none; background: transparent; padding: 0; font-size: 15px; }
 .android-search-input [data-slot="input"]:focus-visible { border: 0; box-shadow: none; }
-.android-search-input > button { min-width: 24px; height: 38px; display: grid; place-items: center; }
-.android-filter-trigger { width: 44px; height: 44px; border: 1px solid #e3e1da; border-radius: 14px; background: #eeece6; display: grid; place-items: center; flex-shrink: 0; position: relative; }
-.android-filter-trigger.has-filters { background: #dfe5d9; border-color: #cbd3c5; }
-.android-filter-trigger i { position: absolute; top: -3px; right: -3px; height: 16px; min-width: 16px; border-radius: 50%; background: #405640; color: #fff; font-size: 10px; display: grid; place-items: center; font-style: normal; }
+.android-search-input > button { min-width: 24px; height: 36px; display: grid; place-items: center; color: #8e8e93; }
+.android-filter-trigger { width: 40px; height: 40px; border: 0; border-radius: 12px; background: rgba(118, 118, 128, 0.12); color: var(--foreground); display: grid; place-items: center; flex-shrink: 0; position: relative; }
+.android-filter-trigger.has-filters { background: var(--primary); color: #ffffff; }
+.android-filter-trigger i { position: absolute; top: -4px; right: -4px; height: 17px; min-width: 17px; padding: 0 4px; border-radius: 9999px; background: var(--apple-blue); color: #fff; font-size: 10px; font-weight: 600; display: grid; place-items: center; font-style: normal; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2); }
 .android-app .wardrobe-toolbar { border: 0; margin: 0 0 12px; }
-.android-app .category-tabs, .android-occasion-tabs { display: flex; overflow-x: auto; gap: 8px; scrollbar-width: none; margin: 0 0 12px; }
+.android-app .category-tabs, .android-occasion-tabs { display: flex; overflow-x: auto; gap: 8px; scrollbar-width: none; margin: 0 0 12px; padding: 2px 0; }
 .android-app .category-tabs { margin-bottom: 0; }
-.android-app .category-tabs > button, .android-occasion-tabs > button { min-height: 36px; padding: 0 16px; border: 0; border-radius: 50px; background: #eeece6; color: #7a8077; font-size: 13px; font-weight: 400; white-space: nowrap; flex-shrink: 0; }
-.android-app .category-tabs > button.active, .android-occasion-tabs > button.active { background: #29362f; color: #fff; }
+.android-app .category-tabs > button, .android-occasion-tabs > button { min-height: 34px; padding: 0 15px; border: 0.5px solid rgba(0, 0, 0, 0.06); border-radius: 9999px; background: #ffffff; color: #6e6e73; font-size: 13px; font-weight: 500; white-space: nowrap; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03); transition: background-color 150ms ease, color 150ms ease; }
+.android-app .category-tabs > button.active, .android-occasion-tabs > button.active { background: var(--primary); border-color: var(--primary); color: #ffffff; font-weight: 600; }
 .android-app .category-tabs button span { display: none; }
 .android-app .item-grid, .android-app .outfit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 10px; }
 .android-app .item-card, .android-app .outfit-card { background: transparent; border: 0; border-radius: 0; overflow: visible; box-shadow: none; position: relative; }
@@ -45,35 +60,44 @@ html[data-closet-ui="android"] .android-search-input [data-slot="input"] { heigh
 .android-app .outfit-footer > button { background: #f8f7f0dd; border-radius: 50%; width: 32px; min-height: 32px; height: 32px; color: #636e5d; }
 .android-app .outfit-collage { background: #eeeae1; gap: 5px; padding: 10px; }
 .android-app .outfit-collage .photo { background: #f5f2ea; border-radius: 5px; }
-.android-app .subset-section { border: 0; margin-bottom: 20px; }
-.android-app .subset-section-heading { padding: 3px 0 10px; }
+.android-app .subset-section { border: 0; margin-bottom: 18px; }
+.android-app .subset-section-heading { padding: 2px 4px 8px; }
 .android-app .subset-title { font-size: 16px; }
-.android-app .subset-actions button { font-size: 11px; }
-.android-app .collection-switch { margin: 0 0 16px; }
-.android-app .compact-empty, .android-app .empty-state { background: #f0eee7; border: 0; border-radius: 18px; padding: 38px 20px; gap: 15px; }
-.android-app .compact-empty > svg { color: #7a886d; width: 36px; height: 36px; }
-.android-app .compact-empty h2 { font-size: 19px; }
-.android-my-profile { padding: 0 0 12px; }
-.android-my-profile .profile-switch-compact { padding: 0; min-height: 44px; width: 100%; gap: 8px; border-radius: 0; }
-.android-my-profile .profile-switch-compact > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: 1; min-width: 0; }
-.android-my-profile .profile-switch strong { display: block; font-size: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.android-my-profile .profile-switch span { font-size: 12px; color: #818879; flex-shrink: 0; }
-html[data-closet-ui="android"] .profile-mini-mark { display: none; }
-.android-my-status { display: flex; align-items: center; color: #748269; margin-top: 2px; }
-.android-my-status .sync-label { font-size: 11px; color: inherit; }
+.android-app .collection-switch { margin: 0 0 14px; }
+.android-app .compact-empty, .android-app .empty-state { background: #ffffff; border: 0.5px solid var(--border); border-radius: 20px; padding: 36px 20px; gap: 14px; box-shadow: var(--shadow-card); }
+.android-app .compact-empty > svg { color: var(--muted-foreground); width: 34px; height: 34px; }
+.android-app .compact-empty h2 { font-size: 18px; font-weight: 650; }
+.android-my { display: grid; gap: 14px; }
+.android-my-card { background: #ffffff; border-radius: 18px; border: 0.5px solid rgba(0, 0, 0, 0.06); box-shadow: var(--shadow-card); overflow: hidden; }
+.android-my-profile { padding: 14px 16px; }
+.android-my-profile .profile-switch-compact { padding: 0; min-height: 44px; width: 100%; gap: 12px; border-radius: 0; }
+.android-my-profile .profile-switch-compact > div:nth-child(2) { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: 1; min-width: 0; }
+.android-my-profile .profile-switch strong { display: block; font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.android-my-profile .profile-switch span { font-size: 13px; color: var(--apple-blue); flex-shrink: 0; font-weight: 500; }
+.android-my-status { display: flex; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 0.5px solid rgba(0, 0, 0, 0.06); color: var(--muted-foreground); }
+.android-my-status .sync-label { font-size: 12px; color: inherit; }
 .android-my-links { margin-top: 0; }
-.android-my-links > button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 0; min-height: 56px; border-top: 1px solid #e0ded6; text-align: left; }
-.android-my-links > button:last-child { border-bottom: 1px solid #e0ded6; }
-.android-my-links > button > span { flex: 1; }
-.android-my-links strong { display: block; font-size: 14px; font-weight: 500; }
-html[data-closet-ui="android"] .android-filter-sheet { max-height: 85dvh; border-radius: 23px 23px 0 0; padding: 20px 20px max(20px, env(safe-area-inset-bottom)); overflow-y: auto; background: #f7f5f0; border: 0; }
-.android-filter-options { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px 0; }
-.android-filter-options > [data-slot="select-trigger"] { width: 100%; height: 46px; border-radius: 12px; }
-.android-filter-options .archive-filter { border: 1px solid #deded5; border-radius: 12px; min-height: 44px; padding: 0 14px; }
-.android-group-controls { flex-basis: 100%; border-top: 1px solid #e0ded6; padding-top: 14px; margin-top: 6px; }
-.android-filter-footer { display: flex; gap: 12px; margin-top: 12px; }
-.android-filter-footer > button { min-height: 46px; border-radius: 12px; flex: 1; font-size: 14px; }
-.android-primary { background: #29362f; color: #fff; }
+.android-my-links > button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 16px; min-height: 52px; border-top: 0.5px solid rgba(0, 0, 0, 0.06); text-align: left; transition: background-color 140ms ease; }
+.android-my-links > button:first-child { border-top: 0; }
+.android-my-links > button:active { background: rgba(0, 0, 0, 0.03); }
+.android-my-icon { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; }
+.android-my-icon.tone-blue { background: rgba(0, 122, 255, 0.12); color: #007aff; }
+.android-my-icon.tone-green { background: rgba(52, 199, 89, 0.14); color: #248a3d; }
+.android-my-icon.tone-amber { background: rgba(255, 149, 0, 0.14); color: #c96900; }
+.android-my-title { flex: 1; min-width: 0; }
+.android-my-links strong { display: block; font-size: 15px; font-weight: 500; color: var(--foreground); }
+.android-my-chevron { color: #c7c7cc; flex-shrink: 0; }
+.android-my-lang { padding: 8px 14px; }
+.android-my-lang .language-select { padding: 2px 0; }
+html[data-closet-ui="android"] .android-filter-sheet { max-height: 85dvh; border-radius: 24px 24px 0 0; padding: 12px 20px max(20px, env(safe-area-inset-bottom)); overflow-y: auto; background: var(--background); border: 0; }
+.android-filter-options { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 0; }
+.android-filter-options > [data-slot="select-trigger"] { width: 100%; height: 44px; border-radius: 12px; }
+.android-filter-options .archive-filter { border: 0.5px solid var(--border); background: #ffffff; border-radius: 12px; min-height: 44px; padding: 0 14px; }
+.android-group-controls { flex-basis: 100%; border-top: 0.5px solid var(--border); padding-top: 14px; margin-top: 6px; }
+.android-filter-footer { display: flex; gap: 10px; margin-top: 12px; }
+.android-filter-footer > button { min-height: 46px; border-radius: 14px; flex: 1; font-size: 15px; font-weight: 600; }
+.android-secondary { background: #ffffff; border: 0.5px solid rgba(0, 0, 0, 0.08); color: var(--foreground); }
+.android-primary { background: var(--primary); color: #ffffff; }
 .android-app .calendar-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .android-month-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .android-month-header > button:not([data-slot]) { font-size: 18px; font-weight: 500; min-height: 44px; padding: 0 10px; }
@@ -203,4 +227,3 @@ html[data-closet-ui="android"] .item-photo-details dt { color: #616c62; }
 .android-app .assistant-form { gap: 12px; }
 .android-app .assistant-form > button { width: 100%; }
 .android-app .assistant-note { padding-top: 8px; font-size: 11px; }
-@media (min-width: 601px) { .android-add { right: calc((100vw - 600px) / 2 + 20px); } }

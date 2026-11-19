@@ -17,21 +17,26 @@ export function ClosetNotes({ notes, locations, disabled, onAdd, onOpen }: {
   onOpen: (note: NoteRecord) => void;
 }) {
   const { t } = useI18n();
+  if (!notes.length) {
+    return <section className="closet-notes is-empty" aria-label={t("笔记")}>
+      <Button size="sm" variant="outline" className="closet-note-pill" disabled={disabled} onClick={onAdd}><NotebookPen size={14}/><span>{t("新建笔记")}</span></Button>
+    </section>;
+  }
   return <section className="closet-notes" aria-label={t("笔记")}>
     <header className="closet-notes-heading">
-      <h2><NotebookPen size={17}/>{t("笔记")}</h2>
-      <Button size="sm" variant="outline" disabled={disabled} onClick={onAdd}><Plus size={16}/>{t("新建笔记")}</Button>
+      <h2><NotebookPen size={16}/>{t("笔记")}</h2>
+      <Button size="sm" variant="outline" className="closet-note-pill" disabled={disabled} onClick={onAdd}><Plus size={15}/>{t("新建笔记")}</Button>
     </header>
-    {!!notes.length && <div className="closet-note-grid">
+    <div className="closet-note-grid">
       {notes.map(note => {
         const location = locations.get(note.data.subsetId || "") || (note.data.root !== "all" ? t(CATEGORIES[note.data.root]) : "");
         return <button className="closet-note-card" type="button" key={note.id} onClick={() => onOpen(note)}>
           <strong>{note.data.name}</strong>
           {note.data.text && <span className="closet-note-excerpt">{note.data.text}</span>}
-          <span className="closet-note-meta">{location}{note.data.attachments.length > 0 && <span><Paperclip size={13}/> {t("{count} 个附件", { count: note.data.attachments.length })}</span>}</span>
+          {(location || note.data.attachments.length > 0) && <span className="closet-note-meta">{location}{note.data.attachments.length > 0 && <span><Paperclip size={12}/> {t("{count} 个附件", { count: note.data.attachments.length })}</span>}</span>}
         </button>;
       })}
-    </div>}
+    </div>
   </section>;
 }
 
