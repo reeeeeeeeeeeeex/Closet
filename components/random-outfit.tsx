@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { GripVertical, Shuffle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CATEGORIES, type ItemRecord, type RandomOutfitRulesRecord } from "@/lib/domain";
 import { defaultOutfitRules, moveTo, outfitCandidates, randomOutfit, type CategoryRule, type RandomOutfitRules } from "@/lib/random-outfit";
 import { useI18n } from "@/lib/i18n/provider";
@@ -105,22 +106,30 @@ export function RandomOutfitEditor({ record, items, disabled, onClose, onSave, o
                     </ol>
                     <Button type="button" size="sm" variant="ghost" onClick={() => setCandidates(rule.category, null)}>{t("使用全部单品")}</Button>
                   </>}
-                  {rule.itemIds !== null && !!available.length && <select className="random-rule-select" aria-label={t("向 {name} 添加候选单品", { name: categoryName })} value="" onChange={event => {
-                    if (event.target.value) setCandidates(rule.category, [...itemIds, event.target.value]);
+                  {rule.itemIds !== null && !!available.length && <Select value="" onValueChange={value => {
+                    if (value) setCandidates(rule.category, [...itemIds, value]);
                   }}>
-                    <option value="">{t("添加候选单品")}</option>
-                    {available.map(item => <option value={item.id} key={item.id}>{item.data.name}</option>)}
-                  </select>}
+                    <SelectTrigger className="random-rule-select" aria-label={t("向 {name} 添加候选单品", { name: categoryName })}>
+                      <SelectValue placeholder={t("添加候选单品")}/>
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {available.map(item => <SelectItem value={item.id} key={item.id}>{item.data.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>}
                 </div>
               </li>;
             })}
           </ol>
-          {!!availableCategories.length && <select className="random-rule-select" aria-label={t("添加分类")} value="" onChange={event => {
-            if (event.target.value) update([...rules.categories, { category: event.target.value as CategoryRule["category"], itemIds: null }]);
+          {!!availableCategories.length && <Select value="" onValueChange={value => {
+            if (value) update([...rules.categories, { category: value as CategoryRule["category"], itemIds: null }]);
           }}>
-            <option value="">{t("添加分类")}</option>
-            {availableCategories.map(category => <option key={category} value={category}>{t(CATEGORIES[category])}</option>)}
-          </select>}
+            <SelectTrigger className="random-rule-select" aria-label={t("添加分类")}>
+              <SelectValue placeholder={t("添加分类")}/>
+            </SelectTrigger>
+            <SelectContent position="popper">
+              {availableCategories.map(category => <SelectItem key={category} value={category}>{t(CATEGORIES[category])}</SelectItem>)}
+            </SelectContent>
+          </Select>}
         </fieldset>
         <div ref={feedback}>
           {error && <p className="form-error" role="alert">{error}</p>}

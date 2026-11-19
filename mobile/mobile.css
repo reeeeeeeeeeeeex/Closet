@@ -3,5 +3,8 @@ body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inse
 /* Modal scroll locking replaces body padding with its margins. Keep the device
    safe area while dialogs, sheets, and nested menus hold the scroll lock. */
 body[data-scroll-locked] { padding-top: env(safe-area-inset-top) !important; padding-bottom: env(safe-area-inset-bottom) !important; padding-left: env(safe-area-inset-left) !important; padding-right: env(safe-area-inset-right) !important; }
+html[data-closet-ui="android"] body,
+html[data-closet-ui="android"] body[data-scroll-locked] { padding-top: 0 !important; }
+html[data-closet-ui="android"] .android-app .android-topbar { padding-top: calc(8px + env(safe-area-inset-top)); }
 button, a { -webkit-tap-highlight-color: transparent; }
 input, textarea, select { font-size: 16px; }

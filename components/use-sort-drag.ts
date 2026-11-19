@@ -120,10 +120,6 @@ export function useSortDrag(
       try { window.getSelection?.()?.removeAllRanges(); } catch {}
       if (isTouch) {
         try { navigator.vibrate?.(12); } catch {}
-        if (!blockingTouchScroll) {
-          blockingTouchScroll = true;
-          window.addEventListener("touchmove", blockTouchScroll, { capture: true, passive: false });
-        }
       }
       document.body.classList.add("is-sort-dragging");
       setActive({ group, id });
@@ -177,11 +173,12 @@ export function useSortDrag(
     }
 
     drag.current = current;
-    if (options.requireHold) {
-      holdTimer = window.setTimeout(activate, isTouch ? TOUCH_HOLD_MS : MOUSE_HOLD_MS);
-    } else if (isTouch) {
+    if (isTouch) {
       blockingTouchScroll = true;
       window.addEventListener("touchmove", blockTouchScroll, { capture: true, passive: false });
+    }
+    if (options.requireHold) {
+      holdTimer = window.setTimeout(activate, isTouch ? TOUCH_HOLD_MS : MOUSE_HOLD_MS);
     }
     window.addEventListener("pointermove", move, true);
     window.addEventListener("pointerup", drop, true);
