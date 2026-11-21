@@ -2,8 +2,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { NotebookPen, Paperclip, Plus } from "lucide-react";
+import { ChevronRight, NotebookPen, Paperclip, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { CATEGORIES, type Asset, type NoteRecord } from "@/lib/domain";
 import { getClosetClient } from "@/lib/closet-client";
 import { assetUrl, getProfileContext } from "@/lib/profile-client";
@@ -16,27 +18,89 @@ export function ClosetNotes({ notes, locations, disabled, onAdd, onOpen }: {
   onAdd: () => void;
   onOpen: (note: NoteRecord) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const [listOpen, setListOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
   if (!notes.length) {
     return <section className="closet-notes is-empty" aria-label={t("笔记")}>
       <Button size="sm" variant="outline" className="closet-note-pill" disabled={disabled} onClick={onAdd}><NotebookPen size={14}/><span>{t("新建笔记")}</span></Button>
     </section>;
   }
+
+  const latest = notes[0];
+  const normalized = query.trim().toLocaleLowerCase();
+  const filtered = normalized
+    ? notes.filter(note => [note.data.name, note.data.text].join(" ").toLocaleLowerCase().includes(normalized))
+    : notes;
+
   return <section className="closet-notes" aria-label={t("笔记")}>
-    <header className="closet-notes-heading">
-      <h2><NotebookPen size={16}/>{t("笔记")}</h2>
-      <Button size="sm" variant="outline" className="closet-note-pill" disabled={disabled} onClick={onAdd}><Plus size={15}/>{t("新建笔记")}</Button>
-    </header>
-    <div className="closet-note-grid">
-      {notes.map(note => {
-        const location = locations.get(note.data.subsetId || "") || (note.data.root !== "all" ? t(CATEGORIES[note.data.root]) : "");
-        return <button className="closet-note-card" type="button" key={note.id} onClick={() => onOpen(note)}>
-          <strong>{note.data.name}</strong>
-          {note.data.text && <span className="closet-note-excerpt">{note.data.text}</span>}
-          {(location || note.data.attachments.length > 0) && <span className="closet-note-meta">{location}{note.data.attachments.length > 0 && <span><Paperclip size={12}/> {t("{count} 个附件", { count: note.data.attachments.length })}</span>}</span>}
-        </button>;
-      })}
+    <div className="closet-notes-bar">
+      <button type="button" className="closet-notes-summary" onClick={() => setListOpen(true)}>
+        <span className="closet-notes-badge" aria-hidden="true"><NotebookPen size={16} strokeWidth={1.8}/></span>
+        <span className="closet-notes-summary-text">
+          <span className="closet-notes-summary-head">
+            <strong>{t("笔记")}</strong>
+            <span className="closet-notes-count">{notes.length}</span>
+          </span>
+          <span className="closet-notes-summary-preview">{latest.data.name}</span>
+        </span>
+        <ChevronRight size={17} className="closet-notes-chevron" aria-hidden="true"/>
+      </button>
+      <Button type="button" size="sm" variant="ghost" className="closet-notes-quick-add" disabled={disabled} aria-label={t("新建笔记")} title={t("新建笔记")} onClick={onAdd}>
+        <Plus size={16}/>
+      </Button>
     </div>
+
+    <Dialog open={listOpen} onOpenChange={open => { setListOpen(open); if (!open) setQuery(""); }}>
+      <DialogContent className="closet-dialog notes-collection-dialog">
+        <DialogHeader className="notes-collection-header">
+          <div className="notes-collection-title-row">
+            <div>
+              <DialogTitle>{t("全部笔记")}</DialogTitle>
+              <DialogDescription>{t("共 {count} 条笔记", { count: notes.length })}</DialogDescription>
+            </div>
+            <Button type="button" size="sm" disabled={disabled} onClick={() => { setListOpen(false); onAdd(); }}>
+              <Plus size={15}/>
+              {t("新建笔记")}
+            </Button>
+          </div>
+        </DialogHeader>
+        {notes.length > 3 && (
+          <div className="notes-collection-search">
+            <Search size={15} aria-hidden="true"/>
+            <Input value={query} onChange={event => setQuery(event.target.value)} placeholder={t("搜索笔记")} aria-label={t("搜索笔记")}/>
+            {query && <button type="button" aria-label={t("清空搜索")} onClick={() => setQuery("")}><X size={14}/></button>}
+          </div>
+        )}
+        <div className="notes-collection-scroll">
+          {filtered.length ? (
+            <div className="notes-collection-list">
+              {filtered.map(note => {
+                const location = locations.get(note.data.subsetId || "") || (note.data.root !== "all" ? t(CATEGORIES[note.data.root]) : "");
+                const dateLabel = new Date(note.updatedAt).toLocaleDateString(locale, { month: "short", day: "numeric" });
+                return <button className="closet-note-card" type="button" key={note.id} onClick={() => { setListOpen(false); onOpen(note); }}>
+                  <div className="closet-note-card-head">
+                    <strong>{note.data.name}</strong>
+                    <time dateTime={note.updatedAt}>{dateLabel}</time>
+                  </div>
+                  {note.data.text && <span className="closet-note-excerpt">{note.data.text}</span>}
+                  {(location || note.data.attachments.length > 0) && <span className="closet-note-meta">
+                    {location && <span className="closet-note-location">{location}</span>}
+                    {note.data.attachments.length > 0 && <span><Paperclip size={12}/> {t("{count} 个附件", { count: note.data.attachments.length })}</span>}
+                  </span>}
+                </button>;
+              })}
+            </div>
+          ) : (
+            <div className="notes-collection-empty">
+              <NotebookPen size={26} strokeWidth={1.4}/>
+              <p>{t("没有找到匹配的笔记")}</p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   </section>;
 }
 

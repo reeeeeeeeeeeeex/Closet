@@ -135,6 +135,15 @@ html[data-closet-ui="android"] .android-filter-sheet { max-height: 85dvh; border
 .android-app .day-detail > [data-slot="button"] { margin-top: 12px; background: var(--primary); color: #ffffff; min-height: 46px; border: 0; border-radius: 14px; font-weight: 600; }
 .android-app .snapshot-note { display: none; }
 html[data-closet-ui="android"] .closet-dialog { background: #ffffff; border-color: var(--border); border-radius: 22px; }
+html[data-closet-ui="android"] .notes-collection-dialog {
+  width: 100vw !important; max-width: none !important; height: min(86dvh, 720px); max-height: 90dvh;
+  top: auto; bottom: 0; left: 0; --tw-translate-x: 0px !important; --tw-translate-y: 0px !important;
+  transform: none; translate: none; border: 0; border-radius: 24px 24px 0 0 !important;
+  padding-bottom: env(safe-area-inset-bottom) !important;
+}
+html[data-closet-ui="android"] .notes-collection-header [data-slot="dialog-close"],
+html[data-closet-ui="android"] .notes-collection-dialog > [data-slot="dialog-close"] { top: 14px; right: 12px; }
+.android-app .closet-notes { margin: 4px 0 12px; }
 html[data-closet-ui="android"] [data-slot="button"] { border-radius: 12px; }
 html[data-closet-ui="android"] [data-slot="input"], html[data-closet-ui="android"] [data-slot="textarea"], html[data-closet-ui="android"] [data-slot="select-trigger"] { border-color: rgba(0, 0, 0, 0.1); border-radius: 12px; background: #ffffff; box-shadow: none; font-size: 15px; min-height: 44px; }
 html[data-closet-ui="android"] .item-dialog, html[data-closet-ui="android"] .outfit-dialog {

@@ -154,7 +154,12 @@
   "先核对原图和记录，再建立一个新的衣橱。原有衣橱和资料完整保留。": "We'll check the original photos and records, then restore them to a new wardrobe. Your existing wardrobes and data will stay intact.",
   "全部": "All",
   "全部搭配": "All outfits",
+  "全部笔记": "All notes",
   "六": "Sat",
+  "共 {count} 条笔记": {
+    "one": "{count} note",
+    "other": "{count} notes"
+  },
   "关联单品（可选）": "Linked items (optional)",
   "关联的分组、单品、搭配和日历将一起处理。稍后处理会保留双方版本。": "Related groups, items, outfits, and calendar entries will be handled together. You can leave both versions in place and decide later.",
   "关闭大图": "Close photo viewer",
@@ -456,6 +461,7 @@
   "插入": "Insert",
   "搜索": "Search",
   "搜索可加入的单品或搭配": "Search items or outfits to add",
+  "搜索笔记": "Search notes",
   "搜索筛选颜色": "Search color filters",
   "搜索衣服、品牌…": "Search clothes, brands…",
   "搜索颜色名称或色值": "Search color names or hex codes",
@@ -616,6 +622,7 @@
   "没有匹配的颜色": "No matching colors",
   "没有匹配颜色，可以使用上方名称添加。": "No matching colors. Use the name above to add a new one.",
   "没有找到 manifest.json": "manifest.json was not found.",
+  "没有找到匹配的笔记": "No matching notes",
   "没有找到这个搭配": "This outfit could not be found.",
   "浅棕": "Light brown",
   "浅灰": "Light gray",
