@@ -1,7 +1,7 @@
 "use client";
 import { useId, useState, useEffect } from "react";
 import { ZodError } from "zod";
-import { Check, Loader2, RefreshCw } from "lucide-react";
+import { Check, Footprints, Loader2, RefreshCw, Ruler, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,11 +39,33 @@ export function PersonalSizesPanel({ record, collectionName, disabled, onSave, o
     finally { setBusy(false); }
   }
   return <form className="personal-sizes-panel" onSubmit={event => void submit(event)}>
-    {!compact && <><p className="personal-sizes-context">{t("当前衣橱：{name}", { name: collectionName })}</p><p className="field-hint">{t("尺寸可自由填写，如“约70”或“68–72”。默认单位为 cm，也可注明其他单位；围度填写一整圈，可留空。")}</p></>}
+    {!compact && <header className="personal-sizes-header-card">
+      <div className="personal-sizes-header-badge">
+        <span className="apple-section-icon tone-blue" aria-hidden="true"><Ruler size={18}/></span>
+        <div>
+          <p className="personal-sizes-context">{t("当前衣橱：{name}", { name: collectionName })}</p>
+          <p className="field-hint">{t("尺寸可自由填写，如“约70”或“68–72”。默认单位为 cm，也可注明其他单位；围度填写一整圈，可留空。")}</p>
+        </div>
+      </div>
+    </header>}
     {changedElsewhere && <p className="form-error" role="status">{t("其他设备已更新尺码，当前草稿仍保留。请载入最新尺码后重新确认。")}</p>}
-    <fieldset disabled={busy || disabled} className="personal-sizes-grid"><section className="personal-sizes-card"><h2>{t("身体尺寸（cm）")}</h2>{fields(["height", "shoulderWidth", "chest", "waist", "hips"])}</section><section className="personal-sizes-card"><h2>{t("四肢尺寸（cm）")}</h2>{fields(["thigh", "knee", "armLength", "inseam", "outseam", "footLength"])}</section><section className="personal-sizes-card"><h2>{t("我的鞋码")}</h2><ShoeSizeFields value={data.shoeSize} onChange={shoeSize => change({ ...data, shoeSize })}/><p className="field-hint">{t("鞋码可自由填写，如“38/39”或“约240”。两种尺码不自动换算，可留空。")}</p></section></fieldset>
+    <fieldset disabled={busy || disabled} className="personal-sizes-grid">
+      <section className="personal-sizes-card">
+        <div className="personal-sizes-card-head"><span className="apple-section-icon tone-blue" aria-hidden="true"><User size={16}/></span><h2>{t("身体尺寸（cm）")}</h2></div>
+        {fields(["height", "shoulderWidth", "chest", "waist", "hips"])}
+      </section>
+      <section className="personal-sizes-card">
+        <div className="personal-sizes-card-head"><span className="apple-section-icon tone-indigo" aria-hidden="true"><Ruler size={16}/></span><h2>{t("四肢尺寸（cm）")}</h2></div>
+        {fields(["thigh", "knee", "armLength", "inseam", "outseam", "footLength"])}
+      </section>
+      <section className="personal-sizes-card">
+        <div className="personal-sizes-card-head"><span className="apple-section-icon tone-amber" aria-hidden="true"><Footprints size={16}/></span><h2>{t("我的鞋码")}</h2></div>
+        <ShoeSizeFields value={data.shoeSize} onChange={shoeSize => change({ ...data, shoeSize })}/>
+        <p className="field-hint">{t("鞋码可自由填写，如“38/39”或“约240”。两种尺码不自动换算，可留空。")}</p>
+      </section>
+    </fieldset>
     {compact && <AndroidOptionalSection enabled title={t("使用说明")}><p>{t("尺寸可自由填写，如“约70”或“68–72”。默认单位为 cm，也可注明其他单位；围度填写一整圈，可留空。")}</p><dl className="android-measurement-help">{Object.entries(PERSONAL_MEASUREMENTS).map(([key, [label, guide]]) => <div key={key}><dt>{t(label)}</dt><dd>{t(guide)}</dd></div>)}</dl><p>{t("鞋码可自由填写，如“38/39”或“约240”。两种尺码不自动换算，可留空。")}</p></AndroidOptionalSection>}
     {error && <p className="form-error" role="alert">{error}</p>}
-    <div className="personal-sizes-actions"><AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="outline" disabled={busy || disabled}><RefreshCw size={16}/>{t("载入最新尺码")}</Button></AlertDialogTrigger><AlertDialogContent className="closet-dialog"><AlertDialogHeader><AlertDialogTitle>{t("载入最新尺码？")}</AlertDialogTitle><AlertDialogDescription>{t("这会替换当前未保存的草稿。已保存的尺码资料保留。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("取消")}</AlertDialogCancel><AlertDialogAction onClick={async () => { setBusy(true); try { const state = await onRefresh(); if (!state?.records) return; const latest = state.records.find(value => value.kind === "personalSizes"); setBase(latest); setData(structuredClone(latest?.data || personalSizesSchema.parse({}))); setError(""); setSaved(false); } finally { setBusy(false); } }}>{t("载入最新尺码")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><Button type="submit" disabled={busy || disabled}>{busy ? <Loader2 size={16} className="animate-spin"/> : <Check size={16}/>} {busy ? t("保存中…") : t("保存我的尺码")}</Button>{saved && <span role="status">{t("尺码已保存")}</span>}</div>
+    <div className="personal-sizes-actions"><AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="outline" disabled={busy || disabled}><RefreshCw size={16}/>{t("载入最新尺码")}</Button></AlertDialogTrigger><AlertDialogContent className="closet-dialog"><AlertDialogHeader><AlertDialogTitle>{t("载入最新尺码？")}</AlertDialogTitle><AlertDialogDescription>{t("这会替换当前未保存的草稿。已保存的尺码资料保留。")}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("取消")}</AlertDialogCancel><AlertDialogAction onClick={async () => { setBusy(true); try { const state = await onRefresh(); if (!state?.records) return; const latest = state.records.find(value => value.kind === "personalSizes"); setBase(latest); setData(structuredClone(latest?.data || personalSizesSchema.parse({}))); setError(""); setSaved(false); } finally { setBusy(false); } }}>{t("载入最新尺码")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><Button type="submit" disabled={busy || disabled}>{busy ? <Loader2 size={16} className="animate-spin"/> : <Check size={16}/>} {busy ? t("保存中…") : t("保存我的尺码")}</Button>{saved && <span className="personal-sizes-saved" role="status"><Check size={14}/>{t("尺码已保存")}</span>}</div>
   </form>;
 }

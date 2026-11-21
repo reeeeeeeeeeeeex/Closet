@@ -770,6 +770,7 @@
   "裤长／裙长": "Pants / skirt length",
   "要去哪里？穿起来感觉怎么样？": "Where did you go? How did it feel to wear?",
   "解除配对": "Unpair",
+  "解除配对？": "Unpair this device?",
   "解除配对后，本机资料保留；未确认的同步将在下次配对时重新核对。电脑上的设备授权可在电脑端撤销。": "Your local data will be kept. Any unconfirmed sync will be checked when you pair again. You can revoke this device's access on your computer.",
   "记录 ID 重复": "Duplicate record ID.",
   "记录不存在": "Record not found.",

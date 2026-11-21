@@ -14,6 +14,6 @@ export function SyncConflictRecords({records,owner}:{records:ClosetRecord[];owne
     if(typeof value==='string')return names.get(value)||t(values[value]||value);
     return String(value);
   }
-  if(!records.length)return <p>{t('已删除')}</p>;
-  return <div>{records.map(record=><article key={record.id}><h4>{record.kind === "wardrobeOrder" ? t("衣橱排序") : t(values[record.kind])} · {'name' in record.data?record.data.name:''}</h4><div className="sync-photo-strip">{[...referencedAssets(record.kind === "note" ? [] : [record])].map(hash=><img key={hash} src={assetUrl(hash,owner)} alt={t('原图预览')}/>)}</div>{record.kind === "wardrobeOrder" ? <p>{t("此版本保存了 {items} 件单品和 {groups} 个分组的顺序。", { items: record.data.items.length, groups: record.data.groups.length })}</p> : describe(record.data)}</article>)}</div>;
+  if(!records.length)return <p className="sync-empty-record">{t('已删除')}</p>;
+  return <div className="sync-record-list">{records.map(record=><article className="sync-record-card" key={record.id}><h4>{record.kind === "wardrobeOrder" ? t("衣橱排序") : t(values[record.kind])} · {'name' in record.data?record.data.name:''}</h4><div className="sync-photo-strip">{[...referencedAssets(record.kind === "note" ? [] : [record])].map(hash=><img key={hash} src={assetUrl(hash,owner)} alt={t('原图预览')}/>)}</div>{record.kind === "wardrobeOrder" ? <p>{t("此版本保存了 {items} 件单品和 {groups} 个分组的顺序。", { items: record.data.items.length, groups: record.data.groups.length })}</p> : describe(record.data)}</article>)}</div>;
 }

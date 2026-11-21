@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Send, Square, Copy } from "lucide-react";
+import { Check, ChevronRight, Copy, FileText, Loader2, Plug, Send, Sliders, Sparkles, Square } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -18,7 +18,14 @@ const initialSettings: ModelSettings = { provider: "openai", baseUrl: "https://a
 function ScopePicker({ value, onChange, disabled = false, prefix }: { value: ToolScope[]; onChange: (v: ToolScope[]) => void; disabled?: boolean; prefix: string }) {
   const { t } = useI18n();
   const labels: [ToolScope, string][] = [["read", t("读取衣橱资料")], ["photos", t("查看照片")], ["sizes", t("读取身体尺码")], ["write", t("保存搭配与日历")]];
-  return <div className="ai-permissions">{labels.map(([scope, label]) => <label key={scope} htmlFor={prefix + scope}><input id={prefix + scope} type="checkbox" checked={value.includes(scope)} disabled={disabled || scope === "read"} onChange={e => onChange(e.target.checked ? [...value, scope] : value.filter(v => v !== scope))}/>{label}</label>)}</div>;
+  return <div className="ai-permissions">{labels.map(([scope, label]) => {
+    const active = value.includes(scope);
+    return <label key={scope} htmlFor={prefix + scope} className={`ai-scope-chip ${active ? "is-checked" : ""} ${scope === "read" ? "is-locked" : ""}`}>
+      <input className="sr-only" id={prefix + scope} type="checkbox" checked={active} disabled={disabled || scope === "read"} onChange={e => onChange(e.target.checked ? [...value, scope] : value.filter(v => v !== scope))}/>
+      <span className="ai-scope-check" aria-hidden="true">{active && <Check size={12} strokeWidth={2.6}/>}</span>
+      <span>{label}</span>
+    </label>;
+  })}</div>;
 }
 export function AiAssistant({ state, onDraftChange, onBusyChange, onRefresh, native = false }: { state: ClosetState; onDraftChange: (v: boolean) => void; onBusyChange: (v: boolean) => void; onRefresh: () => Promise<unknown>; native?: boolean }) {
   const { t, locale } = useI18n();
@@ -90,7 +97,14 @@ export function AiAssistant({ state, onDraftChange, onBusyChange, onRefresh, nat
   const labels: Record<string, string> = { list_closets: t("查看衣橱"), list_subsets: t("查看分组"), search_items: t("查找单品"), get_item: t("查看单品详情"), search_outfits: t("查找搭配"), get_calendar: t("查看穿搭日历"), get_personal_sizes: t("读取身体尺码"), get_photos: t("查看照片"), create_outfit: t("保存搭配"), plan_outfit: t("安排穿搭") };
   return <section className="assistant-layout ai-workspace">
     <details className="ai-card" open={!configured}>
-      <summary>{t("模型设置")}{configured && <span className="ai-muted">{settings.model}</span>}</summary>
+      <summary className="ai-card-summary">
+        <span className="ai-summary-left">
+          <span className="apple-section-icon tone-blue" aria-hidden="true"><Sliders size={16}/></span>
+          <span>{t("模型设置")}</span>
+          {configured && <span className="ai-status-pill">{settings.model}</span>}
+        </span>
+        <ChevronRight size={17} className="ai-summary-chevron" aria-hidden="true"/>
+      </summary>
       <div className="ai-settings-grid">
         <div className="field"><Label htmlFor="ai-provider">{t("接口类型")}</Label><Select disabled={busy} value={settings.provider} onValueChange={value => update({ provider: value as ModelSettings["provider"], baseUrl: value === "anthropic" ? "https://api.anthropic.com/v1" : "https://api.openai.com/v1" })}><SelectTrigger id="ai-provider" aria-label={t("接口类型")} className="ai-select"><SelectValue/></SelectTrigger><SelectContent position="popper"><SelectItem value="openai">{t("OpenAI 兼容接口")}</SelectItem><SelectItem value="anthropic">{t("Anthropic 原生接口")}</SelectItem></SelectContent></Select></div>
         <div className="field"><Label htmlFor="ai-model">{t("模型名")}</Label><Input id="ai-model" disabled={busy} value={settings.model} maxLength={200} onChange={e => update({ model: e.target.value })}/></div>
@@ -102,7 +116,13 @@ export function AiAssistant({ state, onDraftChange, onBusyChange, onRefresh, nat
       <div className="ai-actions"><Button disabled={!loaded || busy || !settings.model.trim()} onClick={() => void saveSettings()}>{t("保存模型设置")}</Button>{configured && <Button variant="outline" disabled={busy} onClick={() => void work(async () => { await api("/api/ai/settings", { method: "DELETE" }); setConfigured(false); setSettings(initialSettings); setKey(""); setDirty(false); onDraftChange(!!prompt.trim() || !!connectionName.trim()); })}>{t("清除模型配置")}</Button>}</div>
     </details>
     <div className="ai-card ai-chat">
-      <div className="ai-card-heading"><strong>{t("和衣橱聊一聊")}</strong><span className="ai-muted">{collectionName}</span></div>
+      <div className="ai-card-heading">
+        <span className="ai-heading-left">
+          <span className="apple-section-icon tone-amber" aria-hidden="true"><Sparkles size={16}/></span>
+          <strong>{t("和衣橱聊一聊")}</strong>
+        </span>
+        {collectionName && <span className="ai-collection-pill">{collectionName}</span>}
+      </div>
       <p className="field-hint">{t("发送后，模型会按已选权限查询当前衣橱并查看照片。保存搭配或安排日历时，请在需求中明确说明。")}</p>
       <div className="ai-transcript" ref={transcript} aria-live="polite">{messages.length ? messages.map((m, i) => <article key={i} className={"ai-message ai-message-" + m.role}><strong>{m.role === "user" ? t("我") : t("穿搭助手")}</strong><div>{m.content}</div></article>) : <p className="ai-empty">{t("例如：看看我的上装和鞋子，搭配两套适合通勤的穿搭，并解释选择理由。")}</p>}
         {!!events.length && <details className="ai-tool-trace" open={busy}><summary>{t("本轮衣橱操作")}</summary>{events.map((e, i) => e.type === "tool" ? <div key={i}>{labels[e.name] || e.name}<details><summary>{t("查看参数")}</summary><pre>{JSON.stringify(e.arguments, null, 2)}</pre></details></div> : e.type === "tool_result" ? <p key={i}>{labels[e.name] || e.name} · {e.isError ? t("未完成") : e.imageCount ? t("已读取 {count} 张照片", { count: e.imageCount }) : t("已完成")}</p> : null)}</details>}
@@ -111,16 +131,42 @@ export function AiAssistant({ state, onDraftChange, onBusyChange, onRefresh, nat
       <Label htmlFor="ai-chat-prompt">{t("这次想怎么穿？")}</Label><Textarea id="ai-chat-prompt" rows={3} maxLength={3000} disabled={busy} value={prompt} onChange={e => { setPrompt(e.target.value); onDraftChange(dirty || !!connectionName.trim() || !!e.target.value.trim()); }}/>
       <div className="ai-actions"><Button disabled={!loaded || busy || !configured || dirty || !prompt.trim()} onClick={() => void send()}><Send size={16}/>{t("发送")}</Button>{busy && <Button variant="outline" onClick={() => abort.current?.abort()}><Square size={14}/>{t("停止")}</Button>}<Button variant="ghost" disabled={busy || !messages.length} onClick={() => { setMessages([]); setEvents([]); }}>{t("开始新对话")}</Button></div>{dirty && <p className="field-hint">{t("先保存模型设置，再发送需求。")}</p>}
     </div>
-    {!native && <details className="ai-card"><summary>{t("外部 AI 连接（MCP）")}</summary><p className="field-hint">{t("每个连接固定授权当前账号的指定衣橱。可以随时撤销，网页切换账号不会改变外部连接的资料范围。")}</p>
+    {!native && <details className="ai-card">
+      <summary className="ai-card-summary">
+        <span className="ai-summary-left">
+          <span className="apple-section-icon tone-green" aria-hidden="true"><Plug size={16}/></span>
+          <span>{t("外部 AI 连接（MCP）")}</span>
+          {!!connections.length && <span className="ai-status-pill">{connections.length}</span>}
+        </span>
+        <ChevronRight size={17} className="ai-summary-chevron" aria-hidden="true"/>
+      </summary>
+      <p className="field-hint">{t("每个连接固定授权当前账号的指定衣橱。可以随时撤销，网页切换账号不会改变外部连接的资料范围。")}</p>
       <div className="field"><Label htmlFor="mcp-name">{t("连接名称")}</Label><Input id="mcp-name" value={connectionName} maxLength={100} disabled={busy} placeholder={t("例如：我的 AI 客户端")} onChange={e => { setConnectionName(e.target.value); onDraftChange(dirty || !!prompt.trim() || !!e.target.value.trim()); }}/></div>
       <ScopePicker prefix="connection-" value={connectionScopes} disabled={busy} onChange={setConnectionScopes}/>
       <Button disabled={!loaded || busy || !connectionName.trim()} onClick={() => void createExternal()}>{t("为当前衣橱创建连接")}</Button>
       {newToken && <div className="ai-token"><p>{t("令牌仅显示这一次，请保存到客户端配置。")}</p><Input aria-label={t("新连接令牌")} readOnly value={newToken}/><Button variant="outline" onClick={() => void copy(newToken)}><Copy size={16}/>{t("复制令牌")}</Button><Button variant="ghost" onClick={() => setNewToken("")}>{t("我已保存")}</Button></div>}
       <p className="field-hint">{t("HTTP 地址：当前 Closet 服务地址后加 /mcp；认证头为 Authorization: Bearer 加连接令牌。本机也可使用项目附带的 stdio 入口。")}</p>
       <ul className="ai-connections">{connections.map(c => <li key={c.id}><div><strong>{c.name}</strong><small>{state.collections.find(v => v.id === c.collectionId)?.name || c.collectionId} · {c.scopes.join(" / ")}</small></div><Button variant="outline" disabled={busy} onClick={() => void work(async () => { await api("/api/mcp/connections", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: c.id }) }); setNewToken(""); await reloadExternal(); })}>{t("撤销连接")}</Button></li>)}</ul>
-      <details><summary>{t("最近的衣橱操作")}</summary><Button variant="ghost" disabled={busy} onClick={() => void work(reloadExternal)}>{t("刷新操作记录")}</Button>{activity.map(a => <p className="ai-activity" key={a.id}>{["内置 AI", "手机内置 AI"].includes(a.source) ? t(a.source) : a.source} · {labels[a.tool] || a.tool} · {a.ok ? t("已完成") : t("未完成")} · {new Date(a.createdAt).toLocaleString(locale)}</p>)}</details>
+      <details className="ai-sub-details">
+        <summary><ChevronRight size={15} className="ai-sub-chevron" aria-hidden="true"/><span>{t("最近的衣橱操作")}</span></summary>
+        <div className="ai-sub-body">
+          <Button variant="ghost" size="sm" disabled={busy} onClick={() => void work(reloadExternal)}>{t("刷新操作记录")}</Button>
+          {activity.map(a => <p className="ai-activity" key={a.id}>{["内置 AI", "手机内置 AI"].includes(a.source) ? t(a.source) : a.source} · {labels[a.tool] || a.tool} · {a.ok ? t("已完成") : t("未完成")} · {new Date(a.createdAt).toLocaleString(locale)}</p>)}
+        </div>
+      </details>
     </details>}
-    <details className="ai-card"><summary>{t("可复制的衣橱上下文")}</summary><Textarea aria-label={t("可复制的衣橱上下文")} readOnly rows={8} value={wardrobePrompt(state, prompt, locale)}/><Button variant="outline" onClick={() => void copy(wardrobePrompt(state, prompt, locale))}><Copy size={16}/>{t("复制文字上下文")}</Button><p className="field-hint">{t("复制的文字不含照片；连接模型后可通过工具查看照片。")}</p></details>
+    <details className="ai-card">
+      <summary className="ai-card-summary">
+        <span className="ai-summary-left">
+          <span className="apple-section-icon tone-indigo" aria-hidden="true"><FileText size={16}/></span>
+          <span>{t("可复制的衣橱上下文")}</span>
+        </span>
+        <ChevronRight size={17} className="ai-summary-chevron" aria-hidden="true"/>
+      </summary>
+      <Textarea aria-label={t("可复制的衣橱上下文")} readOnly rows={8} value={wardrobePrompt(state, prompt, locale)}/>
+      <div className="ai-actions"><Button variant="outline" onClick={() => void copy(wardrobePrompt(state, prompt, locale))}><Copy size={16}/>{t("复制文字上下文")}</Button></div>
+      <p className="field-hint">{t("复制的文字不含照片；连接模型后可通过工具查看照片。")}</p>
+    </details>
     {error && <p className="form-error" role="alert">{t(error)}</p>}
   </section>;
 }
